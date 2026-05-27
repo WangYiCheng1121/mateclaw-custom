@@ -79,13 +79,12 @@
 
     <!-- ======================== Logger 配置 ======================== -->
 
-    <!-- 应用日志（dev/default 环境：DEBUG + 写 debug 文件） -->
+    <!-- 应用日志（dev/default 环境：INFO，控制台清爽；需调试时临时改 DEBUG） -->
     <springProfile name="default | dev">
-        <logger name="vip.mate" level="DEBUG" additivity="false">
+        <logger name="vip.mate" level="INFO" additivity="false">
             <appender-ref ref="CONSOLE"/>
             <appender-ref ref="FILE_ALL"/>
             <appender-ref ref="FILE_ERROR"/>
-            <appender-ref ref="FILE_DEBUG"/>
         </logger>
     </springProfile>
 
@@ -101,8 +100,8 @@
     <!-- Spring AI -->
     <logger name="org.springframework.ai" level="INFO"/>
 
-    <!-- MyBatis SQL 日志（通过 SLF4J，替代 StdOutImpl） -->
-    <logger name="vip.mate.**.mapper" level="DEBUG"/>
+    <!-- 调试时取消注释以开启指定包 DEBUG 日志 -->
+    <!-- <logger name="vip.mate.agent" level="DEBUG"/> -->
 
     <!-- Spring 框架 -->
     <logger name="org.springframework" level="WARN"/>

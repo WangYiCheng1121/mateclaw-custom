@@ -1,6 +1,8 @@
 package vip.mate.skill.model;
 
 import com.baomidou.mybatisplus.annotation.*;
+import com.fasterxml.jackson.annotation.JsonFormat;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import lombok.Data;
 
 import java.time.LocalDateTime;
@@ -13,6 +15,7 @@ import java.time.LocalDateTime;
  */
 @Data
 @TableName("mate_skill")
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class SkillEntity {
 
     @TableId(type = IdType.ASSIGN_ID)
@@ -150,9 +153,11 @@ public class SkillEntity {
     /** Wall-clock time the skill entered the archived state. */
     private LocalDateTime archivedAt;
 
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     @TableField(fill = FieldFill.INSERT)
     private LocalDateTime createTime;
 
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     @TableField(fill = FieldFill.INSERT_UPDATE)
     private LocalDateTime updateTime;
 

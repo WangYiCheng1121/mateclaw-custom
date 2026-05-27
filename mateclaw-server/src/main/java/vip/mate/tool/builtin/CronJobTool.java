@@ -11,6 +11,7 @@ import org.springframework.ai.tool.annotation.ToolParam;
 import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Component;
 import vip.mate.agent.context.ChatOrigin;
+import vip.mate.channel.ChannelSessionStore;
 import vip.mate.cron.model.CronJobDTO;
 import vip.mate.cron.service.CronJobService;
 
@@ -32,6 +33,8 @@ import java.util.List;
 public class CronJobTool {
 
     private final CronJobService cronJobService;
+    private final ChannelSessionStore channelSessionStore;
+
 
     @vip.mate.tool.ConcurrencyUnsafe("cron job creation persists to mate_cron_job; concurrent creates can race on name")
     @Tool(description = "Create a scheduled task that asks the agent to do something at a specific time — "

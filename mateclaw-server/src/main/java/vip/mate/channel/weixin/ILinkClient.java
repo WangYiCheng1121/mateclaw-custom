@@ -195,6 +195,39 @@ public class ILinkClient {
     // ==================== 消息 API ====================
 
     /**
+     * 快速验证 bot_token 是否有效（用于启动时同步校验）
+     * <p>
+     * 向 getupdates 端点发送请求，使用较短超时（5 秒）：
+     * <ul>
+     *   <li>收到 200 → token 有效</li>
+     *   <li>收到 401/403 → token 过期或无效（通过 ensureOk 抛出 TokenExpiredException）</li>
+     *   <li>请求超时 → token 有效（服务端已接受认证并进入长轮询 hold）</li>
+     *   <li>其它异常 → 网络错误，向上抛出</li>
+     * </ul>
+     *
+     * @throws vip.mate.channel.weixin.error.TokenExpiredException token 无效时抛出
+     */
+    public void validateToken() throws Exception {
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("get_updates_buf", "");
+        body.put("base_info", Map.of("channel_version", CHANNEL_VERSION));
+
+        HttpRequest request = applyHeaders(HttpRequest.newBuilder()
+                .uri(URI.create(baseUrl + "/ilink/bot/getupdates"))
+                .POST(HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(body))))
+                .timeout(Duration.ofSeconds(5))  // 短超时：只需确认认证通过
+                .build();
+        try {
+            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+            ensureOk(response, "validateToken");
+            // 200 = token valid
+        } catch (java.net.http.HttpTimeoutException e) {
+            // 超时 = 认证已通过，服务端进入 long-poll hold，token 有效
+            log.debug("[ilink] validateToken: request timed out (expected — server accepted auth and entered long-poll)");
+        }
+    }
+
+    /**
      * 长轮询获取新消息（服务端最长持有 35 秒）
      *
      * @param cursor 上一次返回的 get_updates_buf，首次传空字符串

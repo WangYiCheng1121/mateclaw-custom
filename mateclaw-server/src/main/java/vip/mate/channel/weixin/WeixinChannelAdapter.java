@@ -188,6 +188,9 @@ public class WeixinChannelAdapter extends AbstractChannelAdapter {
             return t;
         });
 
+        // 同步校验 bot_token 有效性：在启动轮询线程前确认 token 未过期
+        validateBotToken();
+
         // 加载持久化的 context_tokens（用于重启后主动推送）
         loadContextTokens();
 
@@ -246,6 +249,31 @@ public class WeixinChannelAdapter extends AbstractChannelAdapter {
     }
 
     // ==================== 长轮询循环 ====================
+
+    /**
+     * 同步校验 bot_token 有效性
+     * <p>
+     * 通过 {@link ILinkClient#validateToken()} 快速验证 token 是否有效。
+     * 该方法使用 5 秒短超时，不会像 getUpdates 一样阻塞 35-45 秒。
+     * 如果 token 已过期或无效，抛出异常以阻止渠道被标记为 CONNECTED。
+     *
+     * @throws RuntimeException token 无效或已过期时抛出
+     */
+    private void validateBotToken() {
+        try {
+            client.validateToken();
+            log.info("[weixin] Bot token validation passed");
+        } catch (TokenExpiredException te) {
+            String msg = "WeChat bot_token expired (HTTP " + te.getHttpStatus() + "), please re-scan QR code";
+            log.error("[weixin] {}", msg);
+            throw new RuntimeException(msg, te);
+        } catch (Exception e) {
+            String msg = "WeChat bot_token validation failed: " + e.getMessage();
+            log.error("[weixin] {}", msg, e);
+            throw new RuntimeException(msg, e);
+        }
+    }
+
 
     private void pollLoop() {
         log.info("[weixin] Poll thread started");

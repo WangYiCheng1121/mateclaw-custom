@@ -15,6 +15,9 @@ import javax.sql.DataSource;
 import java.sql.Connection;
 import java.sql.DatabaseMetaData;
 import java.sql.ResultSet;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
@@ -66,6 +69,10 @@ public class DatabaseBootstrapRunner implements ApplicationRunner {
         this.jdbcTemplate = jdbcTemplate;
     }
 
+    /** Auto-fallback delay (seconds) for Desktop mode if /setup/init is never called. */
+    private static final int AUTO_INIT_FALLBACK_SECONDS = 5;
+
+
     @Override
     public void run(ApplicationArguments args) throws Exception {
         // Schema creation and built-in tool registration are handled by
@@ -78,14 +85,41 @@ public class DatabaseBootstrapRunner implements ApplicationRunner {
         }
 
         if (awaitLanguageSelection) {
-            // Desktop mode: wait for /api/v1/setup/init
-            log.info("Desktop mode: waiting for language selection via /api/v1/setup/init");
+            // Desktop mode: wait for /api/v1/setup/init, but schedule auto-fallback
+            log.info("Desktop mode: waiting for language selection via /api/v1/setup/init (auto-fallback in {}s)", AUTO_INIT_FALLBACK_SECONDS);
+            scheduleAutoInitFallback();
         } else {
             // Web/dev mode: auto-initialize immediately
             log.info("Auto-initializing database with default locale: {}", defaultLocale);
             initWithLocale(defaultLocale);
         }
     }
+
+    /**
+     * Schedule auto-fallback initialization for Desktop mode.
+     * If the UI doesn't call /api/v1/setup/init within the timeout,
+     * auto-initialize with the default locale to ensure the system is usable.
+     */
+    private void scheduleAutoInitFallback() {
+        ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor(r -> {
+            Thread t = new Thread(r, "db-init-fallback");
+            t.setDaemon(true);
+            return t;
+        });
+        scheduler.schedule(() -> {
+            if (!initialized) {
+                log.info("Auto-init fallback triggered: no /setup/init call received within {}s, initializing with locale={}",
+                        AUTO_INIT_FALLBACK_SECONDS, defaultLocale);
+                try {
+                    initWithLocale(defaultLocale);
+                } catch (Exception e) {
+                    log.error("Auto-init fallback failed", e);
+                }
+            }
+            scheduler.shutdown();
+        }, AUTO_INIT_FALLBACK_SECONDS, TimeUnit.SECONDS);
+    }
+
 
     /**
      * Initialize seed data with the given locale.

@@ -97,7 +97,7 @@ public class DingTalkChannelAdapter extends AbstractChannelAdapter implements St
         String clientId = getConfigString("client_id");
         String clientSecret = getConfigString("client_secret");
 
-        if (clientId == null || clientSecret == null) {
+        if (clientId == null || clientId.isBlank() || clientSecret == null || clientSecret.isBlank()) {
             throw new IllegalStateException("DingTalk channel requires client_id and client_secret in configJson");
         }
 
@@ -133,9 +133,15 @@ public class DingTalkChannelAdapter extends AbstractChannelAdapter implements St
      * 使用钉钉 Stream SDK（dingtalk-stream）建立 WebSocket 长连接，
      * 通过 {@link OpenDingTalkCallbackListener} 回调接收机器人消息，无需公网 IP。
      * <p>
+     * 启动前先同步校验凭证（调用 access_token 接口），确保 AppKey/AppSecret 有效，
+     * 避免异步连接失败后状态仍为 CONNECTED 的问题。
+     * <p>
      * SDK 内部自带断线重连机制。
      */
     private void startStreamMode(String clientId, String clientSecret) {
+        // 先同步校验凭证，失败立即抛异常，阻止 start() 将状态设为 CONNECTED
+        validateCredentials(clientId, clientSecret);
+
         try {
             OpenDingTalkCallbackListener<ChatbotMessage, Void> botListener = message -> {
                 try {
@@ -157,6 +163,58 @@ public class DingTalkChannelAdapter extends AbstractChannelAdapter implements St
             throw new RuntimeException("DingTalk Stream start failed: " + e.getMessage(), e);
         }
     }
+
+    /**
+     * 同步校验钉钉凭证（AppKey + AppSecret）
+     * <p>
+     * 通过调用 /v1.0/oauth2/accessToken 接口验证凭证是否有效。
+     * 如果凭证无效，抛出异常以阻止渠道被标记为 CONNECTED。
+     *
+     * @throws IllegalStateException 凭证校验失败时抛出
+     */
+    private void validateCredentials(String clientId, String clientSecret) {
+        try {
+            String jsonBody = objectMapper.writeValueAsString(Map.of(
+                    "appKey", clientId,
+                    "appSecret", clientSecret
+            ));
+
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create("https://api.dingtalk.com/v1.0/oauth2/accessToken"))
+                    .header("Content-Type", "application/json")
+                    .POST(HttpRequest.BodyPublishers.ofString(jsonBody))
+                    .timeout(Duration.ofSeconds(10))
+                    .build();
+
+            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+
+            if (response.statusCode() != 200) {
+                String msg = String.format("DingTalk credential validation failed: HTTP %d, body=%s",
+                        response.statusCode(), response.body());
+                log.error("[dingtalk] {}", msg);
+                throw new IllegalStateException(msg);
+            }
+
+            // 检查响应中是否包含 accessToken
+            @SuppressWarnings("unchecked")
+            Map<String, Object> result = objectMapper.readValue(response.body(), Map.class);
+            if (result.get("accessToken") == null) {
+                String errMsg = result.getOrDefault("message", result.getOrDefault("errmsg", "unknown error")).toString();
+                String msg = "DingTalk credential validation failed: " + errMsg;
+                log.error("[dingtalk] {}", msg);
+                throw new IllegalStateException(msg);
+            }
+
+            log.info("[dingtalk] Credential validation passed (clientId={})", clientId);
+        } catch (IllegalStateException e) {
+            throw e; // 直接向上抛出
+        } catch (Exception e) {
+            String msg = "DingTalk credential validation error: " + e.getMessage();
+            log.error("[dingtalk] {}", msg, e);
+            throw new IllegalStateException(msg, e);
+        }
+    }
+
 
     /**
      * 处理 Stream 模式收到的机器人消息

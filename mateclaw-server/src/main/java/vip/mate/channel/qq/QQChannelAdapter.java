@@ -141,6 +141,9 @@ public class QQChannelAdapter extends AbstractChannelAdapter {
                 .connectTimeout(Duration.ofSeconds(10))
                 .build();
 
+        // 同步校验凭证：在启动 WS 线程之前验证 appId/clientSecret 是否有效
+        validateCredentials();
+
         this.stopRequested.set(false);
         this.sessionId = null;
         this.lastSeq.set(0);
@@ -154,6 +157,67 @@ public class QQChannelAdapter extends AbstractChannelAdapter {
 
         log.info("[qq] QQ channel initialized (appId={})", appId);
     }
+
+    /**
+     * 同步校验 QQ 凭证（appId + clientSecret）
+     * <p>
+     * 通过调用 Access Token 接口验证凭证是否有效。
+     * 如果凭证无效，抛出异常以阻止渠道被标记为 CONNECTED。
+     *
+     * @throws IllegalStateException 凭证校验失败时抛出
+     */
+    private void validateCredentials() {
+        try {
+            String body = objectMapper.writeValueAsString(Map.of(
+                    "appId", appId,
+                    "clientSecret", clientSecret
+            ));
+
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create(TOKEN_URL))
+                    .header("Content-Type", "application/json")
+                    .POST(HttpRequest.BodyPublishers.ofString(body))
+                    .timeout(Duration.ofSeconds(10))
+                    .build();
+
+            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+            if (response.statusCode() != 200) {
+                String msg = String.format("QQ credential validation failed: HTTP %d, body=%s",
+                        response.statusCode(), response.body());
+                log.error("[qq] {}", msg);
+                throw new IllegalStateException(msg);
+            }
+
+            @SuppressWarnings("unchecked")
+            Map<String, Object> result = objectMapper.readValue(response.body(), Map.class);
+            String token = (String) result.get("access_token");
+            if (token == null || token.isBlank()) {
+                String errMsg = result.getOrDefault("message", result.getOrDefault("msg", "unknown error")).toString();
+                String msg = "QQ credential validation failed: " + errMsg;
+                log.error("[qq] {}", msg);
+                throw new IllegalStateException(msg);
+            }
+
+            // 校验通过，顺便缓存 token 避免 WS 线程启动时重复请求
+            Object expiresIn = result.get("expires_in");
+            int ttl = 7200;
+            if (expiresIn instanceof Number n) ttl = n.intValue();
+            else if (expiresIn instanceof String s) {
+                try { ttl = Integer.parseInt(s); } catch (NumberFormatException ignored) {}
+            }
+            this.cachedToken = token;
+            this.tokenExpiry = Instant.now().plusSeconds(ttl);
+
+            log.info("[qq] Credential validation passed (appId={})", appId);
+        } catch (IllegalStateException e) {
+            throw e;
+        } catch (Exception e) {
+            String msg = "QQ credential validation error: " + e.getMessage();
+            log.error("[qq] {}", msg, e);
+            throw new IllegalStateException(msg, e);
+        }
+    }
+
 
     @Override
     protected void doStop() {

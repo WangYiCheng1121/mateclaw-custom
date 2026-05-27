@@ -4,6 +4,7 @@ import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 import vip.mate.common.result.R;
@@ -12,6 +13,7 @@ import vip.mate.llm.service.ModelConfigService;
 import vip.mate.llm.service.ModelDiscoveryService;
 import vip.mate.llm.service.ModelProviderService;
 
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -32,6 +34,8 @@ public class SetupController {
     private final ModelConfigService modelConfigService;
     private final ModelDiscoveryService modelDiscoveryService;
     private final ModelProviderService modelProviderService;
+    private final JdbcTemplate jdbcTemplate;
+
 
     /**
      * Check whether the application has been initialized.
@@ -101,6 +105,62 @@ public class SetupController {
                 "configuredProviders", configuredProviders
         ));
     }
+
+    /**
+     * Database diagnostic endpoint (no auth required).
+     * Use this to check if the database is properly initialized on a remote installation.
+     * Access via browser: http://localhost:{port}/api/v1/setup/diagnose
+     */
+    @GetMapping("/diagnose")
+    public R<Map<String, Object>> diagnose() {
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("initialized", bootstrapRunner.isInitialized());
+
+        try {
+            Integer userCount = jdbcTemplate.queryForObject("SELECT COUNT(1) FROM mate_user", Integer.class);
+            result.put("userCount", userCount);
+        } catch (Exception e) {
+            result.put("userCount", "ERROR: " + e.getMessage());
+        }
+
+        try {
+            Integer wsCount = jdbcTemplate.queryForObject("SELECT COUNT(1) FROM mate_workspace", Integer.class);
+            result.put("workspaceCount", wsCount);
+            // 检查 ID=1 的默认工作区
+            List<Map<String, Object>> defaultWs = jdbcTemplate.queryForList(
+                    "SELECT id, name, slug, owner_id FROM mate_workspace WHERE id = 1");
+            result.put("defaultWorkspace", defaultWs.isEmpty() ? "MISSING" : defaultWs.get(0));
+        } catch (Exception e) {
+            result.put("workspaceCount", "ERROR: " + e.getMessage());
+        }
+
+        try {
+            Integer memberCount = jdbcTemplate.queryForObject(
+                    "SELECT COUNT(1) FROM mate_workspace_member WHERE workspace_id = 1", Integer.class);
+            result.put("defaultWorkspaceMemberCount", memberCount);
+        } catch (Exception e) {
+            result.put("defaultWorkspaceMemberCount", "ERROR: " + e.getMessage());
+        }
+
+        try {
+            Integer agentCount = jdbcTemplate.queryForObject("SELECT COUNT(1) FROM mate_agent", Integer.class);
+            result.put("agentCount", agentCount);
+        } catch (Exception e) {
+            result.put("agentCount", "ERROR: " + e.getMessage());
+        }
+
+        try {
+            // 检查 Flyway 版本
+            List<Map<String, Object>> flyway = jdbcTemplate.queryForList(
+                    "SELECT installed_rank, version, description, success FROM flyway_schema_history ORDER BY installed_rank");
+            result.put("flywayMigrations", flyway);
+        } catch (Exception e) {
+            result.put("flywayMigrations", "ERROR: " + e.getMessage());
+        }
+
+        return R.ok(result);
+    }
+
 
     @Data
     public static class InitRequest {

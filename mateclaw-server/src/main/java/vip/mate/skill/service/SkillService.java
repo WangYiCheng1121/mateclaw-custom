@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import lombok.RequiredArgsConstructor;
+import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
@@ -30,7 +31,11 @@ import java.util.stream.Collectors;
 /**
  * 技能业务服务
  * <p>
- * 负责技能的 CRUD 管理、启用/禁用控制，以及与 Agent 运行时的集成。
+ * 客户端侧技能管理：
+ * - 只读查询：listSkills / listEnabledSkills / getSkill 等对外暴露
+ * - CRUD 写操作：仅供 {@link vip.mate.skill.platform.SkillSyncService} 内部调用（从平台端同步数据）
+ * - 技能的增删改由平台端统一管理，客户端不直接对外暴露 CRUD 接口
+ * <p>
  * Skill 在 MateClaw 中的定位是"可扩展的能力模块"，分为三种类型：
  * <ul>
  *   <li>builtin — 系统内置技能（不可删除），通常对应预定义的 systemPrompt 片段</li>
@@ -38,7 +43,7 @@ import java.util.stream.Collectors;
  *   <li>dynamic — 用户自定义的动态技能（可包含脚本或配置）</li>
  * </ul>
  *
- * @author MateClaw Team
+ * @author WYC
  */
 @Slf4j
 @Service
@@ -59,14 +64,20 @@ public class SkillService {
     private final ApplicationEventPublisher eventPublisher;
     /** Stamps the activity anchor on create / update / enable so the curator sees fresh skills as active. */
     private final SkillLifecycleService lifecycleService;
-    private vip.mate.skill.runtime.SkillRuntimeService runtimeService;
-
     /**
-     * 延迟注入 SkillRuntimeService 避免循环依赖
+     * -- SETTER --
+     *  延迟注入 SkillRuntimeService 避免循环依赖
      */
-    public void setRuntimeService(vip.mate.skill.runtime.SkillRuntimeService runtimeService) {
-        this.runtimeService = runtimeService;
-    }
+    @Setter
+    private vip.mate.skill.runtime.SkillRuntimeService runtimeService;
+//    private vip.mate.skill.runtime.SkillRuntimeService runtimeService;
+//
+//    /**
+//     * 延迟注入 SkillRuntimeService 避免循环依赖
+//     */
+//    public void setRuntimeService(vip.mate.skill.runtime.SkillRuntimeService runtimeService) {
+//        this.runtimeService = runtimeService;
+//    }
 
     // ==================== CRUD ====================
 
@@ -309,7 +320,9 @@ public class SkillService {
     }
 
     /**
-     * 创建技能
+     * 创建技能（内部方法，仅供 SkillSyncService 平台同步使用）
+     * <p>
+     * 注意：客户端不对外暴露此接口，技能创建由平台端统一管理。
      * 默认类型为 dynamic（用户自定义），非内置
      */
     public SkillEntity createSkill(SkillEntity skill) {
@@ -368,8 +381,9 @@ public class SkillService {
     }
 
     /**
-     * 更新技能
+     * 更新技能（内部方法，仅供 SkillSyncService 平台同步使用）
      * <p>
+     * 注意：客户端不对外暴露此接口，技能更新由平台端统一管理。
      * 内置技能允许修改的字段集合：
      * <ul>
      *   <li>{@code enabled} — 启用开关</li>

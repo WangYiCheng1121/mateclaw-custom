@@ -9,6 +9,7 @@ import vip.mate.auth.model.LoginRequest;
 import vip.mate.auth.model.LoginResponse;
 import vip.mate.auth.model.UserEntity;
 import vip.mate.auth.service.AuthService;
+import vip.mate.auth.service.CaptchaService;
 import vip.mate.common.result.R;
 import vip.mate.exception.MateClawException;
 import vip.mate.workspace.core.annotation.RequireGlobalAdmin;
@@ -27,12 +28,31 @@ import java.util.List;
 public class AuthController {
 
     private final AuthService authService;
+    private final CaptchaService captchaService;
+
+    @Operation(summary = "获取图片验证码")
+    @GetMapping("/captcha")
+    public R<CaptchaService.CaptchaResult> getCaptcha() {
+        return R.ok(captchaService.generate());
+    }
 
     @Operation(summary = "用户登录")
     @PostMapping("/login")
     public R<LoginResponse> login(@RequestBody LoginRequest request) {
+        // 校验验证码
+        if (!captchaService.validate(request.getCaptchaKey(), request.getCaptchaCode())) {
+            throw new MateClawException("err.auth.captcha_invalid", "验证码错误或已过期");
+        }
         return R.ok(authService.login(request));
     }
+
+    @Operation(summary = "退出登录")
+    @PostMapping("/logout")
+    public R<Void> logout() {
+        authService.logout();
+        return R.ok();
+    }
+
 
     @Operation(summary = "获取用户列表")
     @GetMapping("/users")

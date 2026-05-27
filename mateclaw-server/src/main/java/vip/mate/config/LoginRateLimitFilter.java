@@ -47,6 +47,7 @@ public class LoginRateLimitFilter implements Filter {
                 httpResp.setStatus(429);
                 httpResp.setContentType("application/json;charset=UTF-8");
                 httpResp.getWriter().write("{\"code\":429,\"msg\":\"Too many login attempts, please try again later\",\"data\":null}");
+                httpResp.getWriter().flush();
                 return;
             }
         }

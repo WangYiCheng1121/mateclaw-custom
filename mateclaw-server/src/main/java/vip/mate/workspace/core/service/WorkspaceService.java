@@ -248,6 +248,32 @@ public class WorkspaceService {
 
     // ==================== 成员管理 ====================
 
+
+    /**
+     * 确保默认工作区（ID=1）存在。
+     * 用于兜底旧数据库未种子初始化的场景（安装包分发、数据迁移等）。
+     * 幂等操作：如果已存在则跳过。
+     *
+     * @param currentUserId 当前操作用户 ID（用作默认 owner）
+     */
+    @Transactional
+    public void ensureDefaultWorkspaceExists(Long currentUserId) {
+        WorkspaceEntity existing = workspaceMapper.selectById(1L);
+        if (existing != null) {
+            return;
+        }
+        // 默认工作区不存在，自动创建
+        WorkspaceEntity ws = new WorkspaceEntity();
+        ws.setId(1L);
+        ws.setName("默认工作区");
+        ws.setSlug(DEFAULT_SLUG);
+        ws.setDescription("系统默认工作区，所有用户自动加入");
+        ws.setOwnerId(currentUserId);
+        workspaceMapper.insert(ws);
+        log.info("Auto-created default workspace (id=1, owner={})", currentUserId);
+    }
+
+
     public List<WorkspaceMemberEntity> listMembers(Long workspaceId) {
         return memberMapper.selectList(
                 new LambdaQueryWrapper<WorkspaceMemberEntity>()

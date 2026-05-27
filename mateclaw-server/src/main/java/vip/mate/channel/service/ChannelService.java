@@ -16,6 +16,8 @@ import java.security.SecureRandom;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+
 
 /**
  * 渠道业务服务
@@ -63,6 +65,23 @@ public class ChannelService {
     public List<ChannelEntity> listChannelsByWorkspace(Long workspaceId) {
         return channelMapper.selectList(new LambdaQueryWrapper<ChannelEntity>()
                 .eq(ChannelEntity::getWorkspaceId, workspaceId)
+                .orderByDesc(ChannelEntity::getEnabled)
+                .orderByDesc(ChannelEntity::getCreateTime));
+    }
+
+
+    /** 平台管控的渠道类型（仅这4种在前端展示） */
+    private static final Set<String> PLATFORM_MANAGED_TYPES = Set.of("weixin", "qq", "dingtalk", "feishu");
+
+    /**
+     * 按工作区列出平台管控的渠道（仅返回 weixin/qq/dingtalk/feishu）
+     * <p>
+     * 用于前端渠道管理页面展示，过滤掉非平台管控的渠道类型。
+     */
+    public List<ChannelEntity> listPlatformChannelsByWorkspace(Long workspaceId) {
+        return channelMapper.selectList(new LambdaQueryWrapper<ChannelEntity>()
+                .eq(ChannelEntity::getWorkspaceId, workspaceId)
+                .in(ChannelEntity::getChannelType, PLATFORM_MANAGED_TYPES)
                 .orderByDesc(ChannelEntity::getEnabled)
                 .orderByDesc(ChannelEntity::getCreateTime));
     }

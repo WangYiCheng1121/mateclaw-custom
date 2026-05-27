@@ -238,15 +238,34 @@ public class ChannelManager {
         log.info("Initializing ChannelManager...");
         List<ChannelEntity> channels = channelService.listEnabledChannels();
         int started = 0;
+        int skipped = 0;
+        int failed = 0;
         for (ChannelEntity channel : channels) {
+            // 跳过没有有效配置的渠道（避免空配置导致假连接状态）
+            if (channel.getConfigJson() == null || channel.getConfigJson().isBlank()) {
+                log.warn("Skipping channel {} (type={}): no valid config",
+                        channel.getName(), channel.getChannelType());
+                skipped++;
+                continue;
+            }
             try {
                 startChannel(channel);
                 started++;
             } catch (Exception e) {
-                log.error("Failed to start channel {}: {}", channel.getName(), e.getMessage());
+                log.error("Failed to start channel {} (type={}): {} — disabling in DB",
+                        channel.getName(), channel.getChannelType(), e.getMessage());
+                // 启动失败：直接禁用渠道，避免 HealthMonitor 无限重试配置有误的渠道
+                // 用户修复配置后需手动重新启用
+                try {
+                    channelService.toggleChannel(channel.getId(), false);
+                } catch (Exception ex) {
+                    log.debug("Failed to disable channel {} in DB: {}", channel.getName(), ex.getMessage());
+                }
+                failed++;
             }
         }
-        log.info("ChannelManager initialized: {}/{} channels started", started, channels.size());
+        log.info("ChannelManager initialized: {}/{} channels started, {} failed, {} skipped (no config)",
+                started, channels.size(), failed, skipped);
     }
 
     /**
@@ -265,35 +284,38 @@ public class ChannelManager {
 
     /**
      * 启动指定渠道
+     * <p>
+     * 先在锁外创建并启动 adapter（可能耗时 5-15s），
+     * 然后加写锁将其放入 activeAdapters。
+     * 避免长时间持锁阻塞其他读写操作。
      */
     public void startChannel(ChannelEntity channel) {
-        adapterLock.writeLock().lock();
+        // Step 1: 快速检查是否已在运行（读锁）
+        adapterLock.readLock().lock();
         try {
             if (activeAdapters.containsKey(channel.getId())) {
                 log.info("Channel {} already running, skipping", channel.getName());
                 return;
             }
+        } finally {
+            adapterLock.readLock().unlock();
+        }
 
-            ChannelAdapter adapter = createAdapter(channel);
-            if (adapter.requiresSingleLeader()) {
-                attemptLeaderStart(channel, adapter);
-            } else {
-                adapter.start();
-                activeAdapters.put(channel.getId(), adapter);
-                lastSeenChannelUpdateTime.put(channel.getId(), channel.getUpdateTime());
-                // A follower retry may still be scheduled if this channel was
-                // previously in leader-required mode and just flipped to a
-                // non-leader transport (e.g. Feishu websocket → webhook).
-                // Cancel it so we don't tick forever on a no-op startChannel.
-                cancelFollowerRetryLocked(channel.getId());
-                // Schedule cross-node reconciliation for this non-leader adapter:
-                // followers driven by their retry tick re-read the channel, but
-                // a running non-leader has neither a heartbeat nor a retry, so
-                // without this ticker it would never notice admin actions
-                // processed on a different node.
-                scheduleReconcileLocked(channel.getId(), channel.getName());
-                log.info("Channel started: {} (type={}, id={})", channel.getName(), channel.getChannelType(), channel.getId());
+        // Step 2: 锁外创建并启动 adapter（可能耗时，不阻塞其他操作）
+        ChannelAdapter adapter = createAdapter(channel);
+        adapter.start();
+
+        // Step 3: 加写锁放入 activeAdapters
+        adapterLock.writeLock().lock();
+        try {
+            // 双重检查：并发情况下可能有另一个线程已经启动了相同渠道
+            if (activeAdapters.containsKey(channel.getId())) {
+                log.warn("Channel {} was started concurrently, stopping duplicate", channel.getName());
+                stopAdapterSafely(adapter, "startChannel-duplicate");
+                return;
             }
+            activeAdapters.put(channel.getId(), adapter);
+            log.info("Channel started: {} (type={}, id={})", channel.getName(), channel.getChannelType(), channel.getId());
         } finally {
             adapterLock.writeLock().unlock();
         }
@@ -752,6 +774,14 @@ public class ChannelManager {
             return;
         }
 
+        // 配置为空或缺失时不尝试重启（避免 HealthMonitor 对配置不完整的渠道无限重试）
+        if (channel.getConfigJson() == null || channel.getConfigJson().isBlank()) {
+            log.warn("[hot-swap] Channel {} has no valid config, skipping restart", channel.getName());
+            resetAdapterEventTime(channelId);
+            return;
+        }
+
+
         log.info("[hot-swap] Starting hot-swap for channel: {} (type={}, id={})",
                 channel.getName(), channel.getChannelType(), channelId);
 
@@ -765,6 +795,8 @@ public class ChannelManager {
             // 新 Adapter 启动失败，保留旧的不变
             log.error("[hot-swap] New adapter failed to start for channel {}, keeping old adapter: {}",
                     channel.getName(), e.getMessage(), e);
+            // 重置计时器，避免 HealthMonitor 对配置有误的渠道高频重试
+            resetAdapterEventTime(channelId);
             return;
         }
 
@@ -910,14 +942,28 @@ public class ChannelManager {
      * 获取渠道运行状态摘要（含连接状态和最后错误信息）
      */
     public Map<String, Object> getStatus() {
+        return getStatusFiltered(null);
+    }
+
+    /**
+     * 获取渠道运行状态（可按平台启用类型过滤）
+     * <p>
+     * 如果 enabledTypes 不为 null，则只返回该集合内的渠道类型状态。
+     *
+     * @param enabledTypes 平台启用的渠道类型集合，null 表示不过滤
+     */
+    public Map<String, Object> getStatusFiltered(Set<String> enabledTypes) {
         adapterLock.readLock().lock();
         try {
             Map<String, Object> status = new LinkedHashMap<>();
-            status.put("activeCount", activeAdapters.size());
-            status.put("supportedTypes", SUPPORTED_TYPES);
 
             List<Map<String, Object>> channels = new ArrayList<>();
             activeAdapters.forEach((id, adapter) -> {
+                // 按平台启用类型过滤
+                if (enabledTypes != null && !enabledTypes.contains(adapter.getChannelType())) {
+                    return;
+                }
+
                 Map<String, Object> info = new LinkedHashMap<>();
                 info.put("id", id);
                 info.put("type", adapter.getChannelType());
@@ -944,6 +990,8 @@ public class ChannelManager {
 
                 channels.add(info);
             });
+            status.put("activeCount", channels.size());
+            status.put("supportedTypes", enabledTypes != null ? enabledTypes : SUPPORTED_TYPES);
             status.put("channels", channels);
             return status;
         } finally {
@@ -1134,6 +1182,28 @@ public class ChannelManager {
     }
 
     // ==================== 内部方法 ====================
+
+
+    /**
+     * 重置指定渠道 adapter 的活跃时间戳（用于延迟 HealthMonitor 下一次重试）
+     * <p>
+     * 当渠道配置不完整或启动失败时调用，将 lastEventTimeMs 重置为当前时间，
+     * 这样 HealthMonitor 需要再等待 ERROR_THRESHOLD（5 分钟）才会再次触发重启，
+     * 而不是仅等待 cooldown（2 分钟）就开始无限重试。
+     */
+    private void resetAdapterEventTime(Long channelId) {
+        adapterLock.readLock().lock();
+        try {
+            ChannelAdapter adapter = activeAdapters.get(channelId);
+            if (adapter instanceof AbstractChannelAdapter aca) {
+                aca.getLastEventTimeMs().set(System.currentTimeMillis());
+            }
+        } finally {
+            adapterLock.readLock().unlock();
+        }
+    }
+
+
 
     /**
      * 安全停止 Adapter：捕获异常，不影响调用方

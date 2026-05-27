@@ -8,6 +8,7 @@ import org.springframework.web.bind.annotation.*;
 import vip.mate.common.result.R;
 import vip.mate.agent.AgentService;
 import vip.mate.agent.binding.model.AgentSkillBinding;
+import vip.mate.skill.platform.SkillSyncService;
 import vip.mate.workspace.core.annotation.RequireWorkspaceRole;
 import vip.mate.agent.binding.repository.AgentSkillBindingMapper;
 import vip.mate.agent.binding.service.AgentBindingService;
@@ -42,12 +43,19 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * 技能管理接口
+ * 技能管理接口（客户端侧）
  * <p>
- * 提供技能的 CRUD、启用/禁用、按类型查询、技能摘要等能力。
- * 对应前端 SkillMarket 页面。
+ * 客户端提供只读查询、运行时操作和本地启禁控制能力。
+ * 技能的增删改由平台端统一管理，客户端通过 /sync 接口从平台拉取被授权的技能。
+ * 平台下发的技能默认启用，客户端可自主决定是否启用/禁用（PUT /{id}/toggle）。
+ * <p>
+ * 已移除的接口（迁移至平台端）：
+ * - POST   /api/v1/skills           → 创建技能
+ * - PUT    /api/v1/skills/{id}      → 更新技能
+ * - DELETE /api/v1/skills/{id}      → 删除技能
+ * - POST   /api/v1/skills/synthesize-from-conversation → 合成技能
  *
- * @author MateClaw Team
+ * @author WYC
  */
 @Tag(name = "技能管理")
 @RestController
@@ -71,6 +79,9 @@ public class SkillController {
     private final SkillLifecycleService skillLifecycleService;
     private final SkillCuratorJob skillCuratorJob;
     private final SkillCuratorReportStore skillCuratorReportStore;
+    private final SkillSyncService skillSyncService;
+
+    // ==================== 只读查询 API ====================
 
     @Operation(summary = "获取技能分页列表（RFC-042 §2.1）")
     @GetMapping
@@ -108,6 +119,13 @@ public class SkillController {
         }
         return R.ok(dbPage);
     }
+
+    @Operation(summary = "启用/禁用技能（客户端本地控制）")
+    @PutMapping("/{id}/toggle")
+    public R<SkillEntity> toggle(@PathVariable Long id, @RequestParam boolean enabled) {
+        return R.ok(skillService.toggleSkill(id, enabled));
+    }
+
 
     @Operation(summary = "获取各类型技能计数（tab 徽章用）")
     @GetMapping("/counts")
@@ -448,66 +466,66 @@ public class SkillController {
         return R.ok(skill);
     }
 
-    @Operation(summary = "创建技能")
-    @PostMapping
-    @RequireWorkspaceRole("admin")
-    public R<SkillEntity> create(
-            @RequestHeader(value = "X-Workspace-Id", required = false) Long workspaceId,
-            @RequestBody SkillEntity skill) {
-        // Always stamp the owning workspace from the request context — never
-        // trust a workspaceId in the request body.
-        skill.setWorkspaceId(workspaceId != null
-                ? workspaceId : SkillService.DEFAULT_WORKSPACE_ID);
-        return R.ok(skillService.createSkill(skill));
-    }
+//    @Operation(summary = "创建技能")
+//    @PostMapping
+//    @RequireWorkspaceRole("admin")
+//    public R<SkillEntity> create(
+//            @RequestHeader(value = "X-Workspace-Id", required = false) Long workspaceId,
+//            @RequestBody SkillEntity skill) {
+//        // Always stamp the owning workspace from the request context — never
+//        // trust a workspaceId in the request body.
+//        skill.setWorkspaceId(workspaceId != null
+//                ? workspaceId : SkillService.DEFAULT_WORKSPACE_ID);
+//        return R.ok(skillService.createSkill(skill));
+//    }
+//
+//    @Operation(summary = "更新技能")
+//    @PutMapping("/{id}")
+//    @RequireWorkspaceRole("admin")
+//    public R<SkillEntity> update(@PathVariable Long id, @RequestBody SkillEntity skill,
+//            @RequestHeader(value = "X-Workspace-Id", required = false) Long workspaceId) {
+//        rejectVirtualSkillMutation(id);
+//        verifyResourceWorkspace(skillService.getSkill(id), workspaceId);
+//        skill.setId(id);
+//        return R.ok(skillService.updateSkill(skill));
+//    }
 
-    @Operation(summary = "更新技能")
-    @PutMapping("/{id}")
-    @RequireWorkspaceRole("admin")
-    public R<SkillEntity> update(@PathVariable Long id, @RequestBody SkillEntity skill,
-            @RequestHeader(value = "X-Workspace-Id", required = false) Long workspaceId) {
-        rejectVirtualSkillMutation(id);
-        verifyResourceWorkspace(skillService.getSkill(id), workspaceId);
-        skill.setId(id);
-        return R.ok(skillService.updateSkill(skill));
-    }
-
-    /**
-     * RFC-090 §14.5 — admin-only hard delete: physical row removal +
-     * workspace purge. UI surfaces this as "permanently delete" and
-     * confirms with a destructive warning. The routine user-facing
-     * "remove" button on the skill card calls
-     * {@code DELETE /skills/install/{name}} instead, which goes through
-     * {@link vip.mate.skill.installer.SkillInstaller#uninstall} for the
-     * recoverable logical-delete + archive path.
-     */
-    @Operation(summary = "硬删除技能 (admin only — 物理删除 + 工作区清空)")
-    @DeleteMapping("/{id}")
-    @RequireWorkspaceRole("admin")
-    public R<Void> delete(@PathVariable Long id,
-            @RequestHeader(value = "X-Workspace-Id", required = false) Long workspaceId) {
-        rejectVirtualSkillMutation(id);
-        verifyResourceWorkspace(skillService.getSkill(id), workspaceId);
-        skillService.hardDeleteSkill(id);
-        return R.ok();
-    }
-
-    @Operation(summary = "启用/禁用技能")
-    @PutMapping("/{id}/toggle")
-    @RequireWorkspaceRole("admin")
-    public R<SkillEntity> toggle(@PathVariable Long id, @RequestParam boolean enabled,
-            @RequestHeader(value = "X-Workspace-Id", required = false) Long workspaceId) {
-        // A virtual MCP skill mirrors an MCP server — toggling it enables /
-        // disables that server, keeping the Skills page and Settings ▸ MCP
-        // Connections in sync. ACP virtual skills have no such mapping and
-        // stay read-only via rejectVirtualSkillMutation below.
-        if (vip.mate.skill.mcp.McpSkillBridge.isVirtualMcpSkillId(id)) {
-            return R.ok(mcpSkillBridge.toggleVirtualSkill(id, enabled));
-        }
-        rejectVirtualSkillMutation(id);
-        verifyResourceWorkspace(skillService.getSkill(id), workspaceId);
-        return R.ok(skillService.toggleSkill(id, enabled));
-    }
+//    /**
+//     * RFC-090 §14.5 — admin-only hard delete: physical row removal +
+//     * workspace purge. UI surfaces this as "permanently delete" and
+//     * confirms with a destructive warning. The routine user-facing
+//     * "remove" button on the skill card calls
+//     * {@code DELETE /skills/install/{name}} instead, which goes through
+//     * {@link vip.mate.skill.installer.SkillInstaller#uninstall} for the
+//     * recoverable logical-delete + archive path.
+//     */
+//    @Operation(summary = "硬删除技能 (admin only — 物理删除 + 工作区清空)")
+//    @DeleteMapping("/{id}")
+//    @RequireWorkspaceRole("admin")
+//    public R<Void> delete(@PathVariable Long id,
+//            @RequestHeader(value = "X-Workspace-Id", required = false) Long workspaceId) {
+//        rejectVirtualSkillMutation(id);
+//        verifyResourceWorkspace(skillService.getSkill(id), workspaceId);
+//        skillService.hardDeleteSkill(id);
+//        return R.ok();
+//    }
+//
+//    @Operation(summary = "启用/禁用技能")
+//    @PutMapping("/{id}/toggle")
+//    @RequireWorkspaceRole("admin")
+//    public R<SkillEntity> toggle(@PathVariable Long id, @RequestParam boolean enabled,
+//            @RequestHeader(value = "X-Workspace-Id", required = false) Long workspaceId) {
+//        // A virtual MCP skill mirrors an MCP server — toggling it enables /
+//        // disables that server, keeping the Skills page and Settings ▸ MCP
+//        // Connections in sync. ACP virtual skills have no such mapping and
+//        // stay read-only via rejectVirtualSkillMutation below.
+//        if (vip.mate.skill.mcp.McpSkillBridge.isVirtualMcpSkillId(id)) {
+//            return R.ok(mcpSkillBridge.toggleVirtualSkill(id, enabled));
+//        }
+//        rejectVirtualSkillMutation(id);
+//        verifyResourceWorkspace(skillService.getSkill(id), workspaceId);
+//        return R.ok(skillService.toggleSkill(id, enabled));
+//    }
 
     @Operation(summary = "预览技能 Prompt 增强效果（调试用，与 Agent 真实运行时一致）")
     @GetMapping("/prompt-preview")
@@ -741,56 +759,80 @@ public class SkillController {
         return R.ok(Map.of("cleared", cleared));
     }
 
-    // ==================== Synthesis API (RFC-023) ====================
+//    // ==================== Synthesis API (RFC-023) ====================
+//
+//    @Operation(summary = "从对话历史合成 Skill（RFC-023）")
+//    @PostMapping("/synthesize-from-conversation")
+//    @RequireWorkspaceRole("admin")
+//    public R<Map<String, Object>> synthesizeFromConversation(@RequestBody Map<String, Object> body,
+//            @RequestHeader(value = "X-Workspace-Id", required = false) Long workspaceId) {
+//        String conversationId = (String) body.get("conversationId");
+//        Long agentId = body.get("agentId") != null ? Long.valueOf(body.get("agentId").toString()) : null;
+//        if (conversationId == null || conversationId.isBlank()) {
+//            return R.fail("conversationId is required");
+//        }
+//
+//        SkillSynthesisService.SynthesisResult result = synthesisService.synthesize(
+//                conversationId, agentId, workspaceId);
+//
+//        if (result.blocked()) {
+//            return R.ok(Map.of(
+//                    "success", false,
+//                    "blocked", true,
+//                    "skillName", result.skillName() != null ? result.skillName() : "",
+//                    "error", result.error(),
+//                    "scanSummary", result.scanSummary() != null ? result.scanSummary() : ""
+//            ));
+//        }
+//        if (!result.success()) {
+//            return R.ok(Map.of("success", false, "error", result.error()));
+//        }
+//        return R.ok(Map.of(
+//                "success", true,
+//                "skillId", result.skillId(),
+//                "skillName", result.skillName()
+//        ));
+//    }
+//
+//    // ==================== Workspace API ====================
+//
+//    @Operation(summary = "将 skill 导出到工作区目录")
+//    @PostMapping("/{id}/export-workspace")
+//    @RequireWorkspaceRole("admin")
+//    public R<Map<String, Object>> exportToWorkspace(@PathVariable Long id,
+//            @RequestHeader(value = "X-Workspace-Id", required = false) Long workspaceId) {
+//        SkillEntity skill = skillService.getSkill(id);
+//        verifyResourceWorkspace(skill, workspaceId);
+//        var path = workspaceManager.exportToWorkspace(skill.getName(), skill.getSkillContent());
+//        if (path == null) {
+//            return R.ok(Map.of("success", false, "message", "Failed to export workspace"));
+//        }
+//        return R.ok(Map.of("success", true, "path", path.toString()));
+//    }
 
-    @Operation(summary = "从对话历史合成 Skill（RFC-023）")
-    @PostMapping("/synthesize-from-conversation")
-    @RequireWorkspaceRole("admin")
-    public R<Map<String, Object>> synthesizeFromConversation(@RequestBody Map<String, Object> body,
-            @RequestHeader(value = "X-Workspace-Id", required = false) Long workspaceId) {
-        String conversationId = (String) body.get("conversationId");
-        Long agentId = body.get("agentId") != null ? Long.valueOf(body.get("agentId").toString()) : null;
-        if (conversationId == null || conversationId.isBlank()) {
-            return R.fail("conversationId is required");
-        }
+    // ==================== Platform Sync API ====================
 
-        SkillSynthesisService.SynthesisResult result = synthesisService.synthesize(
-                conversationId, agentId, workspaceId);
-
-        if (result.blocked()) {
-            return R.ok(Map.of(
-                    "success", false,
-                    "blocked", true,
-                    "skillName", result.skillName() != null ? result.skillName() : "",
-                    "error", result.error(),
-                    "scanSummary", result.scanSummary() != null ? result.scanSummary() : ""
-            ));
-        }
-        if (!result.success()) {
-            return R.ok(Map.of("success", false, "error", result.error()));
-        }
+    @Operation(summary = "手动触发从平台端同步技能")
+    @PostMapping("/sync")
+    public R<Map<String, Object>> syncFromPlatform() {
+        SkillSyncService.SyncResult result = skillSyncService.syncFromPlatform();
         return R.ok(Map.of(
-                "success", true,
-                "skillId", result.skillId(),
-                "skillName", result.skillName()
+                "success", result.success(),
+                "message", result.message(),
+                "inserted", result.inserted(),
+                "updated", result.updated(),
+                "disabled", result.disabled()
         ));
     }
 
-    // ==================== Workspace API ====================
-
-    @Operation(summary = "将 skill 导出到工作区目录")
-    @PostMapping("/{id}/export-workspace")
-    @RequireWorkspaceRole("admin")
-    public R<Map<String, Object>> exportToWorkspace(@PathVariable Long id,
-            @RequestHeader(value = "X-Workspace-Id", required = false) Long workspaceId) {
-        SkillEntity skill = skillService.getSkill(id);
-        verifyResourceWorkspace(skill, workspaceId);
-        var path = workspaceManager.exportToWorkspace(skill.getName(), skill.getSkillContent());
-        if (path == null) {
-            return R.ok(Map.of("success", false, "message", "Failed to export workspace"));
-        }
-        return R.ok(Map.of("success", true, "path", path.toString()));
+    @Operation(summary = "获取平台同步状态")
+    @GetMapping("/sync/status")
+    public R<Map<String, Object>> getSyncStatus() {
+        return R.ok(skillSyncService.getSyncStatus());
     }
+
+    // ==================== Workspace API（只读） ====================
+
 
     @Operation(summary = "获取 skill 工作区信息")
     @GetMapping("/{id}/workspace")

@@ -249,7 +249,7 @@ public class FeishuChannelAdapter extends AbstractChannelAdapter implements Stre
         String appId = getConfigString("app_id");
         String appSecret = getConfigString("app_secret");
 
-        if (appId == null || appSecret == null) {
+        if (appId == null || appId.isBlank() || appSecret == null || appSecret.isBlank()) {
             throw new IllegalStateException("Feishu channel requires app_id and app_secret in configJson");
         }
 

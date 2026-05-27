@@ -124,6 +124,20 @@ springdoc:
 
 # MateClaw 自定义配置
 mateclaw:
+  # 平台端 OAuth2 认证配置（对接 esp-auth 服务）
+  # 启用后登录必须先通过平台验证，关闭则退化为 MateClaw 单机模式
+  platform:
+    enabled: ${PLATFORM_AUTH_ENABLED:true}
+    # 统一网关地址（通过路径前缀路由到具体服务）
+    gateway-url: ${PLATFORM_GATEWAY_URL:http://192.168.10.211}
+    client-id: ${PLATFORM_CLIENT_ID:J8Kq169h56tm}
+    client-secret: ${PLATFORM_CLIENT_SECRET:dd1492ee1c6e2c0cc72f963134534375}
+    redirect-uri: /login
+    login-path: /uni/login/system
+    authorize-path: /uni/oauth/authorize
+    token-path: /uni/oauth/token
+    connect-timeout: 5000
+    read-timeout: 10000
   jwt:
     secret: ${JWT_SECRET:MateClaw-JWT-Secret-Key-2024-Please-Change-In-Production}
     expiration: 86400000
@@ -140,6 +154,16 @@ mateclaw:
       # legacy: advertise every bound tool up front (pre-disclosure behavior).
       mode: ${MATECLAW_TOOLS_DISCLOSURE_MODE:progressive}
   skill:
+    # 技能同步配置（从平台端拉取被授权技能，优先从 Nacos 发现 ai-manage 服务）
+    sync:
+      enabled: ${SKILL_SYNC_ENABLED:true}
+      service-id: ai-manage
+      assigned-skills-path: /api/skills/assigned
+      skill-detail-path: /api/skills/{id}
+      sync-interval-seconds: ${SKILL_SYNC_INTERVAL:300}
+      connect-timeout: 5000
+      read-timeout: 10000
+      retry-count: 3
     workspace:
       root: ${user.home}/.mateclaw/skills
       auto-init: true
@@ -169,6 +193,20 @@ mateclaw:
   plugin:
     enabled: true
     user-dir: ${user.home}/.mateclaw/plugins
+  # 日志上报到平台端配置
+  log:
+    report:
+      enabled: ${LOG_REPORT_ENABLED:true}
+      service-id: ai-manage
+      report-path: /claw/logs
+      min-level: WARN
+      subsystem: mateclaw-client
+      queue-capacity: 1024
+      batch-size: 20
+      flush-interval-ms: 5000
+      connect-timeout: 5000
+      read-timeout: 10000
+      retry-count: 2
   # RFC-017: 声明式 Hook 系统
   hooks:
     enabled: true

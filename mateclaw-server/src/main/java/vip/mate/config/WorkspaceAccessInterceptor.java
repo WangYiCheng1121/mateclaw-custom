@@ -92,6 +92,33 @@ public class WorkspaceAccessInterceptor implements HandlerInterceptor {
         long workspaceId = resolveWorkspaceId(request);
         String minRole = annotation.value();
         if (!workspaceService.hasPermissionCached(workspaceId, user.getId(), minRole)) {
+            // 兜底：已认证用户自动加入默认工作区（适用于新部署/数据迁移场景）
+            if (workspaceId == DEFAULT_WORKSPACE_ID) {
+                try {
+                    // 确保默认工作区存在（防御旧数据库未种子初始化的情况）
+                    workspaceService.ensureDefaultWorkspaceExists(user.getId());
+                    // 桌面安装包：平台用户给 admin 角色，本地 admin 给 owner
+                    String expectedRole = "admin".equalsIgnoreCase(user.getRole()) ? "owner" : "admin";
+                    try {
+                        workspaceService.addMember(DEFAULT_WORKSPACE_ID, user.getId(), expectedRole);
+                        log.info("Auto-joined user to default workspace: user={}, role={}", username, expectedRole);
+                    } catch (Exception addEx) {
+                        // 已存在，尝试升级角色（兼容旧版本分配的 member 角色）
+                        upgradeRoleIfNeeded(user.getId(), expectedRole, username);
+                    }
+                    workspaceService.evictMembershipCache(DEFAULT_WORKSPACE_ID, user.getId());
+                    // 重新检查权限
+                    if (workspaceService.hasPermissionCached(DEFAULT_WORKSPACE_ID, user.getId(), minRole)) {
+                        return true;
+                    }
+                } catch (Exception e) {
+                    log.debug("Auto-join default workspace failed: user={}, msg={}", username, e.getMessage());
+                    workspaceService.evictMembershipCache(DEFAULT_WORKSPACE_ID, user.getId());
+                    if (workspaceService.hasPermissionCached(DEFAULT_WORKSPACE_ID, user.getId(), minRole)) {
+                        return true;
+                    }
+                }
+            }
             log.warn("Workspace access denied: user={}, workspaceId={}, requiredRole={}", username, workspaceId, minRole);
             sendForbidden(response, "Workspace permission denied: requires " + minRole + " role");
             return false;
@@ -140,6 +167,37 @@ public class WorkspaceAccessInterceptor implements HandlerInterceptor {
         }
         return agent.getWorkspaceId() == workspaceId;
     }
+
+    /**
+     * 自动升级角色（兼容旧安装包中角色为 member 的已有用户）
+     */
+    private void upgradeRoleIfNeeded(Long userId, String expectedRole, String username) {
+        try {
+            var membership = workspaceService.getMembership(DEFAULT_WORKSPACE_ID, userId);
+            if (membership == null || "owner".equals(membership.getRole())) {
+                return;
+            }
+            int currentLevel = roleLevel(membership.getRole());
+            int expectedLevel = roleLevel(expectedRole);
+            if (currentLevel < expectedLevel) {
+                workspaceService.updateMemberRole(DEFAULT_WORKSPACE_ID, userId, expectedRole);
+                log.info("Auto-upgraded workspace role: user={}, {} -> {}", username, membership.getRole(), expectedRole);
+            }
+        } catch (Exception e) {
+            log.debug("Role upgrade check skipped: user={}, msg={}", username, e.getMessage());
+        }
+    }
+
+    private int roleLevel(String role) {
+        return switch (role) {
+            case "owner" -> 4;
+            case "admin" -> 3;
+            case "member" -> 2;
+            case "viewer" -> 1;
+            default -> 0;
+        };
+    }
+
 
     private long resolveWorkspaceId(HttpServletRequest request) {
         String header = request.getHeader("X-Workspace-Id");

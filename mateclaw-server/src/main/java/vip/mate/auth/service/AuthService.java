@@ -9,11 +9,13 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
+import vip.mate.auth.config.PlatformOAuth2Config;
 import vip.mate.auth.model.LoginRequest;
 import vip.mate.auth.model.LoginResponse;
 import vip.mate.auth.model.UserEntity;
 import vip.mate.auth.repository.UserMapper;
 import vip.mate.exception.MateClawException;
+import vip.mate.workspace.core.service.WorkspaceService;
 
 import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
@@ -32,6 +34,10 @@ public class AuthService {
 
     private final UserMapper userMapper;
     private final BCryptPasswordEncoder passwordEncoder;
+    private final PlatformOAuth2Config platformConfig;
+    private final PlatformOAuth2Service platformOAuth2Service;
+    private final PlatformTokenHolder platformTokenHolder;
+    private final WorkspaceService workspaceService;
 
     @Value("${mateclaw.jwt.secret:MateClaw-Secret-Key-2024-Very-Long-String}")
     private String jwtSecret;
@@ -42,21 +48,105 @@ public class AuthService {
     @Value("${mateclaw.jwt.renewal-threshold:7200000}")
     private long renewalThreshold;
 
+
+//    /**
+//     * 登录
+//     */
+//    public LoginResponse login(LoginRequest request) {
+//        UserEntity user = userMapper.selectOne(new LambdaQueryWrapper<UserEntity>()
+//                .eq(UserEntity::getUsername, request.getUsername())
+//                .eq(UserEntity::getEnabled, true));
+//
+//        if (user == null || !passwordEncoder.matches(request.getPassword(), user.getPassword())) {
+//            throw new MateClawException("err.auth.invalid_credentials", 401, "用户名或密码错误");
+//        }
+//
+//        String token = generateToken(user);
+//        return new LoginResponse(user.getId(), token, user.getUsername(), user.getNickname(), user.getRole());
+//    }
+
+
     /**
      * 登录
+     * <p>
+     * 启用平台认证时流程：
+     * 1. 先调用平台 esp-auth OAuth2 验证用户名密码，获取 claw_access_token
+     * 2. 同步本地用户（存在则复用，不存在则自动创建，角色默认 user）
+     * 3. 生成 MateClaw 本地 JWT token
+     * 4. 同时返回 claw_access_token 和 token
+     * <p>
+     * 未启用平台认证时：走原始本地密码验证逻辑
      */
     public LoginResponse login(LoginRequest request) {
+        if (platformConfig.isEnabled()) {
+            return loginWithPlatform(request);
+        }
+        return loginLocal(request);
+    }
+
+    /**
+     * 平台 OAuth2 认证 + 本地用户同步登录
+     */
+    private LoginResponse loginWithPlatform(LoginRequest request) {
+        // Step 1: 平台 OAuth2 认证（失败会直接抛异常）
+        PlatformOAuth2Service.PlatformAuthResult platformResult =
+                platformOAuth2Service.authenticate(request.getUsername(), request.getPassword());
+
+        // Step 2: 同步本地用户
+        UserEntity user = findByUsername(request.getUsername());
+        if (user == null) {
+            // 本地不存在该用户 → 自动创建
+            log.info("[PlatformLogin] 本地用户不存在，自动创建: {}", request.getUsername());
+            user = new UserEntity();
+            user.setUsername(request.getUsername());
+            user.setNickname(request.getUsername());
+            // 平台认证模式下本地密码仅作占位，实际验证由平台完成
+            user.setPassword(passwordEncoder.encode(java.util.UUID.randomUUID().toString()));
+            user.setRole("user");
+            user.setEnabled(true);
+            userMapper.insert(user);
+            log.info("[PlatformLogin] 本地用户创建成功: id={}, username={}", user.getId(), user.getUsername());
+            // 自动加入默认工作区
+            ensureDefaultWorkspaceMembership(user);
+        } else if (!Boolean.TRUE.equals(user.getEnabled())) {
+            throw new MateClawException("err.auth.user_disabled", "用户已被禁用");
+        }
+
+        // Step 3: 生成 MateClaw 本地 JWT token
+        String token = generateToken(user);
+
+        // Step 4: 缓存平台 access_token，供 Platform*Client 调用平台 API 时携带认证头
+        String clawAccessToken = platformResult != null ? platformResult.getAccessToken() : null;
+        if (clawAccessToken != null) {
+            platformTokenHolder.setAccessToken(clawAccessToken);
+        }
+        return new LoginResponse(user.getId(), token, user.getUsername(), user.getNickname(), user.getRole(), clawAccessToken);
+    }
+
+    /**
+     * 原始本地密码验证登录（平台认证未启用时使用）
+     */
+    private LoginResponse loginLocal(LoginRequest request) {
         UserEntity user = userMapper.selectOne(new LambdaQueryWrapper<UserEntity>()
                 .eq(UserEntity::getUsername, request.getUsername())
                 .eq(UserEntity::getEnabled, true));
 
         if (user == null || !passwordEncoder.matches(request.getPassword(), user.getPassword())) {
-            throw new MateClawException("err.auth.invalid_credentials", 401, "用户名或密码错误");
+            throw new MateClawException("err.auth.invalid_credentials", "用户名或密码错误");
         }
 
         String token = generateToken(user);
         return new LoginResponse(user.getId(), token, user.getUsername(), user.getNickname(), user.getRole());
     }
+
+    /**
+     * 退出登录：清除服务端缓存的平台 access_token
+     */
+    public void logout() {
+        platformTokenHolder.clear();
+        log.info("[Auth] 用户退出登录，平台 access_token 已清除");
+    }
+
 
     /**
      * 获取用户列表（管理员）
@@ -85,6 +175,8 @@ public class AuthService {
             user.setRole("user");
         }
         userMapper.insert(user);
+        // 自动加入默认工作区
+        ensureDefaultWorkspaceMembership(user);
         user.setPassword(null);
         return user;
     }
@@ -198,6 +290,64 @@ public class AuthService {
                 .signWith(getSignKey())
                 .compact();
     }
+
+    /**
+     * 确保用户加入默认工作区，并拥有正确的角色（注册/登录时调用）。
+     * <p>
+     * 桌面安装包场景：平台认证用户即为本机使用者，给予 admin 角色。
+     * 如果用户已存在但角色低于期望（如旧版本分配的 member），自动升级。
+     */
+    private void ensureDefaultWorkspaceMembership(UserEntity user) {
+        try {
+            // 先确保默认工作区存在（防御旧数据库/安装包未种子初始化）
+            workspaceService.ensureDefaultWorkspaceExists(user.getId());
+            // 本地 admin 用户给 owner 角色，平台用户给 admin 角色
+            String expectedRole = "admin".equalsIgnoreCase(user.getRole()) ? "owner" : "admin";
+            try {
+                workspaceService.addMember(1L, user.getId(), expectedRole);
+                log.info("[Auth] 用户已自动加入默认工作区: userId={}, role={}", user.getId(), expectedRole);
+            } catch (Exception e) {
+                // 用户已存在，检查是否需要升级角色
+                upgradeWorkspaceRoleIfNeeded(user.getId(), expectedRole);
+            }
+        } catch (Exception e) {
+            log.warn("[Auth] 确保默认工作区成员关系失败: userId={}, msg={}", user.getId(), e.getMessage());
+        }
+    }
+
+    /**
+     * 如果用户当前角色低于期望角色，自动升级（兼容旧安装包升级场景）
+     */
+    private void upgradeWorkspaceRoleIfNeeded(Long userId, String expectedRole) {
+        try {
+            var membership = workspaceService.getMembership(1L, userId);
+            if (membership == null) {
+                return;
+            }
+            String currentRole = membership.getRole();
+            // owner 不降级，其他角色如果低于期望则升级
+            if ("owner".equals(currentRole)) {
+                return;
+            }
+            if (roleLevel(currentRole) < roleLevel(expectedRole)) {
+                workspaceService.updateMemberRole(1L, userId, expectedRole);
+                log.info("[Auth] 用户工作区角色已自动升级: userId={}, {} -> {}", userId, currentRole, expectedRole);
+            }
+        } catch (Exception e) {
+            log.debug("[Auth] 角色升级检查跳过: userId={}, msg={}", userId, e.getMessage());
+        }
+    }
+
+    private int roleLevel(String role) {
+        return switch (role) {
+            case "owner" -> 4;
+            case "admin" -> 3;
+            case "member" -> 2;
+            case "viewer" -> 1;
+            default -> 0;
+        };
+    }
+
 
     private SecretKey getSignKey() {
         byte[] keyBytes = jwtSecret.getBytes(StandardCharsets.UTF_8);
