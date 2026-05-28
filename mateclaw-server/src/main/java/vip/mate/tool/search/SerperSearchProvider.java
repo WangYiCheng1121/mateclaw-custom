@@ -5,6 +5,7 @@ import cn.hutool.json.JSONArray;
 import cn.hutool.json.JSONObject;
 import cn.hutool.json.JSONUtil;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import vip.mate.system.model.SystemSettingsDTO;
 
@@ -22,6 +23,10 @@ import java.util.List;
 public class SerperSearchProvider implements SearchProvider {
 
     private static final String DEFAULT_BASE_URL = "https://google.serper.dev/search";
+
+    /** 平台搜索代理客户端（可选；未配置时退化为直连模式） */
+    @Autowired(required = false)
+    private PlatformSearchProxyClient proxyClient;
 
     @Override
     public String id() {
@@ -45,6 +50,11 @@ public class SerperSearchProvider implements SearchProvider {
 
     @Override
     public boolean isAvailable(SystemSettingsDTO config) {
+        // 平台代理模式：API Key 由平台端管理，本地无需检查
+        if (isProxyEnabled()) {
+            return true;
+        }
+        // 直连模式：检查本地是否配置了 API Key
         String key = config.getSerperApiKey();
         return key != null && !key.isBlank();
     }
@@ -56,6 +66,14 @@ public class SerperSearchProvider implements SearchProvider {
 
     @Override
     public List<SearchResult> search(SearchQuery searchQuery, SystemSettingsDTO config) {
+        // 平台代理模式：通过平台端转发，API Key 由平台管理
+        if (isProxyEnabled()) {
+            String response = proxyClient.search("serper", searchQuery);
+            log.debug("Serper (via proxy) result for '{}': {}", searchQuery.query(), response);
+            return parseResponse(response, searchQuery.resolvedCount());
+        }
+
+        // 直连模式：本地持有 API Key，直接调上游
         String apiKey = config.getSerperApiKey();
         String baseUrl = config.getSerperBaseUrl();
         if (baseUrl == null || baseUrl.isBlank()) {
@@ -93,6 +111,11 @@ public class SerperSearchProvider implements SearchProvider {
 
         log.debug("Serper result for '{}': {}", searchQuery.query(), response);
         return parseResponse(response, searchQuery.resolvedCount());
+    }
+
+    /** 平台搜索代理是否可用 */
+    private boolean isProxyEnabled() {
+        return proxyClient != null && proxyClient.isProxyEnabled();
     }
 
     private String mapFreshnessToTbs(String freshness) {
