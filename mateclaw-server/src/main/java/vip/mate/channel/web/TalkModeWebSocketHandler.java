@@ -10,6 +10,7 @@ import org.springframework.web.socket.TextMessage;
 import org.springframework.web.socket.WebSocketSession;
 import org.springframework.web.socket.handler.AbstractWebSocketHandler;
 import vip.mate.agent.AgentService;
+import vip.mate.llm.platform.LlmUserContextHolder;
 import vip.mate.memory.event.ConversationCompletionPublisher;
 import vip.mate.stt.SttService;
 import vip.mate.tts.TtsService;
@@ -145,7 +146,13 @@ public class TalkModeWebSocketHandler extends AbstractWebSocketHandler {
             conversationService.saveMessage(talkSession.conversationId, "user", transcript, List.of());
 
             // 5. Agent 对话（同步）
-            String reply = agentService.chat(talkSession.agentId, transcript, talkSession.conversationId);
+            String reply;
+            LlmUserContextHolder.set(talkSession.username, talkSession.username);
+            try {
+                reply = agentService.chat(talkSession.agentId, transcript, talkSession.conversationId);
+            } finally {
+                LlmUserContextHolder.clear();
+            }
             if (reply == null || reply.isBlank()) {
                 reply = "Sorry, I couldn't generate a response.";
             }

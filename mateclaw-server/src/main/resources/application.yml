@@ -138,6 +138,11 @@ mateclaw:
     token-path: /uni/oauth/token
     connect-timeout: 5000
     read-timeout: 10000
+    # LLM 代理配置：启用后大模型流量统一走平台代理，而非直连 LLM 提供商
+    llm-proxy:
+      enabled: ${PLATFORM_LLM_PROXY_ENABLED:true}
+      completions-path: /api/proxy/chat/completions
+      service-id: ai-manage
   jwt:
     secret: ${JWT_SECRET:MateClaw-JWT-Secret-Key-2024-Please-Change-In-Production}
     expiration: 86400000

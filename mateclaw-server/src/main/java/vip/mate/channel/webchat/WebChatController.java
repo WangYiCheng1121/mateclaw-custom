@@ -10,6 +10,7 @@ import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import vip.mate.channel.web.Utf8SseEmitter;
+import vip.mate.llm.platform.LlmUserContextHolder;
 import vip.mate.agent.AgentService;
 import vip.mate.channel.model.ChannelEntity;
 import vip.mate.channel.service.ChannelService;
@@ -101,6 +102,7 @@ public class WebChatController {
         });
 
         sseExecutor.execute(() -> {
+            LlmUserContextHolder.set(visitorId, "webchat:" + visitorId);
             try {
                 // 创建或获取会话（workspace 从 agent 获取）
                 var webAgent = agentService.getAgent(agentId);
@@ -167,6 +169,8 @@ public class WebChatController {
                 } catch (IOException ex) {
                     emitter.completeWithError(ex);
                 }
+            } finally {
+                LlmUserContextHolder.clear();
             }
         });
 

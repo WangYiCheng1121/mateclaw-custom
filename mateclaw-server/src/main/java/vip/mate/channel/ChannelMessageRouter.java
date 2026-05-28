@@ -16,6 +16,7 @@ import vip.mate.channel.model.ChannelEntity;
 import vip.mate.channel.notification.ApprovalNotificationService;
 import vip.mate.channel.service.ChannelService;
 import vip.mate.channel.web.ChatStreamTracker;
+import vip.mate.llm.platform.LlmUserContextHolder;
 import vip.mate.memory.event.ConversationCompletionPublisher;
 import vip.mate.tts.TtsService;
 import vip.mate.workspace.conversation.ConversationService;
@@ -712,6 +713,8 @@ public class ChannelMessageRouter {
             // 导致气泡丢失。
             Long savedAssistantId = null;
             try {
+                String senderId = message.getSenderId();
+                LlmUserContextHolder.set(senderId, senderId);
                 // 流式路径：渠道实现了 StreamingChannelAdapter 则委托渠道渲染流式事件
                 // RFC-063r §2.5: build the ChatOrigin once per channel-message
                 // so cron jobs created during this conversation inherit the
@@ -819,6 +822,7 @@ public class ChannelMessageRouter {
                 } catch (Exception e) {
                     log.debug("Failed to reset stream_status for {}: {}", conversationId, e.getMessage());
                 }
+                LlmUserContextHolder.clear();
             }
 
         } catch (Exception e) {

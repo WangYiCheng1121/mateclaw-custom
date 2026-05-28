@@ -20,14 +20,21 @@ import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 import org.springframework.util.StringUtils;
 import org.springframework.web.client.RestClient;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
 import reactor.core.publisher.Flux;
+import vip.mate.auth.config.PlatformOAuth2Config;
+import vip.mate.auth.service.PlatformNacosService;
+import vip.mate.auth.service.PlatformTokenHolder;
 import vip.mate.exception.MateClawException;
 import vip.mate.llm.model.ModelConfigEntity;
 import vip.mate.llm.model.ModelFamily;
 import vip.mate.llm.model.ModelProtocol;
 import vip.mate.llm.model.ModelProviderEntity;
+import vip.mate.llm.platform.LlmUserContextHolder;
+import vip.mate.llm.platform.PlatformLlmProxyProperties;
+import vip.mate.llm.platform.PlatformMachineTokenProvider;
 import vip.mate.llm.service.ModelProviderService;
 
 import java.net.http.HttpClient;
@@ -58,6 +65,26 @@ public class OpenAiCompatibleChatModelBuilder implements ChatModelBuilder {
     private final ObjectProvider<RestClient.Builder> restClientBuilderProvider;
     private final ObjectProvider<WebClient.Builder> webClientBuilderProvider;
     private final ObjectProvider<ObservationRegistry> observationRegistryProvider;
+
+    /** LLM 代理配置（可选；未配置时退化为直连模式） */
+    @Autowired(required = false)
+    private PlatformLlmProxyProperties proxyProperties;
+
+    /** 平台 OAuth2 配置（可选；用于机器令牌申请） */
+    @Autowired(required = false)
+    private PlatformOAuth2Config platformConfig;
+
+    /** 平台服务地址解析（可选） */
+    @Autowired(required = false)
+    private PlatformNacosService nacosService;
+
+    /** 平台 token 持有者（用户登录后缓存，authorization_code 模式，与渠道同步一致） */
+    @Autowired(required = false)
+    private PlatformTokenHolder platformTokenHolder;
+
+    /** 机器令牌提供者（可选；client_credentials 模式，作为 fallback） */
+    @Autowired(required = false)
+    private PlatformMachineTokenProvider machineTokenProvider;
 
     public OpenAiCompatibleChatModelBuilder(
             ModelProviderService modelProviderService,
@@ -210,11 +237,155 @@ public class OpenAiCompatibleChatModelBuilder implements ChatModelBuilder {
     // ==================== OpenAI API client ====================
 
     /**
+     * Resolve the platform access token for LLM proxy requests.
+     * &lt;p&gt;
+     * Priority: PlatformTokenHolder (authorization_code, same as channel sync)
+     * &gt; PlatformMachineTokenProvider (client_credentials fallback).
+     * Returns null if no token source is available.
+     */
+    private String resolveProxyToken() {
+        if (platformTokenHolder != null) {
+            String token = platformTokenHolder.getAccessToken();
+            if (token != null) {
+                return token;
+            }
+        }
+        if (machineTokenProvider != null) {
+            return machineTokenProvider.getAccessToken();
+        }
+        return null;
+    }
+
+    /**
+     * Whether the platform LLM proxy is ready to use.
+     */
+    private boolean isProxyEnabled() {
+        return proxyProperties != null && proxyProperties.isEnabled()
+                && platformConfig != null && platformConfig.isEnabled()
+                && nacosService != null
+                && (platformTokenHolder != null || machineTokenProvider != null);
+    }
+
+    /**
+     * Build an {@link OpenAiApi} that routes through the platform LLM proxy
+     * instead of calling the LLM provider directly.
+     * <p>
+     * The proxy URL is {@code gatewayUrl/ai-manage/api/proxy/chat/completions}.
+     * Authentication uses a machine token (client_credentials). Per-request user
+     * identity (userId, username) is read from {@link LlmUserContextHolder} and
+     * injected as HTTP headers.
+     */
+    private OpenAiApi buildProxyApi(ModelProviderEntity provider, Integer readTimeoutOverride) {
+        String serviceBaseUrl = nacosService.resolveServiceUrl(proxyProperties.getServiceId());
+        String completionsPath = proxyProperties.getCompletionsPath();
+
+        MultiValueMap<String, String> headers = new LinkedMultiValueMap<>();
+        headers.add("User-Agent", "MateClaw/1.0");
+
+        RestClient.Builder restClientBuilder = applyHttpTimeouts(
+                restClientBuilderProvider.getIfAvailable(RestClient::builder), readTimeoutOverride);
+        WebClient.Builder webClientBuilder = applyHttpTimeoutsToWebClient(
+                webClientBuilderProvider.getIfAvailable(WebClient::builder), readTimeoutOverride);
+
+        // Inject platform token + user identity into every outbound request.
+        // Token priority: PlatformTokenHolder (authorization_code, same as channel sync)
+        //                 > PlatformMachineTokenProvider (client_credentials fallback).
+        // Token is fetched per-request so long-lived ChatModel instances
+        // always carry a fresh (non-expired) access token.
+        restClientBuilder = restClientBuilder.requestInterceptor((request, body, execution) -> {
+            HttpHeaders reqHeaders = request.getHeaders();
+            String token = resolveProxyToken();
+            if (token != null) {
+                reqHeaders.set(HttpHeaders.AUTHORIZATION, "Bearer " + token);
+            }
+            injectUserContextHeaders(reqHeaders);
+            return execution.execute(request, body);
+        });
+        webClientBuilder = webClientBuilder.filter((request, next) -> {
+            String token = resolveProxyToken();
+            var modified = org.springframework.web.reactive.function.client.ClientRequest.from(request)
+                    .headers(h -> {
+                        if (token != null) {
+                            h.set(HttpHeaders.AUTHORIZATION, "Bearer " + token);
+                        }
+                        injectUserContextHeaders(h);
+                    })
+                    .build();
+            return next.exchange(modified);
+        });
+
+        log.info("[LlmProxy] Routing through platform proxy: baseUrl={}, completionsPath={}",
+                serviceBaseUrl, completionsPath);
+
+        // Delegating ApiKey: fetch fresh token on every getValue() call
+        // so long-lived OpenAiApi instances never hold a stale token.
+        ApiKey apiKeyImpl = new ApiKey() {
+            @Override
+            public String getValue() {
+                String token = resolveProxyToken();
+                return token != null ? token : "";
+            }
+        };
+        return new OpenAiApi(
+                serviceBaseUrl,
+                apiKeyImpl,
+                headers,
+                completionsPath,
+                "/v1/embeddings",
+                restClientBuilder,
+                webClientBuilder,
+                RetryUtils.DEFAULT_RESPONSE_ERROR_HANDLER) {
+            @Override
+            public org.springframework.http.ResponseEntity<OpenAiApi.ChatCompletion> chatCompletionEntity(
+                    OpenAiApi.ChatCompletionRequest chatRequest,
+                    MultiValueMap<String, String> additionalHttpHeader) {
+                chatRequest = OpenAiRequestRewriter.sanitizeReasoningEffortForProvider(chatRequest, provider);
+                chatRequest = OpenAiRequestRewriter.patchReasoningContent(chatRequest, provider);
+                chatRequest = OpenAiRequestRewriter.stripReasoningEffortIfIncompatible(chatRequest);
+                chatRequest = OpenAiRequestRewriter.stripAutoToolChoice(chatRequest);
+                chatRequest = OpenAiRequestRewriter.injectProvider(chatRequest, provider.getProviderId());
+                chatRequest = OpenAiRequestRewriter.patchVideoMediaContent(chatRequest);
+                logOpenAiRequest(provider, chatRequest);
+                try {
+                    return super.chatCompletionEntity(chatRequest, additionalHttpHeader);
+                } catch (WebClientResponseException e) {
+                    logOpenAiError(provider, e);
+                    throw e;
+                }
+            }
+
+            @Override
+            public Flux<OpenAiApi.ChatCompletionChunk> chatCompletionStream(
+                    OpenAiApi.ChatCompletionRequest chatRequest,
+                    MultiValueMap<String, String> additionalHttpHeader) {
+                chatRequest = OpenAiRequestRewriter.sanitizeReasoningEffortForProvider(chatRequest, provider);
+                chatRequest = OpenAiRequestRewriter.patchReasoningContent(chatRequest, provider);
+                chatRequest = OpenAiRequestRewriter.stripReasoningEffortIfIncompatible(chatRequest);
+                chatRequest = OpenAiRequestRewriter.stripAutoToolChoice(chatRequest);
+                chatRequest = OpenAiRequestRewriter.injectProvider(chatRequest, provider.getProviderId());
+                chatRequest = OpenAiRequestRewriter.patchVideoMediaContent(chatRequest);
+                logOpenAiRequest(provider, chatRequest);
+                return super.chatCompletionStream(chatRequest, additionalHttpHeader)
+                        .doOnError(error -> {
+                            if (error instanceof WebClientResponseException e) {
+                                logOpenAiError(provider, e);
+                            }
+                        });
+            }
+        };
+    }
+
+    /**
      * Build an {@link OpenAiApi} for the provider. Accepts a per-model
      * read-timeout override (seconds), threaded into both the sync RestClient and
      * the streaming WebClient. Null falls back to the default 180s.
      */
     OpenAiApi buildOpenAiApi(ModelProviderEntity provider, Integer readTimeoutOverride) {
+        // ---- 平台 LLM 代理模式 ----
+        if (isProxyEnabled()) {
+            return buildProxyApi(provider, readTimeoutOverride);
+        }
+        // ---- 直连模式 ----
         if (provider == null || !modelProviderService.isProviderConfigured(provider.getProviderId())) {
             throw new MateClawException("err.agent.provider_not_configured",
                     "Provider 未完成配置，请在模型设置中填写有效的 API Key 和 Base URL");
@@ -325,6 +496,18 @@ public class OpenAiCompatibleChatModelBuilder implements ChatModelBuilder {
      * Whether the provider is one of Kimi's first-party providers. Public so the
      * agent graph builder can surface a "built-in search active" log line.
      */
+    /** Inject user identity headers from {@link LlmUserContextHolder}. */
+    private static void injectUserContextHeaders(HttpHeaders headers) {
+        String userId = LlmUserContextHolder.getUserId();
+        String userName = LlmUserContextHolder.getUserName();
+        if (userId != null) {
+            headers.set("X-User-Id", userId);
+        }
+        if (userName != null) {
+            headers.set("X-User-Name", userName);
+        }
+    }
+
     public static boolean isKimiProvider(ModelProviderEntity provider) {
         if (provider == null) return false;
         String id = provider.getProviderId();

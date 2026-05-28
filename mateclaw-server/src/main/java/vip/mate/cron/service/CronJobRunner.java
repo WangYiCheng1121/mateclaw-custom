@@ -10,6 +10,7 @@ import vip.mate.agent.AgentService;
 import vip.mate.agent.context.ChatOrigin;
 import vip.mate.cron.CronChatOriginFactory;
 import vip.mate.cron.model.CronJobEntity;
+import vip.mate.llm.platform.LlmUserContextHolder;
 import vip.mate.dashboard.model.CronJobRunEntity;
 import vip.mate.wiki.service.WikiProcessingService;
 
@@ -263,11 +264,16 @@ public class CronJobRunner {
      */
     private AssistantMessage runAgent(CronJobEntity job, String userMessage, ChatOrigin origin,
                                       String conversationId) {
-        String prompt = buildCronPrompt(userMessage, origin);
-        String text = "agent".equals(job.getTaskType())
-                ? agentService.execute(job.getAgentId(), prompt, conversationId, origin)
-                : agentService.chat(job.getAgentId(), prompt, conversationId, origin);
-        return new AssistantMessage(text != null ? text : "");
+        LlmUserContextHolder.set("system", "cron:" + job.getId());
+        try {
+            String prompt = buildCronPrompt(userMessage, origin);
+            String text = "agent".equals(job.getTaskType())
+                    ? agentService.execute(job.getAgentId(), prompt, conversationId, origin)
+                    : agentService.chat(job.getAgentId(), prompt, conversationId, origin);
+            return new AssistantMessage(text != null ? text : "");
+        } finally {
+            LlmUserContextHolder.clear();
+        }
     }
 
     /**

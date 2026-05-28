@@ -21,6 +21,9 @@ import vip.mate.approval.ApprovalWorkflowService;
 import vip.mate.approval.MetadataDecision;
 import vip.mate.approval.PendingApproval;
 import vip.mate.approval.ResolveOutcome;
+import vip.mate.llm.platform.LlmUserContextHolder;
+import vip.mate.auth.model.UserEntity;
+import vip.mate.auth.service.AuthService;
 import vip.mate.memory.event.ConversationCompletionPublisher;
 import vip.mate.workspace.conversation.ConversationService;
 import vip.mate.workspace.conversation.model.MessageContentPart;
@@ -61,6 +64,7 @@ public class ChatController {
     private final ChatStreamTracker streamTracker;
     private final ObjectMapper objectMapper;
     private final ConversationCompletionPublisher completionPublisher;
+    private final AuthService authService;
     private final Path uploadRoot = Paths.get("data", "chat-uploads");
 
     // 使用虚拟线程池处理 SSE（Java 17+ 兼容，Java 21 可用 Executors.newVirtualThreadPerTaskExecutor()）
@@ -155,6 +159,7 @@ public class ChatController {
             return emitter;
         }
         String username = auth.getName();
+        Long userId = resolveUserId(auth);
         log.info("SSE chat: agentId={}, conversationId={}, user={}", agentId, conversationId, username);
 
         // ---- Workspace 边界校验：确保 agent 属于当前 workspace ----
@@ -233,10 +238,12 @@ public class ChatController {
             AtomicBoolean approvalEmitterDone = new AtomicBoolean(false);
 
             sseExecutor.execute(() -> {
-                StreamAccumulator accumulator = new StreamAccumulator();
-                AtomicBoolean finalized = new AtomicBoolean(false);
+                LlmUserContextHolder.set(String.valueOf(userId), username);
                 try {
-                    // 广播 approval_resolved 事件
+                    StreamAccumulator accumulator = new StreamAccumulator();
+                    AtomicBoolean finalized = new AtomicBoolean(false);
+                    try {
+                        // 广播 approval_resolved 事件
                     broadcastEvent(conversationId, "tool_approval_resolved", Map.of(
                             "pendingId", pending.getPendingId(),
                             "decision", decision,
@@ -484,10 +491,13 @@ public class ChatController {
                     streamTracker.setEmergencySaveCallback(conversationId,
                             () -> emergencySaveAccumulator(conversationId, accumulator));
 
-                } catch (Exception e) {
-                    log.error("SSE approval replay setup error: {}", e.getMessage());
-                    streamTracker.complete(conversationId);
-                    completeEmitterQuietly(emitter, approvalEmitterDone);
+                    } catch (Exception e) {
+                        log.error("SSE approval replay setup error: {}", e.getMessage());
+                        streamTracker.complete(conversationId);
+                        completeEmitterQuietly(emitter, approvalEmitterDone);
+                    }
+                } finally {
+                    LlmUserContextHolder.clear();
                 }
             });
             return emitter;
@@ -516,10 +526,12 @@ public class ChatController {
         AtomicBoolean emitterDone = new AtomicBoolean(false);
 
         sseExecutor.execute(() -> {
-            StreamAccumulator accumulator = new StreamAccumulator();
-            AtomicBoolean finalized = new AtomicBoolean(false);
+            LlmUserContextHolder.set(String.valueOf(userId), username);
             try {
-                conversationService.getOrCreateConversation(conversationId, agentId, username, workspaceId);
+                StreamAccumulator accumulator = new StreamAccumulator();
+                AtomicBoolean finalized = new AtomicBoolean(false);
+                try {
+                    conversationService.getOrCreateConversation(conversationId, agentId, username, workspaceId);
                 // Pin the model the user picked for this conversation so later
                 // turns (and the runtime model resolver) honour it independently
                 // of every other conversation.
@@ -904,16 +916,19 @@ public class ChatController {
                 streamTracker.setEmergencySaveCallback(conversationId,
                         () -> emergencySaveAccumulator(conversationId, accumulator));
 
-            } catch (Exception e) {
-                log.error("SSE setup error: {}", e.getMessage());
-                try {
-                    broadcastEvent(conversationId, "error", Map.of("message", e.getMessage() != null ? e.getMessage() : "unknown error"));
-                } catch (Exception ioException) {
-                    log.warn("SSE setup failure event broadcast error: {}", ioException.getMessage());
+                } catch (Exception e) {
+                    log.error("SSE setup error: {}", e.getMessage());
+                    try {
+                        broadcastEvent(conversationId, "error", Map.of("message", e.getMessage() != null ? e.getMessage() : "unknown error"));
+                    } catch (Exception ioException) {
+                        log.warn("SSE setup failure event broadcast error: {}", ioException.getMessage());
+                    }
+                    streamTracker.complete(conversationId);
+                    conversationService.updateStreamStatus(conversationId, "idle");
+                    completeEmitterQuietly(emitter, emitterDone);
                 }
-                streamTracker.complete(conversationId);
-                conversationService.updateStreamStatus(conversationId, "idle");
-                completeEmitterQuietly(emitter, emitterDone);
+            } finally {
+                LlmUserContextHolder.clear();
             }
         });
 
@@ -1031,14 +1046,20 @@ public class ChatController {
         if (username == null) {
             return R.fail(401, "未登录，请先登录");
         }
+        Long userId = resolveUserId(auth);
         conversationService.getOrCreateConversation(request.getConversationId(), agentId, username, workspaceId);
         conversationService.saveMessage(request.getConversationId(), "user", request.getMessage(), request.getContentParts());
 
         String promptText = buildPromptText(request.getMessage(), request.getContentParts());
-        String response = agentService.chat(agentId, promptText, request.getConversationId());
-        conversationService.saveMessage(request.getConversationId(), "assistant", response);
-        completionPublisher.publish(agentId, request.getConversationId(), request.getMessage(), response, "web");
-        return R.ok(response);
+        LlmUserContextHolder.set(String.valueOf(userId), username);
+        try {
+            String response = agentService.chat(agentId, promptText, request.getConversationId());
+            conversationService.saveMessage(request.getConversationId(), "assistant", response);
+            completionPublisher.publish(agentId, request.getConversationId(), request.getMessage(), response, "web");
+            return R.ok(response);
+        } finally {
+            LlmUserContextHolder.clear();
+        }
     }
 
     @Operation(summary = "上传聊天附件")
@@ -2082,6 +2103,14 @@ public class ChatController {
                 return "{}";
             }
         }
+    }
+
+    private Long resolveUserId(Authentication auth) {
+        if (auth == null) {
+            return null;
+        }
+        UserEntity user = authService.findByUsername(auth.getName());
+        return user != null ? user.getId() : null;
     }
 
     private static Long parseLongOrNull(String s) {

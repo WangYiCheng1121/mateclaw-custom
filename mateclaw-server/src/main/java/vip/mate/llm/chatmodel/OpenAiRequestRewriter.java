@@ -756,4 +756,60 @@ final class OpenAiRequestRewriter {
                 extraBody
         );
     }
+
+    /**
+     * Inject the provider identifier into the request body so the platform LLM
+     * proxy can identify which upstream provider (and its API key / base URL)
+     * to route the request to.
+     *
+     * <p>The provider ID is written into the {@code extraBody} map under the
+     * {@code "provider"} key, which Spring AI serializes as a top-level JSON
+     * field in the chat-completion request body.
+     */
+    static OpenAiApi.ChatCompletionRequest injectProvider(
+            OpenAiApi.ChatCompletionRequest request, String providerId) {
+        if (providerId == null || providerId.isBlank()) {
+            return request;
+        }
+        Map<String, Object> extraBody = new LinkedHashMap<>();
+        if (request.extraBody() != null) {
+            extraBody.putAll(request.extraBody());
+        }
+        extraBody.put("provider", providerId);
+
+        return new OpenAiApi.ChatCompletionRequest(
+                request.messages(),
+                request.model(),
+                request.store(),
+                request.metadata(),
+                request.frequencyPenalty(),
+                request.logitBias(),
+                request.logprobs(),
+                request.topLogprobs(),
+                request.maxTokens(),
+                request.maxCompletionTokens(),
+                request.n(),
+                request.outputModalities(),
+                request.audioParameters(),
+                request.presencePenalty(),
+                request.responseFormat(),
+                request.seed(),
+                request.serviceTier(),
+                request.stop(),
+                request.stream(),
+                request.streamOptions(),
+                request.temperature(),
+                request.topP(),
+                request.tools(),
+                request.toolChoice(),
+                request.parallelToolCalls(),
+                request.user(),
+                request.reasoningEffort(),
+                request.webSearchOptions(),
+                request.verbosity(),
+                request.promptCacheKey(),
+                request.safetyIdentifier(),
+                extraBody
+        );
+    }
 }
