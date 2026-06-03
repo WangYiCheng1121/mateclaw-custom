@@ -11,6 +11,7 @@ import org.springframework.scheduling.annotation.Async;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import vip.mate.tool.guard.model.*;
+import vip.mate.tool.guard.platform.PlatformSecurityClient;
 import vip.mate.tool.guard.repository.ToolGuardAuditLogMapper;
 
 import java.time.LocalDateTime;
@@ -31,6 +32,7 @@ public class ToolGuardAuditService {
     private final ToolGuardAuditLogMapper auditMapper;
     private final ObjectMapper objectMapper;
     private final ToolGuardConfigService configService;
+    private final PlatformSecurityClient platformClient;
 
     /**
      * 异步记录审计日志
@@ -73,6 +75,13 @@ public class ToolGuardAuditService {
             }
 
             auditMapper.insert(entity);
+
+            // 异步推送至平台端（静默失败，不阻塞本地写入）
+            try {
+                platformClient.pushAuditLog(entity);
+            } catch (Exception pushEx) {
+                log.debug("[ToolGuardAudit] Platform push skipped: {}", pushEx.getMessage());
+            }
         } catch (Exception e) {
             log.warn("[ToolGuardAudit] Failed to record audit log: {}", e.getMessage());
         }

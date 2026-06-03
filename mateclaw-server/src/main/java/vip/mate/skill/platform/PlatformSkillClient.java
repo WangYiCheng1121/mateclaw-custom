@@ -20,7 +20,7 @@ import java.util.List;
  * 平台端技能远程调用客户端
  * <p>
  * 负责从平台端拉取当前客户端被授权使用的技能列表。
- * 技能的增删改全部在平台端完成，客户端只做“拉取 + 本地缓存”。
+ * 技能的增删改全部在平台端完成，客户端只做"拉取 + 本地缓存"。
  *
  * @author MateClaw Team
  */
@@ -158,6 +158,84 @@ public class PlatformSkillClient {
             log.debug("Platform unreachable: {}", e.getMessage());
             return false;
         }
+    }
+
+    /**
+     * 从平台端获取技能目录树
+     *
+     * @return 目录树根节点，失败时返回 null
+     */
+    public PlatformTreeNode fetchSkillCategories() {
+        if (!syncProperties.isEnabled() || !platformConfig.isEnabled()) {
+            return null;
+        }
+
+        String url = buildUrl(syncProperties.getCategoriesPath());
+
+        try {
+            HttpHeaders headers = new HttpHeaders();
+            applyAuth(headers);
+            HttpEntity<Void> entity = new HttpEntity<>(headers);
+            ResponseEntity<String> response = restTemplate.exchange(
+                    url, HttpMethod.GET, entity, String.class);
+
+            if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
+                PlatformResponse<PlatformTreeNode> platformResp = objectMapper.readValue(
+                        response.getBody(),
+                        new TypeReference<PlatformResponse<PlatformTreeNode>>() {});
+
+                if (platformResp.isSuccess()) {
+                    return platformResp.getData();
+                }
+                log.warn("Platform returned error for skill categories: {}",
+                        platformResp.getMessage());
+            }
+        } catch (Exception e) {
+            log.error("Failed to fetch skill categories from platform [{}]: {}",
+                    url, e.getMessage());
+        }
+        return null;
+    }
+
+    /**
+     * 从平台端模糊搜索技能目录
+     *
+     * @param name 目录名称关键字（可选）
+     * @return 匹配的目录节点列表，失败时返回空列表
+     */
+    public List<PlatformTreeNode> searchSkillCategories(String name) {
+        if (!syncProperties.isEnabled() || !platformConfig.isEnabled()) {
+            return Collections.emptyList();
+        }
+
+        String url = buildUrl(syncProperties.getCategoriesSearchPath());
+        if (name != null && !name.isBlank()) {
+            url += "?name=" + java.net.URLEncoder.encode(name, java.nio.charset.StandardCharsets.UTF_8);
+        }
+
+        try {
+            HttpHeaders headers = new HttpHeaders();
+            applyAuth(headers);
+            HttpEntity<Void> entity = new HttpEntity<>(headers);
+            ResponseEntity<String> response = restTemplate.exchange(
+                    url, HttpMethod.GET, entity, String.class);
+
+            if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
+                PlatformResponse<List<PlatformTreeNode>> platformResp = objectMapper.readValue(
+                        response.getBody(),
+                        new TypeReference<PlatformResponse<List<PlatformTreeNode>>>() {});
+
+                if (platformResp.isSuccess() && platformResp.getData() != null) {
+                    return platformResp.getData();
+                }
+                log.warn("Platform returned error for skill categories search: {}",
+                        platformResp.getMessage());
+            }
+        } catch (Exception e) {
+            log.error("Failed to search skill categories from platform [{}]: {}",
+                    url, e.getMessage());
+        }
+        return Collections.emptyList();
     }
 
     private void applyAuth(HttpHeaders headers) {

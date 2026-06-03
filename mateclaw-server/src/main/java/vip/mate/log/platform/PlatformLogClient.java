@@ -23,6 +23,7 @@ import java.util.Map;
  * 平台端接口字段：
  * - level (必填): info / warn / error
  * - detail (必填): 详细信息
+ * - logType (可选): 日志类型（runtime=运行日志, operation=操作日志）
  * - username (可选): 操作用户名
  * - logTime (可选): yyyy-MM-dd HH:mm:ss
  * - subsystem (可选): 子系统标识
@@ -65,9 +66,10 @@ public class PlatformLogClient {
      * @param level   日志级别（info/warn/error）
      * @param detail  详细信息
      * @param logTime 日志发生时间
+     * @param logType 日志类型（runtime=运行日志, operation=操作日志）
      * @return true=上报成功, false=上报失败
      */
-    public boolean reportLog(String level, String detail, LocalDateTime logTime) {
+    public boolean reportLog(String level, String detail, LocalDateTime logTime, String logType) {
         if (!logProperties.isEnabled() || !platformConfig.isEnabled()) {
             return false;
         }
@@ -79,6 +81,9 @@ public class PlatformLogClient {
             body.put("level", level);
             body.put("detail", detail);
             body.put("subsystem", logProperties.getSubsystem());
+            if (logType != null) {
+                body.put("logType", logType);
+            }
             if (logTime != null) {
                 body.put("logTime", logTime.format(DATETIME_FMT));
             }

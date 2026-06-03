@@ -9,6 +9,8 @@ import org.springframework.boot.ApplicationRunner;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 import vip.mate.tool.guard.model.ToolGuardRuleEntity;
+import vip.mate.tool.guard.platform.PlatformSecurityClient;
+import vip.mate.tool.guard.platform.PlatformSecurityProperties;
 import vip.mate.tool.guard.repository.ToolGuardRuleMapper;
 
 import java.util.*;
@@ -29,6 +31,8 @@ import java.util.stream.Collectors;
 public class ToolGuardRuleRegistry implements ApplicationRunner {
 
     private final ToolGuardRuleMapper ruleMapper;
+    private final PlatformSecurityClient platformClient;
+    private final PlatformSecurityProperties securityProperties;
 
     private volatile List<ToolGuardRuleEntity> allRules = List.of();
     private final Map<String, Pattern> compiledPatterns = new ConcurrentHashMap<>();
@@ -39,9 +43,25 @@ public class ToolGuardRuleRegistry implements ApplicationRunner {
     }
 
     /**
-     * 重新从 DB 加载所有规则
+     * 重新加载所有规则，优先从平台端拉取，回退到本地 DB
      */
     public void reload() {
+        // 优先从平台端拉取
+        if (securityProperties.isEnabled()) {
+            try {
+                List<ToolGuardRuleEntity> platformRules = platformClient.fetchRules();
+                if (platformRules != null && !platformRules.isEmpty()) {
+                    this.allRules = platformRules.stream()
+                            .filter(r -> Boolean.TRUE.equals(r.getEnabled()))
+                            .toList();
+                    log.info("[ToolGuardRuleRegistry] Loaded {} enabled rules from platform", this.allRules.size());
+                    return;
+                }
+            } catch (Exception e) {
+                log.warn("[ToolGuardRuleRegistry] Failed to load rules from platform: {}", e.getMessage());
+            }
+        }
+        // 回退到本地 DB
         try {
             List<ToolGuardRuleEntity> rules = ruleMapper.selectList(
                     new LambdaQueryWrapper<ToolGuardRuleEntity>()
@@ -49,7 +69,7 @@ public class ToolGuardRuleRegistry implements ApplicationRunner {
                             .orderByDesc(ToolGuardRuleEntity::getPriority)
             );
             this.allRules = List.copyOf(rules);
-            log.info("[ToolGuardRuleRegistry] Loaded {} enabled rules", rules.size());
+            log.info("[ToolGuardRuleRegistry] Loaded {} enabled rules from local DB", rules.size());
         } catch (Exception e) {
             log.warn("[ToolGuardRuleRegistry] Failed to load rules (table may not exist): {}", e.getMessage());
             this.allRules = List.of();

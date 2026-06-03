@@ -102,6 +102,8 @@ CREATE TABLE IF NOT EXISTS mate_skill (
     config_json   TEXT,
     source_code   TEXT,
     skill_content TEXT,
+    description_zh TEXT,
+    secret        TEXT,
     enabled       BOOLEAN      NOT NULL DEFAULT TRUE,
     builtin       BOOLEAN      NOT NULL DEFAULT FALSE,
     tags          VARCHAR(256),

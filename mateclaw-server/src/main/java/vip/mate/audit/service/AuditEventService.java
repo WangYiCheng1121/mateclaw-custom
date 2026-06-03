@@ -16,6 +16,7 @@ import vip.mate.audit.model.AuditEventEntity;
 import vip.mate.audit.repository.AuditEventMapper;
 import vip.mate.auth.model.UserEntity;
 import vip.mate.auth.service.AuthService;
+import vip.mate.log.platform.PlatformLogClient;
 
 import java.time.LocalDateTime;
 
@@ -23,6 +24,7 @@ import java.time.LocalDateTime;
  * 操作审计服务
  * <p>
  * 异步记录用户对资源的 CRUD 操作，不阻塞业务请求。
+ * 同时异步上报到平台端 /claw/logs 接口（logType=operation）。
  *
  * @author MateClaw Team
  */
@@ -33,6 +35,7 @@ public class AuditEventService {
 
     private final AuditEventMapper auditEventMapper;
     private final AuthService authService;
+    private final PlatformLogClient platformLogClient;
 
     /**
      * 异步记录审计事件。
@@ -70,6 +73,9 @@ public class AuditEventService {
         } catch (Exception e) {
             log.warn("Failed to insert audit event: {}/{}", event.getAction(), event.getResourceType(), e);
         }
+
+        // 异步上报到平台端（logType=operation，静默失败不阻塞本地写入）
+        reportToPlatform(event);
     }
 
     /**
@@ -80,6 +86,8 @@ public class AuditEventService {
         AuditEventEntity event = buildEvent(action, resourceType, resourceId, resourceName, detailJson);
         if (event != null) {
             auditEventMapper.insert(event);
+            // 同步上报到平台端（logType=operation）
+            reportToPlatform(event);
         }
     }
 
@@ -107,6 +115,34 @@ public class AuditEventService {
         }
         wrapper.orderByDesc(AuditEventEntity::getCreateTime);
         return auditEventMapper.selectPage(new Page<>(page, size), wrapper);
+    }
+
+    /**
+     * 将操作审计事件上报到平台端 /claw/logs
+     * <p>
+     * detail 格式：action=xxx, resourceType=xxx, resourceId=xxx, resourceName=xxx, username=xxx [, detailJson]
+     * logType 固定为 "operation"，level 固定为 "info"
+     */
+    private void reportToPlatform(AuditEventEntity event) {
+        try {
+            StringBuilder sb = new StringBuilder();
+            sb.append("action=").append(event.getAction());
+            sb.append(", resourceType=").append(event.getResourceType());
+            if (event.getResourceId() != null) {
+                sb.append(", resourceId=").append(event.getResourceId());
+            }
+            if (event.getResourceName() != null) {
+                sb.append(", resourceName=").append(event.getResourceName());
+            }
+            sb.append(", username=").append(event.getUsername() != null ? event.getUsername() : "system");
+            if (event.getDetailJson() != null && !event.getDetailJson().isBlank()) {
+                sb.append(", detail=").append(truncate(event.getDetailJson(), 500));
+            }
+
+            platformLogClient.reportLog("info", sb.toString(), event.getCreateTime(), "operation");
+        } catch (Exception e) {
+            log.debug("[AuditEvent] Platform report skipped: {}", e.getMessage());
+        }
     }
 
     private AuditEventEntity buildEvent(String action, String resourceType, String resourceId,

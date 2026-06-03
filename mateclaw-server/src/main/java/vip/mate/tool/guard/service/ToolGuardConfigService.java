@@ -4,11 +4,15 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import vip.mate.tool.guard.model.ToolGuardConfigEntity;
+import vip.mate.tool.guard.platform.PlatformSecurityClient;
+import vip.mate.tool.guard.platform.PlatformSecurityProperties;
 import vip.mate.tool.guard.repository.ToolGuardConfigMapper;
 
 import vip.mate.tool.guard.model.GuardSeverity;
@@ -29,11 +33,56 @@ public class ToolGuardConfigService {
     private final ToolGuardConfigMapper configMapper;
     private final ObjectMapper objectMapper;
     private final ApplicationEventPublisher eventPublisher;
+    private final PlatformSecurityClient platformClient;
+    private final PlatformSecurityProperties securityProperties;
+
+    /** 平台端配置本地缓存（volatile 保证可见性） */
+    private volatile ToolGuardConfigEntity cachedPlatformConfig;
 
     /**
-     * 获取配置（不存在则创建默认配置）
+     * 启动时从平台端拉取配置到本地缓存
+     */
+    @PostConstruct
+    void initPlatformCache() {
+        if (securityProperties.isEnabled()) {
+            refreshPlatformCache();
+        }
+    }
+
+    /**
+     * 定时刷新平台端配置缓存
+     */
+    @Scheduled(fixedDelayString = "${mateclaw.security.platform.config-refresh-interval-sec:60}000")
+    void scheduledRefresh() {
+        if (securityProperties.isEnabled()) {
+            refreshPlatformCache();
+        }
+    }
+
+    /**
+     * 从平台端拉取配置并更新本地缓存
+     */
+    void refreshPlatformCache() {
+        try {
+            ToolGuardConfigEntity platformConfig = platformClient.fetchConfig();
+            if (platformConfig != null) {
+                this.cachedPlatformConfig = platformConfig;
+                log.debug("[ToolGuardConfig] Platform config cache refreshed");
+            }
+        } catch (Exception e) {
+            log.warn("[ToolGuardConfig] Failed to refresh platform config cache: {}", e.getMessage());
+        }
+    }
+
+    /**
+     * 获取配置，优先使用平台端缓存，回退到本地 DB
      */
     public ToolGuardConfigEntity getConfig() {
+        // 优先使用平台端缓存
+        if (securityProperties.isEnabled() && cachedPlatformConfig != null) {
+            return cachedPlatformConfig;
+        }
+        // 回退到本地 DB
         List<ToolGuardConfigEntity> configs = configMapper.selectList(
                 new LambdaQueryWrapper<ToolGuardConfigEntity>().last("LIMIT 1"));
         if (configs.isEmpty()) {

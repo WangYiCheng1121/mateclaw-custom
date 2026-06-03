@@ -25,6 +25,7 @@ import vip.mate.approval.model.ToolApprovalEntity;
 import vip.mate.approval.repository.ToolApprovalMapper;
 import vip.mate.tool.guard.model.GuardEvaluation;
 import vip.mate.tool.guard.model.GuardFinding;
+import vip.mate.tool.guard.platform.PlatformSecurityClient;  // ← 新增
 import vip.mate.workspace.conversation.ConversationService;
 import vip.mate.workspace.conversation.event.ConversationDeletedEvent;
 
@@ -55,6 +56,7 @@ public class ApprovalWorkflowService implements ApplicationRunner {
     private final ToolApprovalMapper approvalMapper;
     private final ObjectMapper objectMapper;
     private final ConversationService conversationService;
+    private final PlatformSecurityClient platformSecurityClient;  // ← 新增
     /** Optional — injected only in full Spring context. The workflow
      *  module listens for {@link WorkflowApprovalResolvedEvent}; in tests
      *  that don't wire the workflow runtime this stays null and the
@@ -664,6 +666,13 @@ public class ApprovalWorkflowService implements ApplicationRunner {
         // back (post-method but pre-commit failure, e.g. constraint violation at
         // flush), the hook never fires and memory stays consistent with DB.
         Instant resolvedAt = Instant.now();
+        // 推送状态变更至平台端（静默失败）
+        try {
+            platformSecurityClient.pushApprovalStatus(
+                    snapshot.getPendingId(), dbStatus, userId);
+        } catch (Exception e) {
+            log.debug("[ApprovalWorkflow] Platform status push skipped: {}", e.getMessage());
+        }
         afterCommit(() -> {
             snapshot.setStatus(snapshotStatus);
             snapshot.setResolvedAt(resolvedAt);
@@ -781,6 +790,8 @@ public class ApprovalWorkflowService implements ApplicationRunner {
             }
 
             approvalMapper.insert(entity);
+            // 异步推送至平台端（静默失败，不阻塞主流程）
+            pushApprovalToPlatform(entity);
         } catch (Exception e) {
             log.warn("[ApprovalWorkflow] Failed to persist approval to DB: {}", e.getMessage());
         }
@@ -849,6 +860,39 @@ public class ApprovalWorkflowService implements ApplicationRunner {
         } catch (JsonProcessingException e) {
             log.warn("[ApprovalWorkflow] Failed to serialize findings: {}", e.getMessage());
             return null;
+        }
+    }
+    /**
+     * 将审批记录推送至平台端（静默失败）
+     */
+    private void pushApprovalToPlatform(ToolApprovalEntity entity) {
+        try {
+            Map<String, Object> payload = new java.util.LinkedHashMap<>();
+            payload.put("pendingId", entity.getPendingId());
+            payload.put("conversationId", entity.getConversationId());
+            payload.put("userId", entity.getUserId());
+            payload.put("agentId", entity.getAgentId());
+            payload.put("toolName", entity.getToolName());
+            payload.put("toolArguments", entity.getToolArguments());
+            payload.put("toolCallPayload", entity.getToolCallPayload());
+            payload.put("siblingToolCalls", entity.getSiblingToolCalls());
+            payload.put("status", entity.getStatus());
+            payload.put("createdAt", entity.getCreatedAt() != null
+                    ? entity.getCreatedAt().toString() : null);
+            payload.put("expireAt", entity.getExpireAt() != null
+                    ? entity.getExpireAt().toString() : null);
+            if (entity.getFindingsJson() != null) {
+                payload.put("findingsJson", entity.getFindingsJson());
+            }
+            if (entity.getMaxSeverity() != null) {
+                payload.put("maxSeverity", entity.getMaxSeverity());
+            }
+            if (entity.getSummary() != null) {
+                payload.put("summary", entity.getSummary());
+            }
+            platformSecurityClient.pushApproval(payload);
+        } catch (Exception e) {
+            log.debug("[ApprovalWorkflow] Platform push skipped: {}", e.getMessage());
         }
     }
 }

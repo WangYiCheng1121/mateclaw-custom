@@ -101,6 +101,8 @@ CREATE TABLE IF NOT EXISTS mate_skill (
     config_json   TEXT,
     source_code   TEXT,
     skill_content TEXT,
+    description_zh TEXT,
+    secret        TEXT,
     enabled       TINYINT(1)   NOT NULL DEFAULT 1,
     builtin       TINYINT(1)   NOT NULL DEFAULT 0,
     tags          VARCHAR(256),

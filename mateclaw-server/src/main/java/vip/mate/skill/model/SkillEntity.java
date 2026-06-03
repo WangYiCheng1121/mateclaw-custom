@@ -41,6 +41,23 @@ public class SkillEntity {
     /** 技能描述 */
     private String description;
 
+    /**
+     * 中文显示描述（平台同步字段）。
+     * {@code null} → 前端回退显示 {@code description}。
+     */
+    @TableField(value = "description_zh", updateStrategy = FieldStrategy.ALWAYS)
+    private String descriptionZh;
+
+    /**
+     * 所属目录ID（关联tree表，从平台同步）
+     */
+    private String categoryId;
+
+    /**
+     * 所属目录名称（从平台同步，冗余存储方便展示）
+     */
+    private String categoryName;
+
     /** 技能类型：builtin（内置）/ custom（自定义）/ mcp（MCP协议） */
     private String skillType;
 
@@ -94,11 +111,22 @@ public class SkillEntity {
     /** 是否启用 */
     private Boolean enabled;
 
+    /** 是否已安装（平台同步的技能默认未安装，需用户手动安装后才能启用/禁用） */
+    private Boolean installed;
+
     /** 是否系统内置（不可删除） */
     private Boolean builtin;
 
     /** 标签（逗号分隔） */
     private String tags;
+
+    /**
+     * 技能密钥（平台同步字段）。
+     * 部分技能需要的 API Key 等凭证，从平台端同步下发。
+     * {@code null} 表示该技能无需密钥。
+     */
+    @TableField(value = "secret", updateStrategy = FieldStrategy.ALWAYS)
+    private String secret;
 
     /**
      * Owning workspace. The DB column has existed since the baseline schema

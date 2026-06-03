@@ -115,12 +115,12 @@ public class PlatformLogReporter {
 
         for (LogEntry entry : batch) {
             try {
-                boolean success = platformLogClient.reportLog(entry.level, entry.detail, entry.logTime);
+                boolean success = platformLogClient.reportLog(entry.level, entry.detail, entry.logTime, entry.logType);
                 if (!success && logProperties.getRetryCount() > 0) {
                     // 简单重试
                     for (int i = 0; i < logProperties.getRetryCount() && !success; i++) {
                         Thread.sleep(500L * (i + 1));
-                        success = platformLogClient.reportLog(entry.level, entry.detail, entry.logTime);
+                        success = platformLogClient.reportLog(entry.level, entry.detail, entry.logTime, entry.logType);
                     }
                 }
             } catch (InterruptedException e) {
@@ -192,11 +192,13 @@ public class PlatformLogReporter {
         final String level;
         final String detail;
         final LocalDateTime logTime;
+        final String logType;
 
-        LogEntry(String level, String detail, LocalDateTime logTime) {
+        LogEntry(String level, String detail, LocalDateTime logTime, String logType) {
             this.level = level;
             this.detail = detail;
             this.logTime = logTime;
+            this.logType = logType;
         }
     }
 
@@ -250,8 +252,8 @@ public class PlatformLogReporter {
                     Instant.ofEpochMilli(event.getTimeStamp()),
                     ZoneId.systemDefault());
 
-            // 放入队列（非阻塞，队列满时丢弃）
-            LogEntry entry = new LogEntry(toLevelString(event.getLevel()), detailStr, logTime);
+            // 放入队列（非阻塞，队列满时丢弃）—— logType 固定为 runtime
+            LogEntry entry = new LogEntry(toLevelString(event.getLevel()), detailStr, logTime, "runtime");
             queue.offer(entry);
         }
 

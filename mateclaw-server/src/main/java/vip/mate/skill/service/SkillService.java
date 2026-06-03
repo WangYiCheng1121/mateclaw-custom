@@ -147,7 +147,8 @@ public class SkillService {
                                           String runtime,
                                           Set<Long> pinnedSkillIds,
                                           Long workspaceId,
-                                          String lifecycleState) {
+                                          String lifecycleState,
+                                          String categoryId) {
         Page<SkillEntity> pageParam = new Page<>(Math.max(page, 1), Math.max(size, 1));
         LambdaQueryWrapper<SkillEntity> wrapper = new LambdaQueryWrapper<>();
         applyWorkspaceScope(wrapper, workspaceId);
@@ -178,6 +179,9 @@ public class SkillService {
             // Default catalog view hides archived skills — they have their own tab.
             wrapper.and(w -> w.isNull(SkillEntity::getLifecycleState)
                     .or().ne(SkillEntity::getLifecycleState, "archived"));
+        }
+        if (categoryId != null && !categoryId.isBlank()) {
+            wrapper.eq(SkillEntity::getCategoryId, categoryId.trim());
         }
 
         SkillCatalogSort catalogSort = SkillCatalogSort.parse(sort);
@@ -252,13 +256,16 @@ public class SkillService {
     }
 
     /**
-     * 获取已启用的技能列表（Agent 运行时使用）
+     * 获取已安装且启用的技能列表（Agent 运行时使用）
      * <p>
      * RFC-023：追加 security_scan_status 过滤——FAILED 的 skill 不加载。
      * NULL（旧数据/手动创建）和 PASSED（扫描通过）都允许。
+     * <p>
+     * 平台同步的技能默认 installed=false，需用户安装后才能加入此列表。
      */
     public List<SkillEntity> listEnabledSkills() {
         return skillMapper.selectList(new LambdaQueryWrapper<SkillEntity>()
+                .eq(SkillEntity::getInstalled, true)
                 .eq(SkillEntity::getEnabled, true)
                 .and(w -> w.isNull(SkillEntity::getSecurityScanStatus)
                            .or().eq(SkillEntity::getSecurityScanStatus, "PASSED"))
@@ -271,6 +278,7 @@ public class SkillService {
      */
     public List<SkillEntity> listEnabledSkills(Long workspaceId) {
         LambdaQueryWrapper<SkillEntity> wrapper = new LambdaQueryWrapper<SkillEntity>()
+                .eq(SkillEntity::getInstalled, true)
                 .eq(SkillEntity::getEnabled, true)
                 .and(w -> w.isNull(SkillEntity::getSecurityScanStatus)
                            .or().eq(SkillEntity::getSecurityScanStatus, "PASSED"))
@@ -342,6 +350,10 @@ public class SkillService {
         skill.setBuiltin(false);
         if (skill.getEnabled() == null) {
             skill.setEnabled(true);
+        }
+        // 本地创建的技能默认为已安装；平台同步的技能由 SkillSyncService 设为 false
+        if (skill.getInstalled() == null) {
+            skill.setInstalled(true);
         }
         // Every skill belongs to a workspace. Callers that carry an
         // X-Workspace-Id header set this explicitly; the no-arg create
@@ -592,10 +604,14 @@ public class SkillService {
     }
 
     /**
-     * 启用/禁用技能
+     * 启用/禁用技能（仅已安装的技能允许切换）
      */
     public SkillEntity toggleSkill(Long id, boolean enabled) {
         SkillEntity skill = getSkill(id);
+        if (!Boolean.TRUE.equals(skill.getInstalled())) {
+            throw new MateClawException("err.skill.not_installed",
+                    "技能未安装，请先执行安装操作: " + skill.getName());
+        }
         skill.setEnabled(enabled);
         skillMapper.updateById(skill);
         log.info("Skill {} {}", skill.getName(), enabled ? "enabled" : "disabled");
@@ -619,6 +635,65 @@ public class SkillService {
         }
 
         return skill;
+    }
+
+    /**
+     * 安装技能：将平台同步过来的技能标记为已安装并启用。
+     * <p>
+     * 只有已安装（installed=true）的技能才允许在启用/禁用名单中切换。
+     * 安装本质上是一次性"接受该技能"的操作，后续用户可自由启用/禁用。
+     */
+    public SkillEntity installSkill(Long id) {
+        SkillEntity skill = getSkill(id);
+        if (Boolean.TRUE.equals(skill.getInstalled())) {
+            // 已安装，仅刷新 enabled
+            if (!Boolean.TRUE.equals(skill.getEnabled())) {
+                skill.setEnabled(true);
+                skillMapper.updateById(skill);
+                lifecycleService.bumpActivity(id);
+                refreshRuntimeIfNeeded();
+            }
+            return skill;
+        }
+        skill.setInstalled(true);
+        skill.setEnabled(true);
+        skillMapper.updateById(skill);
+        log.info("Skill {} installed and enabled", skill.getName());
+        lifecycleService.bumpActivity(id);
+        refreshRuntimeIfNeeded();
+        return skill;
+    }
+
+    /**
+     * 卸载技能（软卸载）：取消安装标记，同时禁用。
+     * <p>
+     * 与 {@link #uninstallSkill}（逻辑删除）不同，此方法保留技能数据行，
+     * 仅将 installed 和 enabled 置为 false。用户之后可以重新安装。
+     */
+    public SkillEntity unsetInstalled(Long id) {
+        SkillEntity skill = getSkill(id);
+        if (Boolean.TRUE.equals(skill.getBuiltin())) {
+            throw new MateClawException("err.skill.builtin_readonly",
+                    "内置技能不可卸载: " + skill.getName());
+        }
+        skill.setInstalled(false);
+        skill.setEnabled(false);
+        skillMapper.updateById(skill);
+        log.info("Skill {} uninstalled (soft)", skill.getName());
+
+        // 卸载时清理运行时包装器
+        if (runtimeService != null) {
+            runtimeService.deregisterSkillWrappers(id);
+            runtimeService.refreshActiveSkills();
+        }
+        return skill;
+    }
+
+    /** 统一刷新运行时缓存 */
+    private void refreshRuntimeIfNeeded() {
+        if (runtimeService != null) {
+            runtimeService.refreshActiveSkills();
+        }
     }
 
     // ==================== Agent 运行时集成 ====================

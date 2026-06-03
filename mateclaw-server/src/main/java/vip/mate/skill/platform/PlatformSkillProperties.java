@@ -38,6 +38,16 @@ public class PlatformSkillProperties {
     private String skillDetailPath = "/api/skills/{id}";
 
     /**
+     * 获取技能目录树的接口路径
+     */
+    private String categoriesPath = "/claw/skill/categories";
+
+    /**
+     * 模糊搜索技能目录的接口路径
+     */
+    private String categoriesSearchPath = "/claw/skill/categories/search";
+
+    /**
      * 同步间隔（秒），默认 300 秒（5分钟）
      */
     private int syncIntervalSeconds = 300;

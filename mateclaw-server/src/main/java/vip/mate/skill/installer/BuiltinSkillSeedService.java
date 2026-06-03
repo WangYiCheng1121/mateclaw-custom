@@ -319,6 +319,8 @@ public class BuiltinSkillSeedService implements ApplicationRunner {
         // choice and a downgrade in frontmatter never silently disables it.
         boolean optional = booleanFromFrontmatter(parsed, "optional", false);
         row.setEnabled(!optional);
+        // 内置技能默认为已安装，无需用户手动安装
+        row.setInstalled(true);
         row.setSkillContent(content);
         row.setVersion(stringFromFrontmatter(parsed, "version", DEFAULT_VERSION));
         row.setIcon(stringFromFrontmatter(parsed, "icon", DEFAULT_ICON));
