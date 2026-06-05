@@ -143,7 +143,10 @@ public class PlatformSearchProxyClient {
                         "Search proxy returned HTTP " + statusCode.value() + ": " +
                         (body != null ? body.substring(0, Math.min(200, body.length())) : "empty body"));
             }
-            return body;
+
+            // 平台端返回统一包装格式 {"code":"200","data":{...},"message":"成功"}
+            // 解包 data 字段，返回上游原始响应给 Provider 层解析
+            return unwrapData(body, providerId);
 
         } catch (ResourceAccessException e) {
             // ===== CONNECTION FAILURE: cannot reach platform =====
@@ -168,6 +171,34 @@ public class PlatformSearchProxyClient {
     }
 
     // ==================== internal helpers ====================
+
+    /**
+     * 解包平台端统一响应格式 {@code {"code":"200","data":{...},"message":"成功"}}
+     * 提取 {@code data} 字段返回给 Provider 层解析。
+     * <p>兼容非包装格式（如平台端后续改为直传上游响应），此时直接返回原 body。
+     */
+    private String unwrapData(String body, String providerId) {
+        if (body == null || body.isBlank()) {
+            log.warn("[SearchProxy] Empty response body for provider={}", providerId);
+            return body;
+        }
+        try {
+            JSONObject wrapped = JSONUtil.parseObj(body);
+            Object data = wrapped.get("data");
+            if (data != null) {
+                log.debug("[SearchProxy] Unwrapped data field for provider={}", providerId);
+                return data instanceof String ? (String) data : JSONUtil.toJsonStr(data);
+            }
+            // 无 data 字段 → 假定已经是上游原始响应，直接返回
+            log.debug("[SearchProxy] No 'data' wrapper found, treating body as raw upstream response for provider={}",
+                    providerId);
+            return body;
+        } catch (Exception e) {
+            log.warn("[SearchProxy] Failed to unwrap response for provider={}, returning raw body: {}",
+                    providerId, e.getMessage());
+            return body;
+        }
+    }
 
     private String buildProxyUrl() {
         String baseUrl = nacosService.resolveServiceUrl(proxyProperties.getServiceId());

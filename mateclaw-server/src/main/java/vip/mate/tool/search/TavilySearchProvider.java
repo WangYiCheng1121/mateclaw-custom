@@ -45,7 +45,7 @@ public class TavilySearchProvider implements SearchProvider {
 
     @Override
     public int autoDetectOrder() {
-        return 400;
+        return 300;
     }
 
     @Override

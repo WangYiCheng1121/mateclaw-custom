@@ -410,7 +410,7 @@ VALUES (1000000005, 'searchEnabled', 'true', '是否启用搜索功能', NOW(), 
 ON DUPLICATE KEY UPDATE setting_key=VALUES(setting_key), setting_value=VALUES(setting_value), description=VALUES(description), update_time=VALUES(update_time);
 
 INSERT INTO mate_system_setting (id, setting_key, setting_value, description, create_time, update_time)
-VALUES (1000000006, 'searchProvider', 'serper', '搜索服务提供商', NOW(), NOW())
+VALUES (1000000006, 'searchProvider', 'tavily', '搜索服务提供商', NOW(), NOW())
 ON DUPLICATE KEY UPDATE setting_key=VALUES(setting_key), setting_value=VALUES(setting_value), description=VALUES(description), update_time=VALUES(update_time);
 
 INSERT INTO mate_system_setting (id, setting_key, setting_value, description, create_time, update_time)

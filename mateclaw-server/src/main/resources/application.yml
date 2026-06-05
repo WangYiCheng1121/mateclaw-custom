@@ -129,7 +129,7 @@ mateclaw:
   platform:
     enabled: ${PLATFORM_AUTH_ENABLED:true}
     # 统一网关地址（通过路径前缀路由到具体服务）
-    gateway-url: ${PLATFORM_GATEWAY_URL:http://192.168.10.211}
+    gateway-url: ${PLATFORM_GATEWAY_URL:http://192.168.10.225}
     client-id: ${PLATFORM_CLIENT_ID:J8Kq169h56tm}
     client-secret: ${PLATFORM_CLIENT_SECRET:dd1492ee1c6e2c0cc72f963134534375}
     redirect-uri: /login

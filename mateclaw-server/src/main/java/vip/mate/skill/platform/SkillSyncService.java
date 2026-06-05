@@ -58,6 +58,9 @@ public class SkillSyncService {
     private volatile LocalDateTime lastSyncTime;
     private volatile String lastSyncStatus = "NEVER";
 
+    /** 平台目录树缓存（定时同步刷新，Controller 查询时读取，避免每次请求调平台API） */
+    private volatile PlatformTreeNode cachedCategoryTree;
+
     @PostConstruct
     public void init() {
         if (syncProperties.isEnabled() && platformConfig.isEnabled()) {
@@ -77,10 +80,41 @@ public class SkillSyncService {
             return;
         }
         syncFromPlatform();
+        refreshCategoryTree();
     }
 
     /**
-     * 手动触发同步（Controller 调用）
+     * 获取平台目录树缓存（供 Controller 查询使用，避免每次请求调平台API）
+     */
+    public PlatformTreeNode getCategoryTree() {
+        if (cachedCategoryTree == null) {
+            refreshCategoryTree();
+        }
+        return cachedCategoryTree;
+    }
+
+    /**
+     * 刷新目录树缓存（平台不可达时保留旧缓存）
+     */
+    private void refreshCategoryTree() {
+        if (!syncProperties.isEnabled() || !platformConfig.isEnabled()) {
+            return;
+        }
+        try {
+            PlatformTreeNode tree = platformSkillClient.fetchSkillCategories();
+            if (tree != null) {
+                this.cachedCategoryTree = tree;
+                log.debug("Category tree cache refreshed");
+            } else {
+                log.debug("Category tree fetch returned null, keeping stale cache");
+            }
+        } catch (Exception e) {
+            log.warn("Failed to refresh category tree cache: {}", e.getMessage());
+        }
+    }
+
+    /**
+     * 从平台同步技能数据
      *
      * @return 同步结果摘要
      */
@@ -150,6 +184,8 @@ public class SkillSyncService {
                     local.setTags(remote.getTags());
                     local.setAuthor(remote.getAuthor());
                     local.setDescriptionZh(remote.getDescriptionZh());
+                    local.setCategoryId(remote.getCategoryId());
+                    local.setCategoryName(remote.getCategoryName());
                     // 密钥：加密后存入本地
                     if (remote.getSecret() != null) {
                         local.setSecret(encryptSecret(remote.getSecret()));
@@ -232,6 +268,13 @@ public class SkillSyncService {
             return true;
         }
         if (!Objects.equals(local.getDescriptionZh(), remote.getDescriptionZh())) {
+            return true;
+        }
+        // 目录变更检测：平台端移动技能到其他目录时需要同步
+        if (!Objects.equals(local.getCategoryId(), remote.getCategoryId())) {
+            return true;
+        }
+        if (!Objects.equals(local.getCategoryName(), remote.getCategoryName())) {
             return true;
         }
         // 密钥：远程是明文，本地是密文，先加密再比对

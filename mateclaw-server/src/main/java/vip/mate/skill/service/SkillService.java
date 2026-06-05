@@ -148,7 +148,7 @@ public class SkillService {
                                           Set<Long> pinnedSkillIds,
                                           Long workspaceId,
                                           String lifecycleState,
-                                          String categoryId) {
+                                          List<String> categoryIds) {
         Page<SkillEntity> pageParam = new Page<>(Math.max(page, 1), Math.max(size, 1));
         LambdaQueryWrapper<SkillEntity> wrapper = new LambdaQueryWrapper<>();
         applyWorkspaceScope(wrapper, workspaceId);
@@ -180,8 +180,8 @@ public class SkillService {
             wrapper.and(w -> w.isNull(SkillEntity::getLifecycleState)
                     .or().ne(SkillEntity::getLifecycleState, "archived"));
         }
-        if (categoryId != null && !categoryId.isBlank()) {
-            wrapper.eq(SkillEntity::getCategoryId, categoryId.trim());
+        if (categoryIds != null && !categoryIds.isEmpty()) {
+            wrapper.in(SkillEntity::getCategoryId, categoryIds);
         }
 
         SkillCatalogSort catalogSort = SkillCatalogSort.parse(sort);

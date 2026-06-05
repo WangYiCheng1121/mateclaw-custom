@@ -367,7 +367,7 @@ VALUES (1000000005, 'searchEnabled', 'true', '是否启用搜索功能', NOW(), 
 
 MERGE INTO mate_system_setting (id, setting_key, setting_value, description, create_time, update_time)
 KEY (id)
-VALUES (1000000006, 'searchProvider', 'serper', '搜索服务提供商', NOW(), NOW());
+VALUES (1000000006, 'searchProvider', 'tavily', '搜索服务提供商', NOW(), NOW());
 
 MERGE INTO mate_system_setting (id, setting_key, setting_value, description, create_time, update_time)
 KEY (id)

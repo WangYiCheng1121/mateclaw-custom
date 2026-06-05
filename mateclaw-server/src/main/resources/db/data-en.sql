@@ -365,7 +365,7 @@ VALUES (1000000005, 'searchEnabled', 'true', 'Enable web search', NOW(), NOW());
 
 MERGE INTO mate_system_setting (id, setting_key, setting_value, description, create_time, update_time)
 KEY (id)
-VALUES (1000000006, 'searchProvider', 'serper', 'Search provider', NOW(), NOW());
+VALUES (1000000006, 'searchProvider', 'tavily', 'Search provider', NOW(), NOW());
 
 MERGE INTO mate_system_setting (id, setting_key, setting_value, description, create_time, update_time)
 KEY (id)

@@ -105,9 +105,16 @@ public class SkillController {
             @RequestParam(required = false) String categoryId) {
         Set<Long> pinnedSkillIds = agentId != null ? agentBindingService.getBoundSkillIds(agentId) : Set.of();
         if (pinnedSkillIds == null) pinnedSkillIds = Set.of();
+
+        // 递归解析目录ID：将单个categoryId展开为包含所有子孙目录ID的列表
+        List<String> categoryIds = null;
+        if (categoryId != null && !categoryId.isBlank()) {
+            categoryIds = collectDescendantIds(categoryId);
+        }
+
         IPage<SkillEntity> dbPage = skillService.pageSkills(
                 page, size, keyword, skillType, enabled, scanStatus, sort, source, runtime,
-                pinnedSkillIds, workspaceId, lifecycleState, categoryId);
+                pinnedSkillIds, workspaceId, lifecycleState, categoryIds);
         // Virtual MCP/ACP skills mirror live servers and carry no lifecycle
         // state — exclude them whenever the caller filters by lifecycleState
         // (stale / archived / active), otherwise they leak into every tab.
@@ -898,6 +905,52 @@ public class SkillController {
                     "Curator report not found: " + runId);
         }
         return R.ok(report);
+    }
+
+    // ==================== 目录递归辅助方法 ====================
+
+    /**
+     * 递归收集目录及其所有子孙目录的ID列表
+     * <p>
+     * 从缓存的目录树中查找指定categoryId的节点，返回该节点及其所有子孙节点的ID。
+     * 如果目录树缓存为空或找不到对应节点，则降级为只返回当前categoryId。
+     */
+    private List<String> collectDescendantIds(String categoryId) {
+        PlatformTreeNode tree = skillSyncService.getCategoryTree();
+        if (tree == null) {
+            return List.of(categoryId);
+        }
+        List<String> result = new ArrayList<>();
+        collectDescendantIds(tree, categoryId, result);
+        // 如果树中没找到对应节点（可能目录树尚未同步），降级为精确匹配
+        if (result.isEmpty()) {
+            result.add(categoryId);
+        }
+        return result;
+    }
+
+    private void collectDescendantIds(PlatformTreeNode node, String targetId, List<String> collector) {
+        if (node == null) return;
+        if (targetId.equals(node.getId())) {
+            // 找到目标节点，收集自身及所有子孙
+            addSelfAndDescendants(node, collector);
+            return;
+        }
+        if (node.getChildren() != null) {
+            for (PlatformTreeNode child : node.getChildren()) {
+                collectDescendantIds(child, targetId, collector);
+            }
+        }
+    }
+
+    private void addSelfAndDescendants(PlatformTreeNode node, List<String> collector) {
+        if (node == null) return;
+        collector.add(node.getId());
+        if (node.getChildren() != null) {
+            for (PlatformTreeNode child : node.getChildren()) {
+                addSelfAndDescendants(child, collector);
+            }
+        }
     }
 
     /** Body of {@code POST /skills/{id}/pin}. */

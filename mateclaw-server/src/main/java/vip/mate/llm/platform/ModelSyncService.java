@@ -20,7 +20,6 @@ import vip.mate.system.repository.SystemSettingMapper;
 import jakarta.annotation.PostConstruct;
 import java.time.LocalDateTime;
 import java.util.*;
-import java.util.stream.Collectors;
 
 /**
  * 模型同步服务
@@ -28,10 +27,14 @@ import java.util.stream.Collectors;
  * 定时/手动从平台端拉取被分配的 Provider + Model 配置，同步到本地数据库。
  * 同步策略：
  * <ul>
- *   <li>Provider：平台端有 → upsert；平台端无且非本地类型 → 删除</li>
- *   <li>Model：平台端有 → upsert；平台端无且所属 Provider 非本地 → 删除</li>
- *   <li>本地 Provider（is_local=true，如 Ollama/LM Studio）不参与平台同步</li>
+ *   <li>Provider：平台端有 → upsert（enabled 强制 true）；平台端无 → 删除</li>
+ *   <li>Model：平台端有 → upsert；平台端无 → 删除</li>
+ *   <li>所有 Provider 和 Model 均以平台端数据为准，无例外</li>
+ *   <li>敏感凭据（apiKey、baseUrl）平台未下发时保留本地已有值</li>
  * </ul>
+ * <p>
+ * 平台端返回的是独立 DTO（{@code SyncProviderItem} / {@code ModelConfigVO}），
+ * 此处负责转换到本地实体后再持久化。
  *
  * @author MateClaw Team
  */
@@ -63,9 +66,6 @@ public class ModelSyncService {
         }
     }
 
-    /**
-     * 定时同步
-     */
     @Scheduled(fixedDelayString = "${mateclaw.model.sync.sync-interval-seconds:300}000")
     public void scheduledSync() {
         if (!syncProperties.isEnabled() || !platformConfig.isEnabled()) {
@@ -74,9 +74,6 @@ public class ModelSyncService {
         syncFromPlatform();
     }
 
-    /**
-     * 手动触发同步（Controller 调用）
-     */
     public SyncResult syncFromPlatform() {
         if (!syncProperties.isEnabled() || !platformConfig.isEnabled()) {
             return new SyncResult(false, "Platform sync disabled", 0, 0, 0);
@@ -99,33 +96,31 @@ public class ModelSyncService {
         int upsertedProviders = 0, upsertedModels = 0, deletedModels = 0, deletedProviders = 0;
 
         // ==================== 同步 Provider ====================
-        List<ModelProviderEntity> remoteProviders = remoteData.getProviders();
+        List<SyncProviderItem> remoteProviders = remoteData.getProviders();
         if (remoteProviders == null) remoteProviders = Collections.emptyList();
 
         Set<String> remoteProviderIds = new HashSet<>();
-        for (ModelProviderEntity remote : remoteProviders) {
+        for (SyncProviderItem remote : remoteProviders) {
             remoteProviderIds.add(remote.getProviderId());
             ModelProviderEntity local = modelProviderMapper.selectById(remote.getProviderId());
             if (local == null) {
-                // 新增
-                modelProviderMapper.insert(remote);
+                modelProviderMapper.insert(toProviderEntity(remote));
                 upsertedProviders++;
                 log.debug("Synced new provider from platform: {}", remote.getProviderId());
-            } else if (!Boolean.TRUE.equals(local.getIsLocal())) {
-                // 更新非本地 Provider（本地 Provider 不被覆盖）
-                remote.setCreateTime(local.getCreateTime());
-                modelProviderMapper.updateById(remote);
+            } else {
+                mergeProviderFields(local, remote);
+                modelProviderMapper.updateById(local);
                 upsertedProviders++;
                 log.debug("Synced updated provider from platform: {}", remote.getProviderId());
             }
         }
 
         // ==================== 同步 Model ====================
-        List<ModelConfigEntity> remoteModels = remoteData.getModels();
+        List<ModelConfigVO> remoteModels = remoteData.getModels();
         if (remoteModels == null) remoteModels = Collections.emptyList();
 
         Set<String> remoteModelKeys = new HashSet<>();
-        for (ModelConfigEntity remote : remoteModels) {
+        for (ModelConfigVO remote : remoteModels) {
             String key = remote.getProvider() + "/" + remote.getModelName();
             remoteModelKeys.add(key);
 
@@ -136,72 +131,42 @@ public class ModelSyncService {
                             .last("LIMIT 1"));
 
             if (local == null) {
-                // 新增：但需检查ID是否已存在（避免主键冲突）
-                ModelConfigEntity existingById = modelConfigMapper.selectById(remote.getId());
+                ModelConfigEntity newEntity = toModelEntity(remote);
+
+                ModelConfigEntity existingById = modelConfigMapper.selectById(newEntity.getId());
                 if (existingById != null) {
-                    // ID已存在，执行更新操作
-                    existingById.setName(remote.getName());
-                    existingById.setDescription(remote.getDescription());
-                    existingById.setTemperature(remote.getTemperature());
-                    existingById.setMaxTokens(remote.getMaxTokens());
-                    existingById.setMaxInputTokens(remote.getMaxInputTokens());
-                    existingById.setTopP(remote.getTopP());
-                    existingById.setEnableSearch(remote.getEnableSearch());
-                    existingById.setSearchStrategy(remote.getSearchStrategy());
-                    existingById.setBuiltin(remote.getBuiltin());
-                    existingById.setEnabled(remote.getEnabled());
-                    existingById.setIsDefault(remote.getIsDefault());
-                    existingById.setModelType(remote.getModelType());
+                    applyModelFields(existingById, remote);
                     modelConfigMapper.updateById(existingById);
-                    log.debug("Updated existing model by ID from platform: {}/{} (id={})", 
+                    log.debug("Updated existing model by ID from platform: {}/{} (id={})",
                             remote.getProvider(), remote.getModelName(), remote.getId());
                 } else {
-                    // ID也不存在，执行插入；兜底处理 @TableLogic 逻辑删除导致的主键冲突
                     try {
-                        modelConfigMapper.insert(remote);
+                        modelConfigMapper.insert(newEntity);
                         log.debug("Synced new model from platform: {}/{}", remote.getProvider(), remote.getModelName());
                     } catch (Exception e) {
-                        // selectById 因 @TableLogic 过滤了已删除记录，但物理主键仍存在，触发唯一约束冲突
                         log.info("Resurrecting logically deleted model: {}/{} (id={})",
                                 remote.getProvider(), remote.getModelName(), remote.getId());
                         modelConfigMapper.physicalRestore(remote.getId());
-                        modelConfigMapper.updateById(remote);
+                        modelConfigMapper.updateById(newEntity);
                     }
                 }
                 upsertedModels++;
             } else {
-                // 更新：同步关键配置字段
-                local.setName(remote.getName());
-                local.setDescription(remote.getDescription());
-                local.setTemperature(remote.getTemperature());
-                local.setMaxTokens(remote.getMaxTokens());
-                local.setMaxInputTokens(remote.getMaxInputTokens());
-                local.setTopP(remote.getTopP());
-                local.setEnableSearch(remote.getEnableSearch());
-                local.setSearchStrategy(remote.getSearchStrategy());
-                local.setBuiltin(remote.getBuiltin());
-                local.setEnabled(remote.getEnabled());
-                local.setIsDefault(remote.getIsDefault());
-                local.setModelType(remote.getModelType());
+                applyModelFields(local, remote);
                 modelConfigMapper.updateById(local);
                 upsertedModels++;
             }
         }
 
-        // 删除：本地有但平台端已不再分配的非本地 Provider 模型
+        // 删除：本地有但平台端已不再分配的模型
         List<ModelConfigEntity> allLocalModels = modelConfigMapper.selectList(
                 new LambdaQueryWrapper<ModelConfigEntity>());
         for (ModelConfigEntity local : allLocalModels) {
-            // 跳过本地 Provider 的模型
-            ModelProviderEntity provider = modelProviderMapper.selectById(local.getProvider());
-            if (provider != null && Boolean.TRUE.equals(provider.getIsLocal())) {
-                continue;
-            }
             String key = local.getProvider() + "/" + local.getModelName();
             if (!remoteModelKeys.contains(key)) {
                 modelConfigMapper.deleteById(local.getId());
                 deletedModels++;
-                log.debug("Deleted model — no longer assigned by platform: {}", key);
+                log.debug("Deleted model - no longer assigned by platform: {}", key);
             }
         }
 
@@ -211,27 +176,21 @@ public class ModelSyncService {
             syncDefaultModel(remoteData.getDefaultProvider(), remoteData.getDefaultModelName());
         }
 
-        // 同步默认 Embedding 设置
         if (StringUtils.hasText(remoteData.getDefaultEmbeddingModelId())) {
             syncDefaultEmbedding(remoteData.getDefaultEmbeddingModelId());
         }
 
-        // 删除：本地有但平台端已不再分配的非本地 Provider
+        // 删除：本地有但平台端已不再分配的 Provider
         List<ModelProviderEntity> allLocalProviders = modelProviderMapper.selectList(
                 new LambdaQueryWrapper<ModelProviderEntity>());
         for (ModelProviderEntity local : allLocalProviders) {
-            // 跳过本地 Provider
-            if (Boolean.TRUE.equals(local.getIsLocal())) {
-                continue;
-            }
             if (!remoteProviderIds.contains(local.getProviderId())) {
                 modelProviderMapper.deleteById(local.getProviderId());
                 deletedProviders++;
-                log.debug("Deleted provider — no longer assigned by platform: {}", local.getProviderId());
+                log.debug("Deleted provider - no longer assigned by platform: {}", local.getProviderId());
             }
         }
 
-        // 发布变更事件 → 刷新 Agent 缓存
         eventPublisher.publishEvent(new ModelConfigChangedEvent("platform-sync"));
 
         lastSyncTime = LocalDateTime.now();
@@ -242,9 +201,6 @@ public class ModelSyncService {
         return new SyncResult(true, "Sync completed", upsertedProviders, upsertedModels, deletedModels);
     }
 
-    /**
-     * 获取同步状态
-     */
     public Map<String, Object> getSyncStatus() {
         Map<String, Object> status = new LinkedHashMap<>();
         status.put("enabled", syncProperties.isEnabled() && platformConfig.isEnabled());
@@ -255,17 +211,83 @@ public class ModelSyncService {
         return status;
     }
 
-    // ==================== 内部方法 ====================
+    // ==================== DTO -> Entity ====================
+
+    private ModelProviderEntity toProviderEntity(SyncProviderItem dto) {
+        ModelProviderEntity entity = new ModelProviderEntity();
+        entity.setProviderId(dto.getProviderId());
+        entity.setName(dto.getName());
+        entity.setApiKeyPrefix(dto.getApiKeyPrefix());
+        entity.setChatModel(dto.getChatModel());
+        entity.setApiKey(dto.getApiKey());
+        entity.setBaseUrl(dto.getBaseUrl());
+        entity.setGenerateKwargs(dto.getGenerateKwargs());
+        entity.setIsCustom(dto.getIsCustom());
+        entity.setIsLocal(dto.getIsLocal());
+        entity.setSupportConnectionCheck(dto.getSupportConnectionCheck());
+        entity.setFreezeUrl(dto.getFreezeUrl());
+        entity.setRequireApiKey(dto.getRequireApiKey());
+        entity.setAuthType(dto.getAuthType());
+        entity.setEnabled(true);
+        return entity;
+    }
+
+    private ModelConfigEntity toModelEntity(ModelConfigVO dto) {
+        ModelConfigEntity entity = new ModelConfigEntity();
+        entity.setId(dto.getId());
+        applyModelFields(entity, dto);
+        return entity;
+    }
+
+    // ==================== 字段合并 ====================
+
+    private void mergeProviderFields(ModelProviderEntity local, SyncProviderItem remote) {
+        local.setName(remote.getName());
+        local.setApiKeyPrefix(remote.getApiKeyPrefix());
+        local.setChatModel(remote.getChatModel());
+        local.setGenerateKwargs(remote.getGenerateKwargs());
+        local.setIsCustom(remote.getIsCustom());
+        local.setIsLocal(remote.getIsLocal());
+        local.setSupportConnectionCheck(remote.getSupportConnectionCheck());
+        local.setFreezeUrl(remote.getFreezeUrl());
+        local.setRequireApiKey(remote.getRequireApiKey());
+        local.setAuthType(remote.getAuthType());
+        local.setEnabled(true);
+
+        if (StringUtils.hasText(remote.getApiKey())) {
+            local.setApiKey(remote.getApiKey());
+        }
+        if (StringUtils.hasText(remote.getBaseUrl())) {
+            local.setBaseUrl(remote.getBaseUrl());
+        }
+    }
+
+    private void applyModelFields(ModelConfigEntity target, ModelConfigVO remote) {
+        target.setName(remote.getName());
+        target.setProvider(remote.getProvider());
+        target.setModelName(remote.getModelName());
+        target.setDescription(remote.getDescription());
+        target.setTemperature(remote.getTemperature());
+        target.setMaxTokens(remote.getMaxTokens());
+        target.setMaxInputTokens(remote.getMaxInputTokens());
+        target.setTopP(remote.getTopP());
+        target.setEnableSearch(remote.getEnableSearch());
+        target.setSearchStrategy(remote.getSearchStrategy());
+        target.setBuiltin(remote.getBuiltin());
+        target.setEnabled(remote.getEnabled());
+        target.setIsDefault(remote.getIsDefault());
+        target.setModelType(remote.getModelType());
+    }
+
+    // ==================== 默认值同步 ====================
 
     private void syncDefaultModel(String provider, String modelName) {
-        // 清除所有旧默认
         List<ModelConfigEntity> oldDefaults = modelConfigMapper.selectList(
                 new LambdaQueryWrapper<ModelConfigEntity>().eq(ModelConfigEntity::getIsDefault, true));
         for (ModelConfigEntity old : oldDefaults) {
             old.setIsDefault(false);
             modelConfigMapper.updateById(old);
         }
-        // 设置新默认
         ModelConfigEntity target = modelConfigMapper.selectOne(
                 new LambdaQueryWrapper<ModelConfigEntity>()
                         .eq(ModelConfigEntity::getProvider, provider)
@@ -280,8 +302,8 @@ public class ModelSyncService {
     }
 
     private void syncDefaultEmbedding(String modelId) {
-        com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<SystemSettingEntity> qw =
-                new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<SystemSettingEntity>()
+        LambdaQueryWrapper<SystemSettingEntity> qw =
+                new LambdaQueryWrapper<SystemSettingEntity>()
                         .eq(SystemSettingEntity::getSettingKey, SYSTEM_SETTING_DEFAULT_EMBEDDING_ID)
                         .last("LIMIT 1");
         SystemSettingEntity existing = systemSettingMapper.selectOne(qw);
@@ -298,8 +320,5 @@ public class ModelSyncService {
         log.debug("Synced default embedding model from platform: {}", modelId);
     }
 
-    /**
-     * 同步结果
-     */
     public record SyncResult(boolean success, String message, int upsertedProviders, int upsertedModels, int deletedModels) {}
 }

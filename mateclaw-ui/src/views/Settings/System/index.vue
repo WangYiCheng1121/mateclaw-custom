@@ -219,7 +219,7 @@ const settings = reactive<SystemSettings>({
   streamEnabled: true,
   debugMode: false,
   searchEnabled: true,
-  searchProvider: 'serper',
+  searchProvider: 'tavily',
   searchFallbackEnabled: false,
   serperBaseUrl: 'https://google.serper.dev/search',
   tavilyBaseUrl: 'https://api.tavily.com/search',

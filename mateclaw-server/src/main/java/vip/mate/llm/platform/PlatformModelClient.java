@@ -10,23 +10,12 @@ import org.springframework.web.client.RestTemplate;
 import vip.mate.auth.config.PlatformOAuth2Config;
 import vip.mate.auth.service.PlatformNacosService;
 import vip.mate.auth.service.PlatformTokenHolder;
-import vip.mate.llm.model.ModelConfigEntity;
-import vip.mate.llm.model.ModelProviderEntity;
 import vip.mate.skill.platform.PlatformResponse;
 
 import java.time.Duration;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
-/**
- * 平台端模型远程调用客户端
- * <p>
- * 负责从平台端拉取当前客户端被授权使用的 Provider + Model 配置。
- * 模型的增删改全部在平台端完成，客户端只做"拉取 + 本地缓存"。
- *
- * @author MateClaw Team
- */
 @Slf4j
 @Component
 public class PlatformModelClient {
@@ -55,11 +44,6 @@ public class PlatformModelClient {
                 .build();
     }
 
-    /**
-     * 从平台端拉取当前客户端被分配的完整 Provider + Model 配置
-     *
-     * @return 平台端返回的同步数据；失败时返回 null
-     */
     public AssignedModelsResponse fetchAssignedModels() {
         if (!syncProperties.isEnabled() || !platformConfig.isEnabled()) {
             log.debug("Platform model sync disabled, skip fetch");
@@ -105,9 +89,6 @@ public class PlatformModelClient {
         }
     }
 
-    /**
-     * 从平台端获取默认 Embedding 模型配置
-     */
     public String fetchDefaultEmbeddingModelId() {
         if (!syncProperties.isEnabled() || !platformConfig.isEnabled()) {
             return null;
@@ -140,9 +121,6 @@ public class PlatformModelClient {
         return null;
     }
 
-    /**
-     * 检查平台端连通性
-     */
     public boolean isReachable() {
         try {
             String url = buildUrl("/actuator/health");
@@ -176,19 +154,12 @@ public class PlatformModelClient {
         return baseUrl + path;
     }
 
-    // ==================== 响应数据结构 ====================
-
-    /**
-     * 平台端分配的模型同步数据
-     */
     @lombok.Data
     public static class AssignedModelsResponse {
-        private List<ModelProviderEntity> providers;
-        private List<ModelConfigEntity> models;
-        /** 平台端指定的默认 chat 模型 provider+modelName */
+        private List<SyncProviderItem> providers;
+        private List<ModelConfigVO> models;
         private String defaultProvider;
         private String defaultModelName;
-        /** 平台端指定的默认 embedding 模型 ID */
         private String defaultEmbeddingModelId;
     }
 }

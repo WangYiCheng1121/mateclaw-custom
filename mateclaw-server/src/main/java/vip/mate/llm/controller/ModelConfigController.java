@@ -5,22 +5,15 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.*;
-import vip.mate.channel.platform.ChannelSyncService;
 import vip.mate.common.result.R;
 import vip.mate.llm.model.*;
-import org.springframework.ai.embedding.EmbeddingModel;
-import org.springframework.ai.embedding.EmbeddingRequest;
-import org.springframework.ai.embedding.EmbeddingResponse;
-import vip.mate.llm.embedding.EmbeddingModelFactory;
 import vip.mate.llm.platform.ModelSyncService;
 import vip.mate.llm.service.ModelConfigService;
-import vip.mate.llm.service.ModelDiscoveryService;
 import vip.mate.llm.service.ModelProviderService;
 import vip.mate.system.model.SystemSettingEntity;
 import vip.mate.system.repository.SystemSettingMapper;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import vip.mate.workspace.core.annotation.RequireGlobalAdmin;
@@ -50,6 +43,10 @@ import vip.mate.workspace.core.annotation.RequireWorkspaceRole;
  * - POST   /api/v1/models/{providerId}/models/{modelId}/test → 测试模型
  * - POST   /api/v1/models/embedding/{modelId}/test → 测试 Embedding
  * - POST   /api/v1/models/embedding/default      → 设置默认 Embedding
+ * - GET    /api/v1/models/catalog                → Provider 全量目录（不再区分启用/禁用）
+ * - POST   /api/v1/models/{providerId}/enable    → 启用 Provider（由平台端管控）
+ * - POST   /api/v1/models/{providerId}/disable   → 禁用 Provider（由平台端管控）
+ * - PUT    /api/v1/models/active                 → 设置激活模型（由平台端管控）
  *
  * @author MateClaw Team
  */
@@ -64,12 +61,8 @@ public class ModelConfigController {
 
     private final ModelConfigService modelConfigService;
     private final ModelProviderService modelProviderService;
-    private final ModelDiscoveryService modelDiscoveryService;
-    private final EmbeddingModelFactory embeddingModelFactory;
     private final SystemSettingMapper systemSettingMapper;
-    private final ChannelSyncService channelSyncService;
     private final ModelSyncService modelSyncService;
-
 
     private static final String SYSTEM_SETTING_DEFAULT_EMBEDDING_ID = "embedding.default.model.id";
 
@@ -80,27 +73,6 @@ public class ModelConfigController {
     @RequireGlobalAdmin
     public R<List<ProviderInfoDTO>> list() {
         return R.ok(modelProviderService.listProviders());
-    }
-
-    @Operation(summary = "RFC-074: 获取 Provider 全量目录（含未启用），供 Add Provider 抽屉使用")
-    @GetMapping("/catalog")
-    @RequireGlobalAdmin
-    public R<List<ProviderInfoDTO>> catalog() {
-        return R.ok(modelProviderService.listCatalog());
-    }
-
-    @Operation(summary = "RFC-074: 启用 Provider")
-    @PostMapping("/{providerId}/enable")
-    @RequireGlobalAdmin
-    public R<EnableResult> enableProvider(@PathVariable String providerId) {
-        return R.ok(modelProviderService.setEnabled(providerId, true));
-    }
-
-    @Operation(summary = "RFC-074: 禁用 Provider（如其下模型为当前默认会自动切换）")
-    @PostMapping("/{providerId}/disable")
-    @RequireGlobalAdmin
-    public R<EnableResult> disableProvider(@PathVariable String providerId) {
-        return R.ok(modelProviderService.setEnabled(providerId, false));
     }
 
     // Viewers need to know which models are available + which one is active so
@@ -132,15 +104,7 @@ public class ModelConfigController {
         return R.ok(info);
     }
 
-    @Operation(summary = "设置当前激活模型")
-    @PutMapping("/active")
-    @RequireGlobalAdmin
-    public R<ActiveModelsInfo> setActiveModel(@RequestBody ModelSlotRequest request) {
-        ModelConfigEntity model = modelConfigService.setDefaultModel(request.getProviderId(), request.getModel());
-        ActiveModelsInfo info = new ActiveModelsInfo();
-        info.setActiveLlm(new ModelSlotConfig(model.getProvider(), model.getModelName()));
-        return R.ok(info);
-    }
+
 
 //    @Operation(summary = "更新 Provider 配置")
 //    @PutMapping("/{providerId}/config")

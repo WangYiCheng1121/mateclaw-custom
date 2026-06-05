@@ -45,7 +45,7 @@ public class SerperSearchProvider implements SearchProvider {
 
     @Override
     public int autoDetectOrder() {
-        return 300;
+        return 400;
     }
 
     @Override
