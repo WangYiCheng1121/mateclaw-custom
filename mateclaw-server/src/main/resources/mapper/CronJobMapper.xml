@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="vip.mate.cron.repository.CronJobMapper">
+
+    <resultMap id="CronJobEntity" type="vip.mate.cron.model.CronJobEntity">
+        <id property="id" column="id"/>
+        <result property="workspaceId" column="workspace_id"/>
+        <result property="name" column="name"/>
+        <result property="cronExpression" column="cron_expression"/>
+        <result property="timezone" column="timezone"/>
+        <result property="agentId" column="agent_id"/>
+        <result property="taskType" column="task_type"/>
+        <result property="triggerMessage" column="trigger_message"/>
+        <result property="requestBody" column="request_body"/>
+        <result property="enabled" column="enabled"/>
+        <result property="nextRunTime" column="next_run_time"/>
+        <result property="lastRunTime" column="last_run_time"/>
+        <result property="channelId" column="channel_id"/>
+        <result property="deliveryConfig" column="delivery_config"
+                typeHandler="com.baomidou.mybatisplus.extension.handlers.JacksonTypeHandler"/>
+        <result property="createTime" column="create_time"/>
+        <result property="updateTime" column="update_time"/>
+        <result property="deleted" column="deleted"/>
+        <result property="lastDeliveryStatus" column="last_delivery_status"/>
+        <result property="lastDeliveryError" column="last_delivery_error"/>
+    </resultMap>
+
+</mapper>
