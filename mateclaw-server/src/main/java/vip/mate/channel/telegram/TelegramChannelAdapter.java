@@ -80,7 +80,7 @@ public class TelegramChannelAdapter extends AbstractChannelAdapter {
     protected void doStart() {
         this.botToken = getConfigString("bot_token");
         if (botToken == null || botToken.isBlank()) {
-            throw new IllegalStateException("Telegram channel requires bot_token in configJson");
+            throw new IllegalStateException("Telegram 渠道需要在 configJson 中配置 bot_token");
         }
 
         this.apiBaseUrl = "https://api.telegram.org/bot" + botToken;
@@ -242,17 +242,17 @@ public class TelegramChannelAdapter extends AbstractChannelAdapter {
                     log.error("[telegram] Invalid bot token (401 Unauthorized), stopping polling");
                     polling = false;
                     connectionState.set(ConnectionState.ERROR);
-                    lastError = "Invalid bot token";
+                    lastError = "无效的 bot token";
                     return;
                 }
 
                 if (response.statusCode() != 200) {
-                    throw new RuntimeException("getUpdates failed: status=" + response.statusCode());
+                    throw new RuntimeException("getUpdates 失败: status=" + response.statusCode());
                 }
 
                 Map<String, Object> result = objectMapper.readValue(response.body(), Map.class);
                 if (!Boolean.TRUE.equals(result.get("ok"))) {
-                    throw new RuntimeException("getUpdates returned ok=false: " + result.get("description"));
+                    throw new RuntimeException("getUpdates 返回 ok=false: " + result.get("description"));
                 }
 
                 // 连接正常

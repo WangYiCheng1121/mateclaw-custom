@@ -98,7 +98,7 @@ public class DingTalkChannelAdapter extends AbstractChannelAdapter implements St
         String clientSecret = getConfigString("client_secret");
 
         if (clientId == null || clientId.isBlank() || clientSecret == null || clientSecret.isBlank()) {
-            throw new IllegalStateException("DingTalk channel requires client_id and client_secret in configJson");
+            throw new IllegalStateException("钉钉渠道需要在 configJson 中配置 client_id 和 client_secret");
         }
 
         this.httpClient = HttpClient.newBuilder()
@@ -160,7 +160,7 @@ public class DingTalkChannelAdapter extends AbstractChannelAdapter implements St
             log.info("[dingtalk-stream] Stream connection established (no public IP needed)");
         } catch (Exception e) {
             log.error("[dingtalk-stream] Failed to start stream client: {}", e.getMessage(), e);
-            throw new RuntimeException("DingTalk Stream start failed: " + e.getMessage(), e);
+            throw new RuntimeException("钉钉 Stream 启动失败: " + e.getMessage(), e);
         }
     }
 
@@ -189,7 +189,7 @@ public class DingTalkChannelAdapter extends AbstractChannelAdapter implements St
             HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
 
             if (response.statusCode() != 200) {
-                String msg = String.format("DingTalk credential validation failed: HTTP %d, body=%s",
+                String msg = String.format("钉钉凭证校验失败: HTTP %d, body=%s",
                         response.statusCode(), response.body());
                 log.error("[dingtalk] {}", msg);
                 throw new IllegalStateException(msg);
@@ -199,8 +199,8 @@ public class DingTalkChannelAdapter extends AbstractChannelAdapter implements St
             @SuppressWarnings("unchecked")
             Map<String, Object> result = objectMapper.readValue(response.body(), Map.class);
             if (result.get("accessToken") == null) {
-                String errMsg = result.getOrDefault("message", result.getOrDefault("errmsg", "unknown error")).toString();
-                String msg = "DingTalk credential validation failed: " + errMsg;
+                String errMsg = result.getOrDefault("message", result.getOrDefault("errmsg", "未知错误")).toString();
+                String msg = "钉钉凭证校验失败: " + errMsg;
                 log.error("[dingtalk] {}", msg);
                 throw new IllegalStateException(msg);
             }
@@ -209,7 +209,7 @@ public class DingTalkChannelAdapter extends AbstractChannelAdapter implements St
         } catch (IllegalStateException e) {
             throw e; // 直接向上抛出
         } catch (Exception e) {
-            String msg = "DingTalk credential validation error: " + e.getMessage();
+            String msg = "钉钉凭证校验出错: " + e.getMessage();
             log.error("[dingtalk] {}", msg, e);
             throw new IllegalStateException(msg, e);
         }
@@ -445,7 +445,7 @@ public class DingTalkChannelAdapter extends AbstractChannelAdapter implements St
             if (!partial.isBlank()) {
                 return errorPrefix + "\n\n（已生成的部分内容，已忽略）\n" + partial;
             }
-            throw new RuntimeException("AI Card streaming failed: " + e.getMessage(), e);
+            throw new RuntimeException("AI Card 流式处理失败: " + e.getMessage(), e);
         }
     }
 

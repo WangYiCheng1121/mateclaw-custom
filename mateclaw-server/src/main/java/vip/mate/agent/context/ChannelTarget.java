@@ -17,6 +17,13 @@ import org.springframework.lang.Nullable;
 public record ChannelTarget(
         @Nullable String targetId,
         @Nullable String threadId,
-        @Nullable String accountId
+        @Nullable String accountId,
+        /**
+         * Per-channel message type qualifier needed by adapters whose
+         * {@code sendMessage / proactiveSend} dispatch by message type prefix
+         * (currently QQ: {@code c2c / group / guild / dm}). Null for channels
+         * that don't need a type-tag on the targetId.
+         */
+        @Nullable String messageType
 ) {
 }

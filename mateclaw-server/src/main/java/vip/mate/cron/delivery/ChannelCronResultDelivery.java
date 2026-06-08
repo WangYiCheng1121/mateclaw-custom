@@ -49,7 +49,15 @@ public class ChannelCronResultDelivery extends AbstractCronResultDelivery {
         // Adapters that don't override the 4-arg proactiveSend default ignore
         // the hints — preserves pre-RFC behavior for non-threading platforms.
         DeliveryOptions options = new DeliveryOptions(dc.threadId(), dc.accountId(), Map.of());
-        channelManager.sendToChannel(job.getChannelId(), dc.targetId(), rendered, options);
-        return DeliveryOutcome.delivered(dc.targetId());
+
+        // For channels whose sendMessage dispatches by a messageType prefix
+        // (currently QQ: c2c/group/guild/dm), prepend it to targetId so the
+        // adapter can route to the correct API endpoint.
+        String effectiveTargetId = dc.messageType() != null && !dc.messageType().isBlank()
+                ? dc.messageType() + ":" + dc.targetId()
+                : dc.targetId();
+
+        channelManager.sendToChannel(job.getChannelId(), effectiveTargetId, rendered, options);
+        return DeliveryOutcome.delivered(effectiveTargetId);
     }
 }

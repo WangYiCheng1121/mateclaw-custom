@@ -193,7 +193,7 @@ public abstract class AbstractChannelAdapter implements ChannelAdapter {
                 connectionState.set(ConnectionState.ERROR);
                 lastError = e.getMessage();
                 log.error("[{}] Failed to start channel {}: {}", getChannelType(), channelEntity.getName(), e.getMessage(), e);
-                throw new RuntimeException("Channel start failed: " + e.getMessage(), e);
+                throw new RuntimeException("渠道启动失败: " + e.getMessage(), e);
             }
         }
     }

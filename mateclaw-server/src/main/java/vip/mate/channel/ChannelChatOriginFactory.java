@@ -29,7 +29,8 @@ public class ChannelChatOriginFactory {
         ChannelTarget target = new ChannelTarget(
                 resolveTargetId(message),
                 /* threadId  */ null,    // adapters fill via ChannelMessage extension fields when available
-                /* accountId */ null);
+                /* accountId */ null,
+                /* messageType */ resolveMessageType(message));
         return new ChatOrigin(
                 /* agentId           */ null,
                 /* conversationId    */ conversationId,
@@ -72,5 +73,22 @@ public class ChannelChatOriginFactory {
             return message.getChatId();
         }
         return message.getSenderId();
+    }
+
+    /**
+     * Resolve the per-channel message type qualifier needed by adapters
+     * whose {@code sendMessage} dispatches by a type prefix (currently only
+     * QQ: {@code c2c / group / guild / dm}). Extracted from the replyToken
+     * which QQ encodes as {@code messageType:targetId:msgId}.
+     *
+     * <p>Returns {@code null} for all other channels.
+     */
+    private String resolveMessageType(ChannelMessage message) {
+        if (message.getChannelType() == null) return null;
+        if (!"qq".equals(message.getChannelType())) return null;
+        String replyToken = message.getReplyToken();
+        if (replyToken == null) return null;
+        int idx = replyToken.indexOf(':');
+        return idx > 0 ? replyToken.substring(0, idx) : null;
     }
 }

@@ -946,6 +946,56 @@ public class ChatController {
      * Stop 端点现在 deny 所有 pending、同步 update 受影响 message 的 metadata，并广播
      * tool_approval_resolved 让前端实时清理 UI。
      */
+    /**
+     * Regenerate an assistant reply: deletes the old assistant message from DB
+     * so that the frontend can re-send the user message via the SSE stream.
+     *
+     * <p>重新生成 assistant 回复：从数据库删除旧的 assistant 消息，
+     * 前端随后通过 SSE 流重新发送用户消息。
+     */
+    @Operation(summary = "重新生成回复（删除旧消息后由前端重新发送）")
+    @PostMapping("/{conversationId}/regenerate")
+    public R<Map<String, Object>> regenerateMessage(
+            @PathVariable String conversationId,
+            @RequestBody RegenerateRequest request,
+            Authentication auth) {
+        String username = auth != null ? auth.getName() : "anonymous";
+        if (auth != null && !conversationService.isConversationOwner(conversationId, username)) {
+            return R.fail(403, "无权操作该会话");
+        }
+
+        Long messageId = request.getMessageId();
+        if (messageId == null) {
+            return R.fail("messageId 不能为空");
+        }
+
+        // Find and validate the assistant message to be regenerated.
+        MessageEntity deletedMsg = conversationService.deleteMessage(messageId);
+        if (deletedMsg == null) {
+            return R.fail("消息不存在");
+        }
+//        if (!"assistant".equals(deletedMsg.getRole())) {
+//            return R.fail("只能重新生成 assistant 类型的消息");
+//        }
+        if (!conversationId.equals(deletedMsg.getConversationId())) {
+            return R.fail("消息不属于当前会话");
+        }
+
+        log.info("Regenerate: conversationId={}, deletedMessageId={}, user={}",
+                conversationId, messageId, username);
+
+        return R.ok(Map.of(
+                "deletedMessageId", messageId,
+                "conversationId", conversationId
+        ));
+    }
+
+    @lombok.Data
+    public static class RegenerateRequest {
+        /** ID of the assistant message to regenerate */
+        private Long messageId;
+    }
+
     @Operation(summary = "停止流式生成")
     @PostMapping("/{conversationId}/stop")
     public R<Map<String, Object>> stopStream(@PathVariable String conversationId, Authentication auth) {
@@ -1405,7 +1455,6 @@ public class ChatController {
      *       follow-up message (interrupt-with-followup).</li>
      *   <li>{@code stopped} — user pressed Stop without follow-up.</li>
      * </ul>
-     * Package-private so {@link vip.mate.channel.web.ChatControllerPersistStatusTest}
      * can exercise the truth table directly without spinning up the controller.
      */
     static String derivePersistStatus(boolean isAwaitingApproval,

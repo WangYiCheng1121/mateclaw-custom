@@ -325,7 +325,7 @@ public class WeComChannelAdapter extends AbstractChannelAdapter {
         String secret = getConfigString("secret");
 
         if (botId == null || botId.isBlank() || secret == null || secret.isBlank()) {
-            throw new IllegalStateException("WeCom bot channel requires bot_id and secret in configJson");
+            throw new IllegalStateException("企业微信渠道需要在 configJson 中配置 bot_id 和 secret");
         }
 
         this.httpClient = HttpClient.newBuilder()

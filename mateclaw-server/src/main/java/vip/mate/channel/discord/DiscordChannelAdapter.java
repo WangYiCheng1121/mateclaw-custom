@@ -78,7 +78,7 @@ public class DiscordChannelAdapter extends AbstractChannelAdapter {
     protected void doStart() {
         String botToken = getConfigString("bot_token");
         if (botToken == null || botToken.isBlank()) {
-            throw new IllegalStateException("Discord channel requires bot_token in configJson");
+            throw new IllegalStateException("Discord 渠道需要在 configJson 中配置 bot_token");
         }
 
         try {
@@ -123,9 +123,9 @@ public class DiscordChannelAdapter extends AbstractChannelAdapter {
                     jda.getSelfUser().getName(), selfId);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-            throw new RuntimeException("Discord JDA startup interrupted", e);
+            throw new RuntimeException("Discord JDA 启动被中断", e);
         } catch (Exception e) {
-            throw new RuntimeException("Discord JDA startup failed: " + e.getMessage(), e);
+            throw new RuntimeException("Discord JDA 启动失败: " + e.getMessage(), e);
         }
     }
 

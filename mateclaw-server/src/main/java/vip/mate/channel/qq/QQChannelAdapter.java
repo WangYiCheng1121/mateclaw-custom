@@ -125,7 +125,7 @@ public class QQChannelAdapter extends AbstractChannelAdapter {
         this.appId = getConfigString("app_id");
         this.clientSecret = getConfigString("client_secret");
         if (appId == null || appId.isBlank() || clientSecret == null || clientSecret.isBlank()) {
-            throw new IllegalStateException("QQ channel requires app_id and client_secret in configJson");
+            throw new IllegalStateException("QQ 渠道需要在 configJson 中配置 app_id 和 client_secret");
         }
 
         this.markdownEnabled = getConfigBoolean("markdown_enabled", true);
@@ -182,7 +182,7 @@ public class QQChannelAdapter extends AbstractChannelAdapter {
 
             HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
             if (response.statusCode() != 200) {
-                String msg = String.format("QQ credential validation failed: HTTP %d, body=%s",
+                String msg = String.format("QQ 凭证校验失败: HTTP %d, body=%s",
                         response.statusCode(), response.body());
                 log.error("[qq] {}", msg);
                 throw new IllegalStateException(msg);
@@ -192,8 +192,8 @@ public class QQChannelAdapter extends AbstractChannelAdapter {
             Map<String, Object> result = objectMapper.readValue(response.body(), Map.class);
             String token = (String) result.get("access_token");
             if (token == null || token.isBlank()) {
-                String errMsg = result.getOrDefault("message", result.getOrDefault("msg", "unknown error")).toString();
-                String msg = "QQ credential validation failed: " + errMsg;
+                String errMsg = result.getOrDefault("message", result.getOrDefault("msg", "未知错误")).toString();
+                String msg = "QQ 凭证校验失败: " + errMsg;
                 log.error("[qq] {}", msg);
                 throw new IllegalStateException(msg);
             }
@@ -212,7 +212,7 @@ public class QQChannelAdapter extends AbstractChannelAdapter {
         } catch (IllegalStateException e) {
             throw e;
         } catch (Exception e) {
-            String msg = "QQ credential validation error: " + e.getMessage();
+            String msg = "QQ 凭证校验出错: " + e.getMessage();
             log.error("[qq] {}", msg, e);
             throw new IllegalStateException(msg, e);
         }
@@ -308,7 +308,7 @@ public class QQChannelAdapter extends AbstractChannelAdapter {
 
             HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
             if (response.statusCode() != 200) {
-                throw new RuntimeException("Token request failed: status=" + response.statusCode());
+                throw new RuntimeException("Token 请求失败: status=" + response.statusCode());
             }
 
             @SuppressWarnings("unchecked")
@@ -316,7 +316,7 @@ public class QQChannelAdapter extends AbstractChannelAdapter {
             String token = (String) result.get("access_token");
             Object expiresIn = result.get("expires_in");
             if (token == null || token.isBlank()) {
-                throw new RuntimeException("Empty access_token in response: " + response.body());
+                throw new RuntimeException("响应中 access_token 为空: " + response.body());
             }
 
             int ttl = 7200;
@@ -332,7 +332,7 @@ public class QQChannelAdapter extends AbstractChannelAdapter {
             return token;
         } catch (Exception e) {
             log.error("[qq] Failed to refresh access token: {}", e.getMessage());
-            throw new RuntimeException("Token refresh failed: " + e.getMessage(), e);
+            throw new RuntimeException("Token 刷新失败: " + e.getMessage(), e);
         }
     }
 
@@ -366,7 +366,7 @@ public class QQChannelAdapter extends AbstractChannelAdapter {
             if (maxAttempts > 0 && reconnectAttempts >= maxAttempts) {
                 log.error("[qq] Max reconnect attempts ({}) exhausted", maxAttempts);
                 connectionState.set(ConnectionState.ERROR);
-                lastError = "Max reconnect attempts exhausted";
+                lastError = "已达到最大重连次数";
                 break;
             }
 
@@ -458,14 +458,14 @@ public class QQChannelAdapter extends AbstractChannelAdapter {
 
         HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
         if (response.statusCode() != 200) {
-            throw new RuntimeException("Gateway request failed: status=" + response.statusCode() + ", body=" + response.body());
+            throw new RuntimeException("Gateway 请求失败: status=" + response.statusCode() + ", body=" + response.body());
         }
 
         @SuppressWarnings("unchecked")
         Map<String, Object> result = objectMapper.readValue(response.body(), Map.class);
         String url = (String) result.get("url");
         if (url == null || url.isBlank()) {
-            throw new RuntimeException("Empty gateway URL in response");
+            throw new RuntimeException("响应中 gateway URL 为空");
         }
         return url;
     }

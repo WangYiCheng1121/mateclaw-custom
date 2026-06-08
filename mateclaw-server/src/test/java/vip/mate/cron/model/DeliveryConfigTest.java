@@ -20,7 +20,7 @@ class DeliveryConfigTest {
 
     @Test
     void roundTripThroughChannelTarget() {
-        ChannelTarget t = new ChannelTarget("user-1", "thread-a", "bot-x");
+        ChannelTarget t = new ChannelTarget("user-1", "thread-a", "bot-x", null);
         DeliveryConfig dc = DeliveryConfig.from(t);
         assertEquals(t, dc.toChannelTarget());
     }

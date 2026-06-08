@@ -904,6 +904,38 @@ public class ConversationService {
         cleanAttachmentFiles(conversationId);
     }
 
+    /**
+     * Delete a single message by its ID and adjust the conversation's
+     * messageCount accordingly. Used by the regenerate flow to remove the
+     * old assistant reply before creating a new one.
+     *
+     * <p>删除单条消息并更新会话计数器。用于重新生成流程中删除旧的
+     * assistant 回复。
+     *
+     * @return the deleted message entity, or {@code null} if not found
+     */
+    @Transactional
+    public MessageEntity deleteMessage(Long messageId) {
+        MessageEntity msg = messageMapper.selectById(messageId);
+        if (msg == null) {
+            return null;
+        }
+        messageMapper.deleteById(messageId);
+
+        // Adjust the conversation's aggregate counter.
+        ConversationEntity conv = conversationMapper.selectOne(
+                new LambdaQueryWrapper<ConversationEntity>()
+                        .eq(ConversationEntity::getConversationId, msg.getConversationId()));
+        if (conv != null) {
+            int newCount = Math.max(0, (conv.getMessageCount() != null ? conv.getMessageCount() : 0) - 1);
+            conv.setMessageCount(newCount);
+            conversationMapper.updateById(conv);
+        }
+        log.info("[Conversation] Deleted message id={}, role={}, conversationId={}",
+                messageId, msg.getRole(), msg.getConversationId());
+        return msg;
+    }
+
     public List<MessageContentPart> parseMessageParts(MessageEntity message) {
         if (message == null || message.getContentParts() == null || message.getContentParts().isBlank()) {
             return List.of();

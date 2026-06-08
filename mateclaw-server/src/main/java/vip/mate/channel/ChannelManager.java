@@ -386,7 +386,7 @@ public class ChannelManager {
                     channel.getName(), e.getMessage(), e);
             lease.release();
             throw e instanceof RuntimeException re ? re
-                    : new RuntimeException("Channel start failed: " + e.getMessage(), e);
+                    : new RuntimeException("渠道启动失败: " + e.getMessage(), e);
         }
     }
 

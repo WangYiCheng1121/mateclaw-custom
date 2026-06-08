@@ -26,7 +26,7 @@ class ChatOriginTest {
 
     @Test
     void roundTripThroughToolContext_preservesAllFields() {
-        ChannelTarget target = new ChannelTarget("user-42", "thread-abc", "bot-001");
+        ChannelTarget target = new ChannelTarget("user-42", "thread-abc", "bot-001", null);
         ChatOrigin original = new ChatOrigin(7L, "wechat:42", "u123", 5L,
                 "/data/ws/5", 9L, target, false, null, null, null);
 
@@ -39,7 +39,7 @@ class ChatOriginTest {
     @Test
     void wither_doesNotMutateOriginal() {
         ChatOrigin base = ChatOrigin.cron("cron_1", 5L, "/data/ws/5", 9L,
-                new ChannelTarget("group-a", null, null));
+                new ChannelTarget("group-a", null, null, null));
         ChatOrigin enriched = base.withAgent(42L);
 
         assertNull(base.agentId(), "withAgent must not mutate the original");
@@ -75,7 +75,7 @@ class ChatOriginTest {
     void jsonSerialization_isStableAndForwardCompatible() throws Exception {
         ObjectMapper om = new ObjectMapper();
         ChatOrigin origin = new ChatOrigin(7L, "wechat:42", "u123", 5L,
-                "/data/ws/5", 9L, new ChannelTarget("user-42", "thread-abc", "bot-001"), false, null, null, null);
+                "/data/ws/5", 9L, new ChannelTarget("user-42", "thread-abc", "bot-001", null), false, null, null, null);
 
         String json = om.writeValueAsString(origin);
         ChatOrigin restored = om.readValue(json, ChatOrigin.class);

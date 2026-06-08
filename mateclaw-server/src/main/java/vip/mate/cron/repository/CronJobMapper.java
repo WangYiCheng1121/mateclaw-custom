@@ -1,8 +1,10 @@
 package vip.mate.cron.repository;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
+import org.apache.ibatis.annotations.ResultMap;
 import org.apache.ibatis.annotations.Select;
 import vip.mate.cron.model.CronJobEntity;
 
@@ -30,7 +32,13 @@ public interface CronJobMapper extends BaseMapper<CronJobEntity> {
      *
      * <p>Filters out logically-deleted rows and orders by create_time DESC
      * to mirror the existing {@code list()} ordering.
+     *
+     * <p>{@code @ResultMap("vip.mate.cron.model.CronJobEntity")} tells MyBatis to use the auto-
+     * generated ResultMap (from {@code @TableName(autoResultMap = true)}) so
+     * that {@code JacksonTypeHandler} on {@code delivery_config} is active
+     * during deserialization. Without it, {@code deliveryConfig} stays null.
      */
+    @ResultMap("CronJobEntity")
     @Select("""
             SELECT j.*,
                    (SELECT r.delivery_status FROM mate_cron_job_run r
@@ -50,7 +58,11 @@ public interface CronJobMapper extends BaseMapper<CronJobEntity> {
      * subquery pattern, restricted to a single id within the given workspace
      * (cross-workspace access returns null → caller throws not_found, matching
      * the "deleted" shape so workspace existence isn't enumerable).
+     *
+     * <p>{@code @ResultMap("CronJobEntity")} — see
+     * {@link #selectListWithDeliveryStatus} for rationale.
      */
+    @ResultMap("CronJobEntity")
     @Select("""
             SELECT j.*,
                    (SELECT r.delivery_status FROM mate_cron_job_run r
@@ -67,10 +79,16 @@ public interface CronJobMapper extends BaseMapper<CronJobEntity> {
 
     /**
      * RFC-083: workspace-scoped lookup for write paths (update / delete /
-     * toggle / runNow). Skips the delivery-status subquery — those paths
-     * don't need it and pay for the correlated lookup otherwise.
+     * toggle / runNow). Uses {@link LambdaQueryWrapper} instead of a raw
+     * {@code @Select} so the MyBatis Plus auto-ResultMap (which includes
+     * {@code JacksonTypeHandler} for {@code delivery_config}) is applied.
+     * Without it, {@code deliveryConfig} stays null and cron jobs lose their
+     * channel binding on every write-path read.
      */
-    @Select("SELECT * FROM mate_cron_job WHERE id = #{id} AND deleted = 0 AND workspace_id = #{workspaceId}")
-    CronJobEntity selectByIdAndWorkspace(@Param("id") Long id,
-                                         @Param("workspaceId") Long workspaceId);
+    default CronJobEntity selectByIdAndWorkspace(Long id, Long workspaceId) {
+        return selectOne(new LambdaQueryWrapper<CronJobEntity>()
+                .eq(CronJobEntity::getId, id)
+                .eq(CronJobEntity::getDeleted, 0)
+                .eq(CronJobEntity::getWorkspaceId, workspaceId));
+    }
 }

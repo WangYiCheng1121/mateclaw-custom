@@ -37,7 +37,7 @@ class CronJobRunnerPromptTest {
     void channelBoundCron_addsDeliveryClause() {
         ChatOrigin channelOrigin = new ChatOrigin(
                 7L, "cron_7", "system", 1L, null,
-                /* channelId */ 9L, new ChannelTarget("group-a", null, null),
+                /* channelId */ 9L, new ChannelTarget("group-a", null, null, null),
                 /* cronOrigin */ true,
                 /* senderName */ null,
                 /* channelType */ "feishu",

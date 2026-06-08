@@ -35,6 +35,13 @@ public record DeliveryConfig(
          */
         @Nullable String userId,
         /**
+         * Per-channel message type qualifier (e.g. QQ {@code c2c / group /
+         * guild / dm}). Adapters whose {@code sendMessage} dispatches by a
+         * type prefix prepend it to {@link #targetId} before calling the
+         * channel API. Null for channels that don't need a type tag.
+         */
+        @Nullable String messageType,
+        /**
          * RFC-03 Lane C1 — when {@code TRUE}, {@code CronDeliveryListener}
          * skips strategy resolution entirely and the run completes with
          * {@code delivery_status='NONE'}. Tools still execute, the run row
@@ -59,7 +66,7 @@ public record DeliveryConfig(
     public DeliveryConfig(@Nullable String targetId,
                           @Nullable String threadId,
                           @Nullable String accountId) {
-        this(targetId, threadId, accountId, null, null);
+        this(targetId, threadId, accountId, null, null, null);
     }
 
     /** 4-arg legacy constructor — pre-RFC-03 callers that already carry userId. */
@@ -67,24 +74,33 @@ public record DeliveryConfig(
                           @Nullable String threadId,
                           @Nullable String accountId,
                           @Nullable String userId) {
-        this(targetId, threadId, accountId, userId, null);
+        this(targetId, threadId, accountId, userId, null, null);
+    }
+
+    /** 5-arg legacy constructor — callers that carry userId + suppressAgentReply. */
+    public DeliveryConfig(@Nullable String targetId,
+                          @Nullable String threadId,
+                          @Nullable String accountId,
+                          @Nullable String userId,
+                          @Nullable Boolean suppressAgentReply) {
+        this(targetId, threadId, accountId, userId, null, suppressAgentReply);
     }
 
     /** Convert from the {@link ChannelTarget} carried on a {@code ChatOrigin}. */
     public static DeliveryConfig from(@Nullable ChannelTarget t) {
         if (t == null) return null;
-        return new DeliveryConfig(t.targetId(), t.threadId(), t.accountId(), null, null);
+        return new DeliveryConfig(t.targetId(), t.threadId(), t.accountId(), null, t.messageType(), null);
     }
 
     /** Convert from {@link ChannelTarget} + the requester's senderId. */
     public static DeliveryConfig from(@Nullable ChannelTarget t, @Nullable String userId) {
         if (t == null) return null;
-        return new DeliveryConfig(t.targetId(), t.threadId(), t.accountId(), userId, null);
+        return new DeliveryConfig(t.targetId(), t.threadId(), t.accountId(), userId, t.messageType(), null);
     }
 
     /** Convert back to a {@link ChannelTarget} for ChatOrigin reconstruction. */
     public ChannelTarget toChannelTarget() {
-        return new ChannelTarget(targetId, threadId, accountId);
+        return new ChannelTarget(targetId, threadId, accountId, messageType);
     }
 
     /**

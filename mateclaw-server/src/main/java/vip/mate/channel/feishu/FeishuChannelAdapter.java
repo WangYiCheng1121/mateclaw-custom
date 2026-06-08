@@ -250,7 +250,7 @@ public class FeishuChannelAdapter extends AbstractChannelAdapter implements Stre
         String appSecret = getConfigString("app_secret");
 
         if (appId == null || appId.isBlank() || appSecret == null || appSecret.isBlank()) {
-            throw new IllegalStateException("Feishu channel requires app_id and app_secret in configJson");
+            throw new IllegalStateException("飞书渠道需要在 configJson 中配置 app_id 和 app_secret");
         }
 
         // HttpClient 两种模式都需要（发送消息、下载媒体、联系人 API）
@@ -279,10 +279,10 @@ public class FeishuChannelAdapter extends AbstractChannelAdapter implements Stre
             String encryptKey = getConfigString("encrypt_key", null);
             if (encryptKey == null || encryptKey.isBlank()) {
                 throw new IllegalStateException(
-                        "Feishu channel in webhook mode requires encrypt_key in configJson " +
-                        "(fail-closed to prevent unauthenticated webhook abuse). " +
-                        "Configure encrypt_key on the Feishu Event Subscriptions page and mirror " +
-                        "it in this channel's configJson, or switch connection_mode to websocket.");
+                        "飞书渠道在 webhook 模式下需要在 configJson 中配置 encrypt_key " +
+                        "(防未授权 webhook 滥用，安全起见默认拒绝)。" +
+                        "请在飞书事件订阅页面配置 encrypt_key 并同步到此渠道的 configJson 中，" +
+                        "或切换 connection_mode 为 websocket。");
             }
             log.info("[feishu] Webhook mode (encrypt_key configured), waiting for callbacks at /api/v1/channels/webhook/feishu");
         }
@@ -767,7 +767,7 @@ public class FeishuChannelAdapter extends AbstractChannelAdapter implements Stre
 
             Integer code = result.get("code") instanceof Number n ? n.intValue() : null;
             if (code != null && code != 0) {
-                throw new RuntimeException("Feishu API error: code=" + code + ", msg=" + result.get("msg"));
+                throw new RuntimeException("飞书 API 错误: code=" + code + ", msg=" + result.get("msg"));
             }
 
             this.tenantAccessToken = (String) result.get("tenant_access_token");
@@ -779,7 +779,7 @@ public class FeishuChannelAdapter extends AbstractChannelAdapter implements Stre
 
         } catch (Exception e) {
             log.error("[feishu] Failed to refresh tenant_access_token: {}", e.getMessage(), e);
-            throw new RuntimeException("Token refresh failed: " + e.getMessage(), e);
+            throw new RuntimeException("Token 刷新失败: " + e.getMessage(), e);
         }
     }
 
