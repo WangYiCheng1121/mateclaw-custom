@@ -54,7 +54,9 @@ class SkillControllerListEnabledTest {
                 acpSkillBridge,
                 /* skillLifecycleService */ null,
                 /* skillCuratorJob */ null,
-                /* skillCuratorReportStore */ null);
+                /* skillCuratorReportStore */ null,
+                /* skillSyncService */ null,
+                /* platformSkillClient */ null);
         // listSkills() supplies realSkillNames() for shadow base — default
         // to empty so each test can override.
         when(skillService.listSkills(null)).thenReturn(List.of());

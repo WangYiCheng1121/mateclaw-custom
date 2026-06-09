@@ -68,7 +68,7 @@ class ApprovalWorkflowServiceResolveTest {
     void setUp() {
         approvalService = new ApprovalService();
         workflow = new ApprovalWorkflowService(
-                approvalService, approvalMapper, new ObjectMapper(), conversationService);
+                approvalService, approvalMapper, new ObjectMapper(), conversationService, null);
     }
 
     @Test

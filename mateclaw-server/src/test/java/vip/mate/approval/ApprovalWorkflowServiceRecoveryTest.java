@@ -73,7 +73,8 @@ class ApprovalWorkflowServiceRecoveryTest {
                 approvalService,
                 approvalMapper,
                 new ObjectMapper(),
-                conversationService);
+                conversationService,
+                null);
         when(approvalMapper.selectList(any(LambdaQueryWrapper.class))).thenReturn(dbRows);
     }
 

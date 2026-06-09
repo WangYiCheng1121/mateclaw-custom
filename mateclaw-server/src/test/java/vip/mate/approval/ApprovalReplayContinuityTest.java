@@ -26,7 +26,7 @@ class ApprovalReplayContinuityTest {
     void setUp() {
         objectMapper = new ObjectMapper();
         // Don't run the @PostConstruct GC scheduler — only need restoreChatOrigin.
-        workflow = new ApprovalWorkflowService(null, null, objectMapper, null);
+        workflow = new ApprovalWorkflowService(null, null, objectMapper, null, null);
         // Inject objectMapper via reflection so the helper does not NPE.
         ReflectionTestUtils.setField(workflow, "objectMapper", objectMapper);
     }

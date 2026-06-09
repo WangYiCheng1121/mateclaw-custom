@@ -301,23 +301,39 @@ public class ChannelManager {
             adapterLock.readLock().unlock();
         }
 
-        // Step 2: 锁外创建并启动 adapter（可能耗时，不阻塞其他操作）
+        // Step 2: 锁外创建 adapter（可能耗时，不阻塞其他操作）
         ChannelAdapter adapter = createAdapter(channel);
-        adapter.start();
 
-        // Step 3: 加写锁放入 activeAdapters
-        adapterLock.writeLock().lock();
-        try {
-            // 双重检查：并发情况下可能有另一个线程已经启动了相同渠道
-            if (activeAdapters.containsKey(channel.getId())) {
-                log.warn("Channel {} was started concurrently, stopping duplicate", channel.getName());
-                stopAdapterSafely(adapter, "startChannel-duplicate");
-                return;
+        if (adapter.requiresSingleLeader()) {
+            // Leader-required mode: route through election so the lease is
+            // correctly acquired (or follower retry scheduled on loss).
+            adapterLock.writeLock().lock();
+            try {
+                if (activeAdapters.containsKey(channel.getId())) {
+                    log.warn("Channel {} was started concurrently, skipping", channel.getName());
+                    return;
+                }
+                attemptLeaderStart(channel, adapter);
+            } finally {
+                adapterLock.writeLock().unlock();
             }
-            activeAdapters.put(channel.getId(), adapter);
-            log.info("Channel started: {} (type={}, id={})", channel.getName(), channel.getChannelType(), channel.getId());
-        } finally {
-            adapterLock.writeLock().unlock();
+        } else {
+            // Non-leader mode: start directly without election.
+            adapter.start();
+            adapterLock.writeLock().lock();
+            try {
+                // 双重检查：并发情况下可能有另一个线程已经启动了相同渠道
+                if (activeAdapters.containsKey(channel.getId())) {
+                    log.warn("Channel {} was started concurrently, stopping duplicate", channel.getName());
+                    stopAdapterSafely(adapter, "startChannel-duplicate");
+                    return;
+                }
+                activeAdapters.put(channel.getId(), adapter);
+                lastSeenChannelUpdateTime.put(channel.getId(), channel.getUpdateTime());
+                log.info("Channel started: {} (type={}, id={})", channel.getName(), channel.getChannelType(), channel.getId());
+            } finally {
+                adapterLock.writeLock().unlock();
+            }
         }
     }
 

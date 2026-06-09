@@ -134,6 +134,13 @@ public class SkillController {
     @Operation(summary = "启用/禁用技能（仅已安装的技能可切换）")
     @PutMapping("/{id}/toggle")
     public R<SkillEntity> toggle(@PathVariable Long id, @RequestParam boolean enabled) {
+        // Virtual MCP skill: forward to the MCP bridge so the toggle maps to
+        // the underlying MCP server's enabled state.
+        if (vip.mate.skill.mcp.McpSkillBridge.isVirtualMcpSkillId(id)) {
+            return R.ok(mcpSkillBridge.toggleVirtualSkill(id, enabled));
+        }
+        // Virtual ACP skills have no server-mapping for toggle; reject.
+        rejectVirtualSkillMutation(id);
         return R.ok(skillService.toggleSkill(id, enabled));
     }
 

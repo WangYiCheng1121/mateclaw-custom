@@ -16,47 +16,43 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
- * The edit / delete mutation paths refuse virtual MCP/ACP skill ids upfront
- * so the user gets a clear redirect to the connection page instead of the
- * old "技能不存在" 500 from a doomed mate_skill lookup. Toggle is the one
- * exception: a virtual MCP skill mirrors an MCP server, so toggling it
- * forwards to that server's enable/disable.
+ * The mutation paths (rescan / sync-files) refuse virtual MCP/ACP skill ids
+ * upfront so the user gets a clear redirect to the connection page instead
+ * of the old "技能不存在" 500 from a doomed mate_skill lookup. Toggle is
+ * the one exception: a virtual MCP skill mirrors an MCP server, so toggling
+ * it forwards to that server's enable/disable.
  */
 class SkillControllerVirtualGuardTest {
 
     private final SkillController controller = new SkillController(
             null, null, null, null, null, null, null, null, null, null, null, null, null,
-            null, null, null);
+            null, null, null, null, null);
 
     @Test
-    @DisplayName("update on a virtual MCP skill id is rejected before hitting the service")
-    void updateRejectsVirtualMcpId() {
+    @DisplayName("rescan on a virtual MCP skill id is rejected before hitting the service")
+    void rescanRejectsVirtualMcpId() {
         long virtualId = McpSkillBridge.VIRTUAL_ID_BASE + 42L;
         MateClawException ex = assertThrows(MateClawException.class,
-                () -> controller.update(virtualId, new SkillEntity(), null));
+                () -> controller.rescan(virtualId, null));
         assertTrue(ex.getMessage().contains("MCP/ACP"),
                 "expected redirect-to-connection-page hint, got: " + ex.getMessage());
     }
 
     @Test
-    @DisplayName("update on a virtual ACP skill id is rejected before hitting the service")
-    void updateRejectsVirtualAcpId() {
+    @DisplayName("rescan on a virtual ACP skill id is rejected before hitting the service")
+    void rescanRejectsVirtualAcpId() {
         long virtualAcpId = AcpSkillBridge.VIRTUAL_ID_BASE + 7L;
-        // Sanity guard against the test's own arithmetic — any drift in
-        // bridge layout should fail the test loudly here, not silently
-        // pass elsewhere.
         assertTrue(AcpSkillBridge.isVirtualAcpSkillId(virtualAcpId),
                 "test fixture id is not in ACP virtual range; ACP base layout changed?");
         assertThrows(MateClawException.class,
-                () -> controller.update(virtualAcpId, new SkillEntity(), null));
+                () -> controller.rescan(virtualAcpId, null));
     }
 
     @Test
-    @DisplayName("delete / rescan still reject virtual ids the same way")
-    void mutationFamilyAllGuarded() {
+    @DisplayName("sync-files also rejects virtual ids the same way")
+    void syncFilesGuarded() {
         long virtualId = McpSkillBridge.VIRTUAL_ID_BASE + 42L;
-        assertThrows(MateClawException.class, () -> controller.delete(virtualId, null));
-        assertThrows(MateClawException.class, () -> controller.rescan(virtualId, null));
+        assertThrows(MateClawException.class, () -> controller.syncFiles(virtualId, null));
     }
 
     @Test
@@ -65,14 +61,14 @@ class SkillControllerVirtualGuardTest {
         McpSkillBridge bridge = mock(McpSkillBridge.class);
         SkillController c = new SkillController(
                 null, null, null, null, null, null, null, null, null, null, null,
-                bridge, null, null, null, null);
+                bridge, null, null, null, null, null, null);
         long virtualMcpId = McpSkillBridge.VIRTUAL_ID_BASE + 42L;
         SkillEntity toggled = new SkillEntity();
         toggled.setName("github");
         toggled.setEnabled(false);
         when(bridge.toggleVirtualSkill(virtualMcpId, false)).thenReturn(toggled);
 
-        R<SkillEntity> resp = c.toggle(virtualMcpId, false, null);
+        R<SkillEntity> resp = c.toggle(virtualMcpId, false);
 
         verify(bridge).toggleVirtualSkill(virtualMcpId, false);
         assertEquals("github", resp.getData().getName());
@@ -85,7 +81,7 @@ class SkillControllerVirtualGuardTest {
         assertTrue(AcpSkillBridge.isVirtualAcpSkillId(virtualAcpId),
                 "test fixture id is not in ACP virtual range; ACP base layout changed?");
         assertThrows(MateClawException.class,
-                () -> controller.toggle(virtualAcpId, true, null));
+                () -> controller.toggle(virtualAcpId, true));
     }
 
     @Test
@@ -98,14 +94,14 @@ class SkillControllerVirtualGuardTest {
         SkillController real = new SkillController(
                 mock(vip.mate.skill.service.SkillService.class),
                 null, null, null, null, null, null, null, null, null, null, null, null,
-                null, null, null);
+                null, null, null, null, null);
         long snowflakeId = 1_900_000_001_000_000_902L;
-        // updateSkill on a mocked SkillService returns null without throwing,
+        // rescan on a mocked SkillService will NPE on skillService.getSkill,
         // which is fine — we just need to confirm the guard didn't fire.
         // A virtual-id call would have thrown MateClawException before
         // reaching the service.
         try {
-            real.update(snowflakeId, new SkillEntity(), null);
+            real.rescan(snowflakeId, null);
         } catch (MateClawException e) {
             // The guard message contains "MCP/ACP"; any other MateClawException
             // (e.g. from the service layer) is acceptable.
