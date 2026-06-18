@@ -4,7 +4,7 @@
 
 Left to its own devices, a language model is a pattern-matcher wrapped in text. It doesn't know what time it is. It doesn't know what's in your files. It can't search the web, run a command, look at a PDF, delegate to another agent, or open a browser. It can only *talk about* doing those things.
 
-Tools are how MateClaw fixes this. Each tool is a concrete operation the agent is allowed to invoke — read a file, search the web, execute a shell command, extract text from a PDF, delegate to another agent. When the agent decides it needs one, it emits a **tool call**, the runtime executes it, and the result comes back as an **observation**.
+Tools are how GLClaw fixes this. Each tool is a concrete operation the agent is allowed to invoke — read a file, search the web, execute a shell command, extract text from a PDF, delegate to another agent. When the agent decides it needs one, it emits a **tool call**, the runtime executes it, and the result comes back as an **observation**.
 
 Fourteen tools ship built-in. Unlimited more can be added through MCP servers, custom skill scripts, or your own `@Tool`-annotated Spring beans.
 
@@ -50,9 +50,9 @@ None of this shows up in the agent's prompt. The agent just asks for a tool. The
 
 ## Tool registration — three paths
 
-**1. Built-in tools.** The twenty tools that ship with MateClaw — registered into the tool table on startup.
+**1. Built-in tools.** The twenty tools that ship with GLClaw — registered into the tool table on startup.
 
-**2. MCP servers.** External processes speaking the Model Context Protocol expose tools dynamically. MateClaw discovers them via `tools/list` and they appear in the registry alongside built-in ones. See [MCP](./mcp).
+**2. MCP servers.** External processes speaking the Model Context Protocol expose tools dynamically. GLClaw discovers them via `tools/list` and they appear in the registry alongside built-in ones. See [MCP](./mcp).
 
 > **Per-agent MCP tool scoping (1.4.0+, #117)**: when an agent has **ticked no specific MCP tool rows**, enabled MCP tools **auto-join** its tool set; once it ticks specific MCP tools, it's **restricted to that set**. Agents bound to skills / built-in tools only keep full access to all MCP tools.
 
@@ -99,7 +99,7 @@ As the tool count grows, the system prompt balloons with dozens of full tool sch
 | `SkillManageTool` | Create / edit / delete skill packages | ⚠️ |
 | `BrowserUseTool` | Drive a headless browser | ⚠️ |
 | `DelegateAgentTool` | Delegate a task to another agent (parallel supported) | — |
-| `MateClawDocTool` | Read built-in project documentation | — |
+| `GLClawDocTool` | Read built-in project documentation | — |
 | `ImageGenerateTool` | Text-to-image / **image-to-image (1.3.0+)** | — |
 | `VideoGenerateTool` | Text-to-video / image-to-video generation | — |
 | `DocxRenderTool` | **1.3.0+** Markdown → .docx (Word document) | — |
@@ -216,9 +216,9 @@ Safety:
 - **Isolated sessions** — the delegated agent runs in its own conversation
 - **Result truncation** — delegated results capped at 4000 characters
 
-### MateClawDocTool
+### GLClawDocTool
 
-Reads the built-in MateClaw project documentation. Lets an agent answer "how does X work in MateClaw" questions by consulting actual docs rather than guessing.
+Reads the built-in GLClaw project documentation. Lets an agent answer "how does X work in GLClaw" questions by consulting actual docs rather than guessing.
 
 ### enable_tool — activate an extension-tier tool (1.4.0+)
 
@@ -259,7 +259,7 @@ Feed both back into the next call to page through a giant single-line file in se
 
 ## Tool Guard — the permission layer
 
-Tool Guard is how MateClaw keeps strong tools from doing stupid things. It's **rule-based**, not a flat dangerous-tools list. Each rule says: *for this tool, with these arguments, in this context, do X* — where X is `allow`, `deny`, or `require_approval`.
+Tool Guard is how GLClaw keeps strong tools from doing stupid things. It's **rule-based**, not a flat dangerous-tools list. Each rule says: *for this tool, with these arguments, in this context, do X* — where X is `allow`, `deny`, or `require_approval`.
 
 Core pieces:
 

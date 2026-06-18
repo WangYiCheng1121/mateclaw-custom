@@ -2,9 +2,9 @@
 
 **A workspace is a box around one team's stuff.**
 
-MateClaw supports multiple teams in a single deployment by organizing every resource — agents, skills, wiki knowledge bases, conversations, memory files, tool guard rules, channels — into **workspaces**. When you're logged in, you see the workspaces you belong to and nothing else. When you switch workspace, the whole UI re-scopes: different agents, different skills, different knowledge, different channels.
+GLClaw supports multiple teams in a single deployment by organizing every resource — agents, skills, wiki knowledge bases, conversations, memory files, tool guard rules, channels — into **workspaces**. When you're logged in, you see the workspaces you belong to and nothing else. When you switch workspace, the whole UI re-scopes: different agents, different skills, different knowledge, different channels.
 
-The point is that one MateClaw deployment can serve a product team, an engineering team, and a research team without their data, agents, or conversations bleeding into each other.
+The point is that one GLClaw deployment can serve a product team, an engineering team, and a research team without their data, agents, or conversations bleeding into each other.
 
 ---
 

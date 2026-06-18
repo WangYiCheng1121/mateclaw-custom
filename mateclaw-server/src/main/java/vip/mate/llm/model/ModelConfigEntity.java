@@ -84,4 +84,14 @@ public class ModelConfigEntity {
     private LocalDateTime updateTime;
 
     private Integer deleted;
+
+    // ==================== 瞬态字段（不持久化到数据库） ====================
+
+    /** 供应商展示名称，由 Controller 层在返回前填充 */
+    @TableField(exist = false)
+    private String providerName;
+
+    /** 供应商运行态存活状态，由 Controller 层在返回前填充 */
+    @TableField(exist = false)
+    private Liveness liveness;
 }

@@ -136,13 +136,17 @@ public class PlatformSecurityClient {
      * @param pendingId  审批唯一标识
      * @param status     新状态（APPROVED/DENIED/TIMEOUT/SUPERSEDED/CONSUMED）
      * @param resolvedBy 审批人 ID（可为 null）
+     * @param userId     审批发起人 ID（可为 null）
      */
-    public boolean pushApprovalStatus(String pendingId, String status, String resolvedBy) {
+    public boolean pushApprovalStatus(String pendingId, String status, String resolvedBy, String userId) {
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("pendingId", pendingId);
         payload.put("status", status);
         if (resolvedBy != null) {
             payload.put("resolvedBy", resolvedBy);
+        }
+        if (userId != null) {
+            payload.put("userId", userId);
         }
         return postJson(securityProperties.getApprovalStatusPath(), payload);
     }

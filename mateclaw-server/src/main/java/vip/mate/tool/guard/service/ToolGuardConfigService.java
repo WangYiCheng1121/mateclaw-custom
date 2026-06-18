@@ -19,6 +19,7 @@ import vip.mate.tool.guard.model.GuardSeverity;
 
 import java.util.List;
 import java.util.Set;
+import java.util.regex.Pattern;
 
 /**
  * 工具安全配置管理服务
@@ -60,35 +61,65 @@ public class ToolGuardConfigService {
     }
 
     /**
-     * 从平台端拉取配置并更新本地缓存
+     * 从平台端拉取配置，覆盖写入本地 H2，再刷新内存缓存
      */
-    void refreshPlatformCache() {
+    public void refreshPlatformCache() {
         try {
             ToolGuardConfigEntity platformConfig = platformClient.fetchConfig();
             if (platformConfig != null) {
-                this.cachedPlatformConfig = platformConfig;
-                log.debug("[ToolGuardConfig] Platform config cache refreshed");
+                // 直接覆盖写入 H2，使 H2 与平台保持一致
+                boolean isFirstLoad = this.cachedPlatformConfig == null;
+                upsertToLocalDb(platformConfig);
+                // 从 H2 重新读取作为内存缓存（确保内存=H2=平台）
+                this.cachedPlatformConfig = readFromLocalDb();
+                log.info("[ToolGuardConfig] Platform config {}refreshed → H2+memory (fileGuard={}, audit={}, sensitivePaths={})",
+                        isFirstLoad ? "initialized: " : "",
+                        platformConfig.getFileGuardEnabled(),
+                        platformConfig.getAuditEnabled(),
+                        platformConfig.getSensitivePathsJson() != null
+                                ? platformConfig.getSensitivePathsJson()
+                                : "empty");
+            } else {
+                log.warn("[ToolGuardConfig] Platform config fetch returned null — keeping existing data");
             }
         } catch (Exception e) {
-            log.warn("[ToolGuardConfig] Failed to refresh platform config cache: {}", e.getMessage());
+            log.warn("[ToolGuardConfig] Failed to refresh platform config: {}", e.getMessage());
         }
     }
 
-    /**
-     * 获取配置，优先使用平台端缓存，回退到本地 DB
-     */
-    public ToolGuardConfigEntity getConfig() {
-        // 优先使用平台端缓存
-        if (securityProperties.isEnabled() && cachedPlatformConfig != null) {
-            return cachedPlatformConfig;
+    /** 将平台配置覆盖写入本地 H2（若无则插入，有则全量更新） */
+    private void upsertToLocalDb(ToolGuardConfigEntity platformConfig) {
+        ToolGuardConfigEntity local = readFromLocalDb();
+        if (local != null) {
+            // 已有本地记录 → 全量覆盖更新
+            platformConfig.setId(local.getId());
+            platformConfig.setCreateTime(local.getCreateTime());
+            configMapper.updateById(platformConfig);
+        } else {
+            configMapper.insert(platformConfig);
         }
-        // 回退到本地 DB
+    }
+
+    /** 从本地 H2 读取单行配置 */
+    private ToolGuardConfigEntity readFromLocalDb() {
         List<ToolGuardConfigEntity> configs = configMapper.selectList(
                 new LambdaQueryWrapper<ToolGuardConfigEntity>().last("LIMIT 1"));
-        if (configs.isEmpty()) {
-            return createDefaultConfig();
+        return configs.isEmpty() ? null : configs.get(0);
+    }
+
+    /**
+     * 获取配置，优先内存缓存，回退到本地 H2
+     */
+    public ToolGuardConfigEntity getConfig() {
+        if (cachedPlatformConfig != null) {
+            return cachedPlatformConfig;
         }
-        return configs.get(0);
+        // 回退到本地 H2
+        ToolGuardConfigEntity local = readFromLocalDb();
+        if (local != null) {
+            return local;
+        }
+        return createDefaultConfig();
     }
 
     /**
@@ -121,7 +152,8 @@ public class ToolGuardConfigService {
     }
 
     public boolean isEnabled() {
-        return Boolean.TRUE.equals(getConfig().getEnabled());
+        // null → true（安全默认：未配置时启用 guard）
+        return !Boolean.FALSE.equals(getConfig().getEnabled());
     }
 
     public Set<String> getDeniedTools() {
@@ -136,7 +168,8 @@ public class ToolGuardConfigService {
     }
 
     public boolean isFileGuardEnabled() {
-        return Boolean.TRUE.equals(getConfig().getFileGuardEnabled());
+        // null → true（安全默认：未配置时启用文件守卫）
+        return !Boolean.FALSE.equals(getConfig().getFileGuardEnabled());
     }
 
     public List<String> getSensitivePaths() {
@@ -147,7 +180,8 @@ public class ToolGuardConfigService {
     // ==================== 审计配置 ====================
 
     public boolean isAuditEnabled() {
-        return Boolean.TRUE.equals(getConfig().getAuditEnabled());
+        // null → true（安全默认：未配置时启用审计）
+        return !Boolean.FALSE.equals(getConfig().getAuditEnabled());
     }
 
     public GuardSeverity getAuditMinSeverity() {
@@ -193,8 +227,38 @@ public class ToolGuardConfigService {
         try {
             return objectMapper.readValue(json, new TypeReference<>() {});
         } catch (JsonProcessingException e) {
+            // Windows paths (e.g. C:\Users\...) contain backslashes that are
+            // invalid JSON escapes (\U, \l, \D, \A, etc.). When the JSON is stored
+            // in H2, those backslashes are not escaped, which makes Jackson reject
+            // the string. Retry after escaping lone backslashes.
+            String fixed = fixJsonBackslashEscaping(json);
+            try {
+                List<String> result = objectMapper.readValue(fixed, new TypeReference<>() {});
+                log.info("[ToolGuardConfig] Parsed JSON list after backslash fix: {} entries", result.size());
+                return result;
+            } catch (JsonProcessingException e2) {
+                log.warn("[ToolGuardConfig] Failed to parse JSON list even after fixing backslashes: {}", e2.getMessage());
+            }
             log.warn("[ToolGuardConfig] Failed to parse JSON list: {}", e.getMessage());
             return List.of();
         }
     }
+
+    /**
+     * Escape lone backslashes in JSON that are not part of valid JSON escape sequences.
+     * <p>
+     * Valid JSON escapes: {@code \" \\ \/ \b \f \n \r \t} plus 4-hex-digit Unicode.
+     * Any other backslash (e.g. Windows path {@code C:\Users}) is doubled so
+     * Jackson can parse the string correctly.
+     */
+    static String fixJsonBackslashEscaping(String json) {
+        // Match a backslash NOT followed by a valid JSON escape starter:
+        //   \  /  b  f  n  r  t  u
+        // Replace it with \\(doubled backslash).
+        return BACKSLASH_FIX_PATTERN.matcher(json).replaceAll("\\\\\\\\");
+    }
+
+    /** @see #fixJsonBackslashEscaping(String) */
+    private static final Pattern BACKSLASH_FIX_PATTERN =
+            Pattern.compile("\\\\(?![\\\\/bfnrtu])");
 }

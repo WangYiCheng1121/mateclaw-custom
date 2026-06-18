@@ -15,22 +15,9 @@ import vip.mate.skill.model.SkillEntity;
 public interface SkillMapper extends BaseMapper<SkillEntity> {
 
     /**
-     * RFC-090 §14.5 — physical delete bypassing the {@code deleted}
-     * logical-delete flag. Used by the admin "hard delete" path
-     * ({@code DELETE /skills/{id}}); the user-facing "uninstall" path
-     * still goes through {@link BaseMapper#deleteById} so the row can
-     * be recovered by re-installing the same skill name.
+     * Physical delete by id. Same as {@link BaseMapper#deleteById};
+     * kept for backward-compatible callers that expect this method name.
      */
     @Delete("DELETE FROM mate_skill WHERE id = #{id}")
     int hardDeleteById(@Param("id") Long id);
-
-
-    /**
-     * 物理删除指定名称的软删除残留记录（绕过 @TableLogic）
-     * <p>
-     * 用于平台同步场景：技能被平台取消后软删除，重新分配时需先清理残留记录再 INSERT，
-     * 否则主键冲突。
-     */
-    @Delete("DELETE FROM mate_skill WHERE name = #{name} AND deleted != 0")
-    int clearSoftDeletedByName(@Param("name") String name);
 }

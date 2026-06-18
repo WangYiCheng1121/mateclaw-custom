@@ -7,6 +7,7 @@ import org.springframework.stereotype.Component;
 import vip.mate.tool.guard.model.*;
 import vip.mate.tool.guard.service.ToolGuardConfigService;
 
+import java.io.File;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
@@ -35,10 +36,11 @@ public class FilePathGuardian implements ToolGuardGuardian {
     static {
         Set<String> dirs = new HashSet<>();
         String home = System.getProperty("user.home", "~");
-        dirs.add(home + "/.ssh/");
-        dirs.add(home + "/.aws/");
-        dirs.add(home + "/.gnupg/");
-        dirs.add("/etc/ssh/");
+        String sep = File.separator;
+        dirs.add(home + sep + ".ssh" + sep);
+        dirs.add(home + sep + ".aws" + sep);
+        dirs.add(home + sep + ".gnupg" + sep);
+        dirs.add(sep + "etc" + sep + "ssh" + sep);
         DEFAULT_SENSITIVE_DIRS = Set.copyOf(dirs);
     }
 
@@ -50,21 +52,31 @@ public class FilePathGuardian implements ToolGuardGuardian {
             "service-account.json"
     );
 
-    /** 已知文件工具的路径参数名（必须与 @ToolParam 声明的 JSON 键名一致） */
+    /** 已知文件/目录工具的路径参数名（必须与 @ToolParam 声明的 JSON 键名一致） */
     private static final Map<String, String> TOOL_FILE_PARAMS = Map.of(
             "read_file", "filePath",
             "write_file", "filePath",
             "edit_file", "filePath",
             "file_read", "file_path",
-            "file_write", "file_path"
+            "file_write", "file_path",
+            "list_dir", "path",
+            "list_directory", "path",
+            "read_directory", "path"
     );
 
     private static final Set<String> SHELL_TOOL_NAMES = Set.of(
-            "execute_shell_command", "shell_execute", "run_command"
+            "execute_shell_command", "shell_execute", "run_command",
+            "run_in_terminal", "get_terminal_output"
     );
 
+    /**
+     * 匹配类路径字符串的模式。
+     * <p>
+     * Unix: /home/user/docs, ~/Downloads, ./relative
+     * Windows: C:\Users\..., D:/path, \\?\UNC\...
+     */
     private static final Pattern PATH_LIKE = Pattern.compile(
-            "(?:^|[\\s\"'])(/[\\w./-]+|~[/\\w./-]+|\\./[\\w./-]+)"
+            "(?:^|[\\s\"'])([A-Za-z]:[\\\\/][\\w./\\\\-]+|/[\\w./\\\\-]+|~[/\\\\\\w./\\\\-]+|\\./[/\\\\\\w./\\\\-]+|\\\\\\?\\\\)"
     );
 
     private final ObjectMapper objectMapper = new ObjectMapper();
@@ -93,11 +105,21 @@ public class FilePathGuardian implements ToolGuardGuardian {
     public List<GuardFinding> evaluate(ToolInvocationContext context) {
         // 若 file guard 被配置禁用，跳过检查
         if (!configService.isFileGuardEnabled()) {
+            log.info("[FilePathGuardian] File guard is DISABLED — skipping evaluation for tool={}", context.toolName());
             return List.of();
         }
 
+        // 诊断日志：每次检查时打印当前配置态
+        List<String> cfgPaths = configService.getSensitivePaths();
+        log.info("[FilePathGuardian] Evaluating tool={}, fileGuard enabled, sensitivePaths configured={}: {}",
+                context.toolName(), cfgPaths.size(), cfgPaths);
+
         List<String> paths = extractPaths(context);
-        if (paths.isEmpty()) return List.of();
+        if (paths.isEmpty()) {
+            log.info("[FilePathGuardian] No paths extracted from tool={} args", context.toolName());
+            return List.of();
+        }
+        log.info("[FilePathGuardian] Extracted {} path(s) from tool={}: {}", paths.size(), context.toolName(), paths);
 
         List<GuardFinding> findings = new ArrayList<>();
         for (String rawPath : paths) {
@@ -184,7 +206,14 @@ public class FilePathGuardian implements ToolGuardGuardian {
     }
 
     private boolean looksLikePath(String value) {
-        return value.startsWith("/") || value.startsWith("~/") || value.startsWith("./");
+        if (value == null || value.isEmpty()) return false;
+        // Unix: /path, ~/path, ./
+        if (value.startsWith("/") || value.startsWith("~/") || value.startsWith("./")) return true;
+        // Windows: C:\..., D:/
+        if (value.length() >= 2 && Character.isLetter(value.charAt(0)) && value.charAt(1) == ':') return true;
+        // UNC: \\...
+        if (value.startsWith("\\\\")) return true;
+        return false;
     }
 
     private String normalizePath(String rawPath) {
@@ -203,11 +232,11 @@ public class FilePathGuardian implements ToolGuardGuardian {
         // 精确匹配（默认敏感文件）
         if (DEFAULT_SENSITIVE_FILES.contains(normalized)) return true;
 
-        // 目录前缀匹配（默认敏感目录）
+        // 目录前缀匹配（默认敏感目录，跨平台分隔符适配）
         for (String dir : DEFAULT_SENSITIVE_DIRS) {
             String normalizedDir = normalizePath(dir);
-            if (normalizedDir != null && (normalized.startsWith(normalizedDir)
-                    || normalized.equals(normalizedDir.substring(0, normalizedDir.length() - 1)))) {
+            if (normalizedDir != null && (normalized.equals(normalizedDir)
+                    || normalized.startsWith(normalizedDir + File.separator))) {
                 return true;
             }
         }
@@ -216,22 +245,33 @@ public class FilePathGuardian implements ToolGuardGuardian {
         String fileName = Path.of(normalized).getFileName().toString();
         if (SENSITIVE_FILE_PATTERNS.contains(fileName)) return true;
 
-        // 路径中包含密钥/凭据相关目录
+        // 路径中包含密钥/凭据相关目录（跨平台：同时匹配 / 和 \）
         String lower = normalized.toLowerCase();
-        if (lower.contains("/secrets/") || lower.contains("/credentials/")
-                || lower.contains("/private-keys/")) {
-            return true;
-        }
+        if (lower.contains("secrets") && (lower.contains("/secrets/") || lower.contains("\\secrets\\")
+                || lower.endsWith("/secrets") || lower.endsWith("\\secrets"))) return true;
+        if (lower.contains("credentials") && (lower.contains("/credentials/") || lower.contains("\\credentials\\")
+                || lower.endsWith("/credentials") || lower.endsWith("\\credentials"))) return true;
+        if (lower.contains("private-keys") && (lower.contains("/private-keys/") || lower.contains("\\private-keys\\")
+                || lower.endsWith("/private-keys") || lower.endsWith("\\private-keys"))) return true;
 
         // 配置的自定义敏感路径（从 ToolGuardConfigService 加载）
         List<String> configPaths = configService.getSensitivePaths();
+        log.info("[FilePathGuardian] Checking normalized='{}' against {} config path(s): {}",
+                normalized, configPaths.size(), configPaths);
         for (String configPath : configPaths) {
             String normalizedConfig = normalizePath(configPath);
             if (normalizedConfig != null) {
-                if (normalized.equals(normalizedConfig) || normalized.startsWith(normalizedConfig + "/")
-                        || normalized.startsWith(normalizedConfig)) {
+                boolean eq = normalized.equals(normalizedConfig);
+                boolean startsSlash = normalized.startsWith(normalizedConfig + "/");
+                boolean startsBackslash = normalized.startsWith(normalizedConfig + "\\");
+                boolean startsRaw = normalized.startsWith(normalizedConfig);
+                if (eq || startsSlash || startsBackslash || startsRaw) {
+                    log.info("[FilePathGuardian] ✓ Sensitive path MATCHED: '{}' against config '{}' (eq={}, /={}, \\={}, raw={})",
+                            normalized, normalizedConfig, eq, startsSlash, startsBackslash, startsRaw);
                     return true;
                 }
+                log.info("[FilePathGuardian] ✗ No match: '{}' against config '{}' (eq={}, /={}, \\={}, raw={})",
+                        normalized, normalizedConfig, eq, startsSlash, startsBackslash, startsRaw);
             }
         }
 

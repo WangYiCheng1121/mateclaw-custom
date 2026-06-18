@@ -78,9 +78,13 @@ public class ToolGuardAuditService {
 
             // 异步推送至平台端（静默失败，不阻塞本地写入）
             try {
-                platformClient.pushAuditLog(entity);
+                boolean pushed = platformClient.pushAuditLog(entity);
+                if (!pushed) {
+                    log.warn("[ToolGuardAudit] Platform audit push returned false — platform may be unreachable or reject the payload (tool={}, decision={})",
+                            entity.getToolName(), entity.getDecision());
+                }
             } catch (Exception pushEx) {
-                log.debug("[ToolGuardAudit] Platform push skipped: {}", pushEx.getMessage());
+                log.warn("[ToolGuardAudit] Platform audit push failed: {}", pushEx.getMessage());
             }
         } catch (Exception e) {
             log.warn("[ToolGuardAudit] Failed to record audit log: {}", e.getMessage());

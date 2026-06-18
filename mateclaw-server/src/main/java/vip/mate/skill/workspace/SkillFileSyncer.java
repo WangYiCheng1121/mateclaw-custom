@@ -1,5 +1,6 @@
 package vip.mate.skill.workspace;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -15,7 +16,9 @@ import java.nio.file.Path;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 /**
@@ -45,6 +48,7 @@ public class SkillFileSyncer {
     private final SkillService skillService;
     private final SkillFileService skillFileService;
     private final SkillWorkspaceManager workspaceManager;
+    private final ObjectMapper objectMapper;
 
     /** Aggregate counters for one full sync pass. */
     public record SyncReport(int skillsConsidered,
@@ -100,6 +104,18 @@ public class SkillFileSyncer {
         if (dbFiles.isEmpty()) {
             backfilled = backfillFromDiskIfNeeded(skill, workspaceDir);
             if (backfilled > 0) {
+                didBackfill = true;
+                dbFiles = skillFileService.listBySkillId(skill.getId());
+            }
+        }
+        // Fallback: when no files on disk and no rows in mate_skill_file,
+        // try extracting scripts / references from configJson. This covers
+        // skills whose bundle data was embedded in configJson (e.g. platform-
+        // synced or pre-V112 zip installs) instead of the mate_skill_file table.
+        if (dbFiles.isEmpty()) {
+            int configBackfilled = backfillFromConfigJsonIfNeeded(skill);
+            if (configBackfilled > 0) {
+                backfilled += configBackfilled;
                 didBackfill = true;
                 dbFiles = skillFileService.listBySkillId(skill.getId());
             }
@@ -205,5 +221,64 @@ public class SkillFileSyncer {
         // Use a synthetic event type — INSTALLED is the closest existing match.
         skill.setUpdateTime(LocalDateTime.now());
         return ingested.size();
+    }
+
+    /**
+     * Extract scripts / references embedded in {@code configJson} and ingest
+     * them into {@code mate_skill_file}. This is a fallback for skills whose
+     * bundle payload was serialised inline in the config blob (platform sync,
+     * pre-V112 zip installs) instead of stored as proper file rows.
+     *
+     * <p>Only runs when both the file table and the on-disk workspace are
+     * empty — once canonical rows exist, this path is permanently skipped.
+     *
+     * @return number of file rows ingested, 0 if configJson has no payload
+     */
+    private int backfillFromConfigJsonIfNeeded(SkillEntity skill) {
+        String raw = skill.getConfigJson();
+        if (raw == null || raw.isBlank()) return 0;
+
+        Map<String, Object> config;
+        try {
+            @SuppressWarnings("unchecked")
+            Map<String, Object> parsed = objectMapper.readValue(raw, Map.class);
+            config = parsed;
+        } catch (Exception e) {
+            log.debug("Failed to parse configJson for skill '{}': {}", skill.getName(), e.getMessage());
+            return 0;
+        }
+
+        Map<String, String> combined = new LinkedHashMap<>();
+
+        // Extract scripts block — keys are already prefixed "scripts/…"
+        appendConfigBucket(combined, config, "scripts");
+        // Extract references block — keys are already prefixed "references/…"
+        appendConfigBucket(combined, config, "references");
+
+        if (combined.isEmpty()) return 0;
+
+        skillFileService.applyBundleFiles(skill.getId(), combined, false);
+        log.info("Backfilled {} bundle file(s) from configJson into mate_skill_file for skill '{}' (id={})",
+                combined.size(), skill.getName(), skill.getId());
+
+        skill.setUpdateTime(LocalDateTime.now());
+        return combined.size();
+    }
+
+    @SuppressWarnings("unchecked")
+    private void appendConfigBucket(Map<String, String> combined, Map<String, Object> config, String bucket) {
+        Object obj = config.get(bucket);
+        if (!(obj instanceof Map)) return;
+        Map<String, Object> entries = (Map<String, Object>) obj;
+        for (var entry : entries.entrySet()) {
+            String key = entry.getKey();
+            String value = entry.getValue() != null ? entry.getValue().toString() : "";
+            // Normalise: ensure the key carries the bucket prefix so
+            // materializeOne accepts it.
+            if (!key.startsWith(bucket + "/")) {
+                key = bucket + "/" + key;
+            }
+            combined.put(key, value);
+        }
     }
 }

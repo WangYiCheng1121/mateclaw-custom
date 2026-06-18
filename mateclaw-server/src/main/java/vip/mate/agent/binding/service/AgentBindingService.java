@@ -616,6 +616,7 @@ public class AgentBindingService implements AgentBindingResolver {
             // not-found → gave up before ever reaching renderDocx.
             "search",
             "browser_use",
+            "web_fetch",
             "read_file",
             "send_file",
             "write_file",

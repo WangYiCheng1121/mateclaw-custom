@@ -179,7 +179,7 @@ Same pattern, same outcome: have a Claude Pro / Max / Team subscription? Sign in
 
 `Settings → Models → Add Provider → Anthropic Claude Code OAuth`. Two flows are supported:
 
-- **Browser callback** — local install, browser pops up, you click through, token lands in MateClaw
+- **Browser callback** — local install, browser pops up, you click through, token lands in GLClaw
 - **MANUAL_PASTE** — for remote-server deployments where the browser can't reach the backend, you complete the auth in your local browser and paste the token in
 
 Anti-abuse-gate compliant: Claude Code identity is injected into the system prompt, the request shape (UA / accept headers / `system` array form / `mcp_` tool-name prefixes) matches Claude Code's wire format exactly so the requests aren't rejected.

@@ -1,6 +1,6 @@
 # Chat & Messaging
 
-Chat is where you actually work. Everything else in MateClaw — agents, tools, memory, wiki, channels — exists so that what happens inside this box can be good.
+Chat is where you actually work. Everything else in GLClaw — agents, tools, memory, wiki, channels — exists so that what happens inside this box can be good.
 
 This page is about what that box actually does. Not the REST endpoint. Not the SSE event schema. What you see, what it does for you, and why the interaction design is what it is. (The API part is at the bottom for integrators who need it.)
 
@@ -40,7 +40,7 @@ Use Plan-and-Execute when the task needs several ordered steps and you want to w
 
 ## Thinking, tool calls, and what to trust
 
-One of the questions MateClaw tries to answer with its chat UI is: **should you trust what the AI just told you?** The default answer elsewhere is "look at the answer and guess". MateClaw tries to do better.
+One of the questions GLClaw tries to answer with its chat UI is: **should you trust what the AI just told you?** The default answer elsewhere is "look at the answer and guess". GLClaw tries to do better.
 
 **Thinking is visible.** If the agent's thinking was sloppy, you can expand the thinking panel and see it. If it skipped a step, it's in there. If it hallucinated a fact before catching itself, you can watch it catch itself.
 
@@ -48,7 +48,7 @@ One of the questions MateClaw tries to answer with its chat UI is: **should you 
 
 **Phase hints are visible.** At the top of a streaming response, a small indicator shows the current phase — *thinking*, *searching*, *reading*, *generating*, *summarizing*. You're never staring at a spinner wondering whether the agent is alive.
 
-Trust is earned by showing the work. MateClaw shows the work.
+Trust is earned by showing the work. GLClaw shows the work.
 
 ---
 
@@ -74,7 +74,7 @@ Three ways to give the agent a file:
 | **Paste** from clipboard (Ctrl/Cmd+V) | Paste images or files copied from other apps |
 | **Drag & drop** into the chat area | A translucent overlay appears; drop anywhere inside |
 
-Drop a **folder** on the desktop app and the agent gets a reference to the folder's absolute path — it can then walk it with the file-reader or shell tool. Drop a folder on the web and MateClaw recursively expands it and uploads each file individually.
+Drop a **folder** on the desktop app and the agent gets a reference to the folder's absolute path — it can then walk it with the file-reader or shell tool. Drop a folder on the web and GLClaw recursively expands it and uploads each file individually.
 
 Upload limits, default:
 
@@ -144,7 +144,7 @@ The thing to notice: **persistence is synchronous with streaming**. Segments lan
 
 ## Conversations
 
-A conversation is a sequence of messages scoped to a single agent and a single user. MateClaw stores them in two tables:
+A conversation is a sequence of messages scoped to a single agent and a single user. GLClaw stores them in two tables:
 
 **mate_conversation**
 
@@ -231,7 +231,7 @@ All three entry points open the **same dialog** with identical behavior. Agent i
 
 ## Context window management
 
-Every turn, MateClaw builds the prompt that actually goes to the LLM. Roughly:
+Every turn, GLClaw builds the prompt that actually goes to the LLM. Roughly:
 
 1. **System prompt** — the agent's instructions
 2. **Workspace file injection** — `AGENTS.md`, `SOUL.md`, `PROFILE.md`, `MEMORY.md` (only `enabled=true` files)

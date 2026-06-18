@@ -2,6 +2,7 @@ package vip.mate.tool.builtin;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import vip.mate.agent.binding.service.AgentBindingService;
 import vip.mate.skill.runtime.SkillRuntimeService;
 import vip.mate.skill.runtime.model.ResolvedSkill;
 
@@ -26,7 +27,8 @@ class SkillLoadToolTest {
     void blankSkillNameRejected() {
         SkillRuntimeService runtime = mock(SkillRuntimeService.class);
         SkillFileTool fileTool = mock(SkillFileTool.class);
-        SkillLoadTool tool = new SkillLoadTool(runtime, fileTool);
+        AgentBindingService agentBindingService = mock(AgentBindingService.class);
+        SkillLoadTool tool = new SkillLoadTool(runtime, fileTool, agentBindingService);
 
         String out = tool.loadSkill("  ", null, null);
 
@@ -41,7 +43,8 @@ class SkillLoadToolTest {
         SkillRuntimeService runtime = mock(SkillRuntimeService.class);
         SkillFileTool fileTool = mock(SkillFileTool.class);
         when(runtime.findActiveSkill("nope")).thenReturn(null);
-        SkillLoadTool tool = new SkillLoadTool(runtime, fileTool);
+        AgentBindingService agentBindingService = mock(AgentBindingService.class);
+        SkillLoadTool tool = new SkillLoadTool(runtime, fileTool, agentBindingService);
 
         String out = tool.loadSkill("nope", null, null);
 
@@ -58,7 +61,8 @@ class SkillLoadToolTest {
         when(runtime.findActiveSkill("foo")).thenReturn(skill("foo"));
         when(fileTool.readSkillFile(eq("foo"), eq("SKILL.md"), isNull(), isNull(), any()))
                 .thenReturn("SKILL CONTENT");
-        SkillLoadTool tool = new SkillLoadTool(runtime, fileTool);
+        AgentBindingService agentBindingService = mock(AgentBindingService.class);
+        SkillLoadTool tool = new SkillLoadTool(runtime, fileTool, agentBindingService);
 
         String out = tool.loadSkill("foo", null, null);
 
@@ -74,7 +78,8 @@ class SkillLoadToolTest {
         when(runtime.findActiveSkill("foo")).thenReturn(skill("foo"));
         when(fileTool.readSkillFile(eq("foo"), eq("references/api.md"), isNull(), isNull(), any()))
                 .thenReturn("REF CONTENT");
-        SkillLoadTool tool = new SkillLoadTool(runtime, fileTool);
+        AgentBindingService agentBindingService = mock(AgentBindingService.class);
+        SkillLoadTool tool = new SkillLoadTool(runtime, fileTool, agentBindingService);
 
         String out = tool.loadSkill("foo", "references/api.md", null);
 

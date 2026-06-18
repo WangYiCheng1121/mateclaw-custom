@@ -259,7 +259,7 @@ public class ChannelMessageRouter {
         }
 
         String channelType = adapter.getChannelType();
-        String conversationId = buildConversationId(message);
+        String conversationId = buildConversationId(message, channelEntity.getId());
 
         log.info("[{}] Enqueuing message: sender={}, conversationId={}, agentId={}",
                 channelType, message.getSenderId(), conversationId, agentId);
@@ -434,7 +434,7 @@ public class ChannelMessageRouter {
                     continue; // 超时，重新检查 shutdown 标志
                 }
 
-                String conversationId = buildConversationId(entry.message());
+                String conversationId = buildConversationId(entry.message(), entry.channelEntity().getId());
                 ReentrantLock lock = sessionLocks.computeIfAbsent(conversationId, k -> new ReentrantLock());
 
                 lock.lock();
@@ -1099,7 +1099,7 @@ public class ChannelMessageRouter {
             return Flux.error(new IllegalStateException("Channel has no associated agent"));
         }
 
-        String conversationId = buildConversationId(message);
+        String conversationId = buildConversationId(message, channelEntity.getId());
         String username = message.getSenderName() != null ? message.getSenderName() : message.getSenderId();
 
         conversationService.getOrCreateConversation(conversationId, agentId, username, channelEntity.getWorkspaceId());
@@ -1170,12 +1170,15 @@ public class ChannelMessageRouter {
 
     /**
      * 构建会话 ID
-     * 格式：{channelType}:{chatId 或 senderId}
-     * 格式采用 {channelType}:{identifier} 命名规则
+     * 格式：{channelType}:{channelId}:{chatId 或 senderId}
+     * <p>
+     * 加入 channelId 确保同一用户通过不同渠道（机器人）与系统交互时，
+     * 会话相互隔离。例如钉钉用户 A 同时与机器人1、机器人2对话时，
+     * 两个机器人的消息不会混入同一个会话。
      */
-    private String buildConversationId(ChannelMessage message) {
+    private String buildConversationId(ChannelMessage message, long channelId) {
         String identifier = message.getChatId() != null ? message.getChatId() : message.getSenderId();
-        return message.getChannelType() + ":" + identifier;
+        return message.getChannelType() + ":" + channelId + ":" + identifier;
     }
 
     /**

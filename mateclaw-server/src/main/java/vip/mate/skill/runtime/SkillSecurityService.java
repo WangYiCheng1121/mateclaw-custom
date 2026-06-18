@@ -229,7 +229,7 @@ public class SkillSecurityService {
             "Consider documenting that skills should not require root"),
         // Medium: 文档中的绝对路径引用（只是提示，不 block）
         rule("ABSOLUTE_PATH_DOC", "PATH_REFERENCE", SkillValidationResult.Severity.LOW,
-            "(?m)^[^#]*(/etc/|/usr/|/var/|/root/|/home/|C:\\\\)",
+            "(?m)^[^#]*(/etc/|/usr/|/var/|/root/|/home/|[A-Za-z]:\\\\)",
             "Documentation references absolute system paths",
             "Example references system directories",
             "Use relative paths or explain the system dependency")
@@ -237,8 +237,10 @@ public class SkillSecurityService {
 
     // ==================== 路径逃逸规则 ====================
 
-    private static final Pattern PATH_TRAVERSAL_PATTERN = Pattern.compile("\\.\\./");
-    private static final Pattern ABSOLUTE_PATH_PATTERN = Pattern.compile("(?m)^[^#]*(?<!['\"])(/etc/|/usr/|/var/|/root/|/home/|C:\\\\)");
+    /** 匹配 Unix 和 Windows 的路径逃逸：../ 和 ..\ */
+    private static final Pattern PATH_TRAVERSAL_PATTERN = Pattern.compile("\\.\\.[/\\\\]");
+    /** 匹配 Unix (/etc/ 等) 和 Windows (C:\, D:\ 等盘符) 的绝对系统路径 */
+    private static final Pattern ABSOLUTE_PATH_PATTERN = Pattern.compile("(?m)^[^#]*(?<!['\"])(/etc/|/usr/|/var/|/root/|/home/|[A-Za-z]:\\\\)");
     private static final Set<String> ALLOWED_SCRIPT_EXTENSIONS = Set.of(
         ".py", ".sh", ".bash", ".js", ".ts", ".rb", ".pl"
     );
@@ -464,8 +466,8 @@ public class SkillSecurityService {
                         .ruleId("PATH_TRAVERSAL")
                         .severity(SkillValidationResult.Severity.HIGH)
                         .category("PATH_TRAVERSAL")
-                        .title("Path traversal pattern (../)")
-                        .description("Line contains ../ which may escape the skill directory")
+                        .title("Path traversal pattern (../ or ..\\)")
+                        .description("Line contains ../ or ..\\ which may escape the skill directory")
                         .filePath(filePath)
                         .lineNumber(i + 1)
                         .snippet(truncate(line, 150))

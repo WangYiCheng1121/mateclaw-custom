@@ -10,9 +10,9 @@ Docker 和源码启动在 [配置说明](./config) 和 [贡献指南](./contribu
 
 去 [GitHub Releases](https://github.com/matevip/mateclaw/releases) 拿最新安装包。
 
-- **Windows**——`MateClaw-Setup-x.y.z.exe`
-- **macOS**——`MateClaw-x.y.z.dmg`
-- **Linux**——`MateClaw-x.y.z.AppImage`
+- **Windows**——`GLClaw-Setup-x.y.z.exe`
+- **macOS**——`GLClaw-x.y.z.dmg`
+- **Linux**——`GLClaw-x.y.z.AppImage`
 
 不用装 Java。不用装 Node。不用装 Maven。桌面端已经把 JRE 21 和后端 JAR 打包好了。
 

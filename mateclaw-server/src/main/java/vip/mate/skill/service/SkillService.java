@@ -70,14 +70,6 @@ public class SkillService {
      */
     @Setter
     private vip.mate.skill.runtime.SkillRuntimeService runtimeService;
-//    private vip.mate.skill.runtime.SkillRuntimeService runtimeService;
-//
-//    /**
-//     * 延迟注入 SkillRuntimeService 避免循环依赖
-//     */
-//    public void setRuntimeService(vip.mate.skill.runtime.SkillRuntimeService runtimeService) {
-//        this.runtimeService = runtimeService;
-//    }
 
     // ==================== CRUD ====================
 
@@ -249,6 +241,10 @@ public class SkillService {
         for (String type : List.of("builtin", "mcp", "dynamic")) {
             LambdaQueryWrapper<SkillEntity> wrapper = new LambdaQueryWrapper<SkillEntity>()
                     .eq(SkillEntity::getSkillType, type);
+            // dynamic 技能需已安装才计入 tab 徽章数（平台同步的技能默认 installed=false）
+            if ("dynamic".equals(type)) {
+                wrapper.eq(SkillEntity::getInstalled, true);
+            }
             applyWorkspaceScope(wrapper, workspaceId);
             result.put(type, skillMapper.selectCount(wrapper));
         }
@@ -604,10 +600,15 @@ public class SkillService {
     }
 
     /**
-     * 启用/禁用技能（仅已安装的技能允许切换）
+     * 启用/禁用技能（仅已安装且未被平台移除的技能允许切换）
      */
     public SkillEntity toggleSkill(Long id, boolean enabled) {
         SkillEntity skill = getSkill(id);
+        // 平台已移除的技能不允许启用
+        if (enabled && skill.getPlatformStatus() != null) {
+            throw new MateClawException("err.skill.platform_removed",
+                    "平台端已禁用或删除此技能，无法启用。请联系平台管理员恢复后重试。");
+        }
         if (!Boolean.TRUE.equals(skill.getInstalled())) {
             throw new MateClawException("err.skill.not_installed",
                     "技能未安装，请先执行安装操作: " + skill.getName());
@@ -645,6 +646,11 @@ public class SkillService {
      */
     public SkillEntity installSkill(Long id) {
         SkillEntity skill = getSkill(id);
+        // 平台已移除的技能不允许安装
+        if (skill.getPlatformStatus() != null) {
+            throw new MateClawException("err.skill.platform_removed",
+                    "平台端已禁用或删除此技能，无法安装。请联系平台管理员恢复后重试。");
+        }
         if (Boolean.TRUE.equals(skill.getInstalled())) {
             // 已安装，仅刷新 enabled
             if (!Boolean.TRUE.equals(skill.getEnabled())) {
@@ -884,3 +890,4 @@ public class SkillService {
         return configJson.contains("skillDir") || configJson.contains("path") || configJson.contains("directory");
     }
 }
+

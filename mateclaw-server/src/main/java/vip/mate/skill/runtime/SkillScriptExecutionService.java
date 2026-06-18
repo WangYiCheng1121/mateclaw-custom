@@ -33,6 +33,28 @@ public class SkillScriptExecutionService {
             .toLowerCase(Locale.ROOT).contains("win");
 
     /**
+     * Escape a command-line argument for Windows so that double quotes
+     * inside the argument survive {@code CommandLineToArgvW} / Python's
+     * {@code sys.argv} parsing intact.
+     *
+     * <p>Rule (MSVC convention): wrap the whole argument in {@code "..."},
+     * then double every internal {@code "} → {@code ""}.  On the receiving
+     * side the parser treats {@code ""} inside a quoted region as one
+     * literal double-quote character.
+     *
+     * <p>This is a no-op on non-Windows systems and for arguments that do
+     * not contain any double-quote character.
+     */
+    static String escapeWindowsArg(String arg) {
+        if (!IS_WINDOWS || arg.indexOf('"') < 0) {
+            return arg;
+        }
+        // Wrap and double every internal double-quote.
+        // Example:  {"query":"hello"}  →  "{""query"":""hello""}"
+        return '"' + arg.replace("\"", "\"\"") + '"';
+    }
+
+    /**
      * 执行脚本（兼容签名 — 不注入额外 env vars）
      *
      * @param scriptPath 脚本绝对路径（已验证安全）
@@ -102,7 +124,9 @@ public class SkillScriptExecutionService {
 
             command.add(scriptPath.toString());
             if (args != null) {
-                command.addAll(args);
+                for (String arg : args) {
+                    command.add(escapeWindowsArg(arg));
+                }
             }
 
             // 重定向到临时文件，使 waitFor(timeout) 不被管道阻塞
@@ -118,13 +142,19 @@ public class SkillScriptExecutionService {
             // OVERRIDES same-named entries with the supplied values.
             // Null / blank values are skipped to avoid clearing
             // legitimate parent env vars.
+            Map<String, String> processEnv = pb.environment();
             if (envVars != null && !envVars.isEmpty()) {
-                Map<String, String> processEnv = pb.environment();
                 for (Map.Entry<String, String> e : envVars.entrySet()) {
                     if (e.getKey() == null || e.getKey().isBlank()) continue;
                     if (e.getValue() == null) continue;
                     processEnv.put(e.getKey(), e.getValue());
                 }
+            }
+            // Windows: force Python to use UTF-8 for stdin/stdout/stderr,
+            // otherwise the default GBK codec garbles Chinese output while
+            // readFileTruncated() on the Java side reads in UTF-8.
+            if (IS_WINDOWS && fileName.endsWith(".py")) {
+                processEnv.putIfAbsent("PYTHONIOENCODING", "utf-8");
             }
 
             Process process = pb.start();

@@ -154,13 +154,12 @@ public class SkillController {
         Set<String> realNames = realSkillNames(workspaceId);
         // RFC-090 §3.2 — virtual MCP-derived skills aren't in mate_skill,
         // so countByType() misses them. Fold in the live count so the
-        // "MCP" and "all" tab badges match what the list endpoint shows.
+        // "MCP" tab badge matches what the list endpoint shows.
         try {
             long virtualMcp = countUnshadowedVirtualSkills(
                     mcpSkillBridge.listMcpDerivedSkillEntities(), realNames);
             if (virtualMcp > 0) {
                 result.merge("mcp", virtualMcp, Long::sum);
-                result.merge("all", virtualMcp, Long::sum);
             }
         } catch (Exception ignored) {
             // Bridge failure must not break the badge fetch.
@@ -170,11 +169,14 @@ public class SkillController {
                     acpSkillBridge.listAcpDerivedSkillEntities(), realNames);
             if (virtualAcp > 0) {
                 result.merge("acp", virtualAcp, Long::sum);
-                result.merge("all", virtualAcp, Long::sum);
             }
         } catch (Exception ignored) {
             // Same defensive stance as the MCP bridge above.
         }
+        // "all" tab badge only counts builtin + dynamic (real DB skills),
+        // excluding MCP/ACP rows and their virtual derivatives.
+        result.put("all", result.getOrDefault("builtin", 0L)
+                + result.getOrDefault("dynamic", 0L));
         return R.ok(result);
     }
 
@@ -751,7 +753,7 @@ public class SkillController {
     }
 
     @Operation(summary = "卸载技能（软卸载：取消安装标记并禁用，保留数据行）")
-    @DeleteMapping("/{id}/uninstall")
+    @PostMapping("/{id}/uninstall")
     @RequireWorkspaceRole("admin")
     public R<SkillEntity> uninstall(@PathVariable Long id,
             @RequestHeader(value = "X-Workspace-Id", required = false) Long workspaceId) {

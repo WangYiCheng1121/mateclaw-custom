@@ -4,7 +4,7 @@
 
 把语言模型单独放在那里，它只是一个包在文本里的模式匹配器。它不知道现在几点。它不知道你的文件里写了什么。它不能搜索网页、执行命令、看一份 PDF、把任务交给另一个 Agent、打开一个浏览器。它只能**谈论**做这些事。
 
-工具是 MateClaw 解决这件事的方式。每一个工具是一个 Agent 被允许调用的具体操作——读文件、搜网页、执行 shell 命令、从 PDF 抽文字、把任务委托给另一个 Agent。Agent 判断需要某个工具时，发出一次**工具调用**，运行时执行它，结果作为**观察**回到 Agent 下一步推理里。
+工具是 GLClaw 解决这件事的方式。每一个工具是一个 Agent 被允许调用的具体操作——读文件、搜网页、执行 shell 命令、从 PDF 抽文字、把任务委托给另一个 Agent。Agent 判断需要某个工具时，发出一次**工具调用**，运行时执行它，结果作为**观察**回到 Agent 下一步推理里。
 
 **二十个内置工具**开箱即用。无限多个可以通过 MCP 服务、自定义技能脚本、或者你自己写的 `@Tool` Spring bean 加进来。
 
@@ -50,9 +50,9 @@ Tool Guard 是守门员。超时是**每个工具独立**的（这样一个慢�
 
 ## 工具注册的三条路
 
-**1. 内置工具。** MateClaw 出厂带的二十个工具，启动时自动注册到工具表里。
+**1. 内置工具。** GLClaw 出厂带的二十个工具，启动时自动注册到工具表里。
 
-**2. MCP 服务。** 说 Model Context Protocol 的外部进程动态暴露工具。MateClaw 通过 `tools/list` 发现它们。见 [MCP 协议](./mcp)。
+**2. MCP 服务。** 说 Model Context Protocol 的外部进程动态暴露工具。GLClaw 通过 `tools/list` 发现它们。见 [MCP 协议](./mcp)。
 
 > **每 Agent 的 MCP 工具范围（1.4.0+，#117）**：当一个 Agent **没有勾选任何具体的 MCP 工具行**时，已启用的 MCP 工具会**自动并入**它的工具集；一旦它勾选了某些具体 MCP 工具，就**只限定在这个集合**内。只绑技能 / 内置工具的 Agent 仍保留对全部 MCP 工具的访问。
 
@@ -99,7 +99,7 @@ Tool Guard 是守门员。超时是**每个工具独立**的（这样一个慢�
 | `SkillManageTool` | 创建 / 编辑 / 删除技能包 | ⚠️ |
 | `BrowserUseTool` | 驱动无头浏览器 | ⚠️ |
 | `DelegateAgentTool` | 把任务委托给另一个 Agent（支持并行） | — |
-| `MateClawDocTool` | 读取内置项目文档 | — |
+| `GLClawDocTool` | 读取内置项目文档 | — |
 | `ImageGenerateTool` | 文生图 / **图生图（1.3.0+）** | — |
 | `VideoGenerateTool` | 文生视频 / 图生视频 | — |
 | `DocxRenderTool` | **1.3.0+** Markdown → .docx（Word 文档） | — |
@@ -211,9 +211,9 @@ Agent A：[调 WebSearchTool]
 - **隔离会话**——被委托的 Agent 跑在自己的会话里
 - **结果截断**——委托结果上限 4000 字符
 
-### MateClawDocTool
+### GLClawDocTool
 
-读取内置的 MateClaw 项目文档。让 Agent 回答"MateClaw 里 X 是怎么工作的"这种问题时，**去查真文档**而不是猜。
+读取内置的 GLClaw 项目文档。让 Agent 回答"GLClaw 里 X 是怎么工作的"这种问题时，**去查真文档**而不是猜。
 
 ### enable_tool —— 激活扩展层工具（1.4.0+）
 
@@ -254,7 +254,7 @@ Agent A：[调 WebSearchTool]
 
 ## Tool Guard —— 权限层
 
-Tool Guard 是 MateClaw 不让强工具干蠢事的机制。它是**基于规则的**，不是一个扁平的"危险 / 不危险"清单。每条规则说：*对这个工具，带这些参数，在这个上下文里，做 X*——X 是 `allow`、`deny`、或 `require_approval`。
+Tool Guard 是 GLClaw 不让强工具干蠢事的机制。它是**基于规则的**，不是一个扁平的"危险 / 不危险"清单。每条规则说：*对这个工具，带这些参数，在这个上下文里，做 X*——X 是 `allow`、`deny`、或 `require_approval`。
 
 核心几张表：
 

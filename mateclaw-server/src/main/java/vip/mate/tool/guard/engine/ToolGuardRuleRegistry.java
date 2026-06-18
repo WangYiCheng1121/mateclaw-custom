@@ -7,6 +7,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.core.annotation.Order;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import vip.mate.tool.guard.model.ToolGuardRuleEntity;
 import vip.mate.tool.guard.platform.PlatformSecurityClient;
@@ -43,36 +44,66 @@ public class ToolGuardRuleRegistry implements ApplicationRunner {
     }
 
     /**
-     * 重新加载所有规则，优先从平台端拉取，回退到本地 DB
+     * 定时从平台端刷新规则（60 秒间隔）。
+     * <p>
+     * 与 ToolGuardConfigService 的定时刷新保持一致的节奏，
+     * 确保平台端对规则的增删改能在 60 秒内同步到客户端内存，无需重启。
+     */
+    @Scheduled(fixedDelayString = "${mateclaw.security.platform.rules-refresh-interval-sec:60}000")
+    public void scheduledRefresh() {
+        if (securityProperties.isEnabled()) {
+            reload();
+        }
+    }
+
+    /**
+     * 重新加载所有规则：优先从平台端拉取 → 覆盖写入 H2 → 从 H2 加载到内存
      */
     public void reload() {
+        boolean loadedFromPlatform = false;
+
         // 优先从平台端拉取
         if (securityProperties.isEnabled()) {
             try {
                 List<ToolGuardRuleEntity> platformRules = platformClient.fetchRules();
                 if (platformRules != null && !platformRules.isEmpty()) {
-                    this.allRules = platformRules.stream()
-                            .filter(r -> Boolean.TRUE.equals(r.getEnabled()))
-                            .toList();
-                    log.info("[ToolGuardRuleRegistry] Loaded {} enabled rules from platform", this.allRules.size());
-                    return;
+                    // 覆盖写入本地 H2（先清再插，保持与平台一致）
+                    overwriteLocalRules(platformRules);
+                    loadedFromPlatform = true;
+                    log.info("[ToolGuardRuleRegistry] Overwrote {} rules from platform → H2", platformRules.size());
                 }
             } catch (Exception e) {
-                log.warn("[ToolGuardRuleRegistry] Failed to load rules from platform: {}", e.getMessage());
+                log.warn("[ToolGuardRuleRegistry] Failed to fetch rules from platform: {}", e.getMessage());
             }
         }
-        // 回退到本地 DB
+
+        // 从本地 H2 加载到内存
         try {
             List<ToolGuardRuleEntity> rules = ruleMapper.selectList(
                     new LambdaQueryWrapper<ToolGuardRuleEntity>()
                             .eq(ToolGuardRuleEntity::getEnabled, true)
-                            .orderByDesc(ToolGuardRuleEntity::getPriority)
-            );
+                            .orderByDesc(ToolGuardRuleEntity::getPriority));
             this.allRules = List.copyOf(rules);
-            log.info("[ToolGuardRuleRegistry] Loaded {} enabled rules from local DB", rules.size());
+            log.info("[ToolGuardRuleRegistry] Loaded {} enabled rules from {} into memory",
+                    rules.size(), loadedFromPlatform ? "H2 (synced from platform)" : "local H2");
         } catch (Exception e) {
-            log.warn("[ToolGuardRuleRegistry] Failed to load rules (table may not exist): {}", e.getMessage());
+            log.warn("[ToolGuardRuleRegistry] Failed to load rules from H2: {}", e.getMessage());
             this.allRules = List.of();
+        }
+    }
+
+    /** 全量覆盖：清空本地规则表，插入平台规则 */
+    private void overwriteLocalRules(List<ToolGuardRuleEntity> platformRules) {
+        try {
+            // 先清空全部已有规则
+            ruleMapper.delete(new LambdaQueryWrapper<>());
+            // 批量插入平台规则
+            for (ToolGuardRuleEntity rule : platformRules) {
+                rule.setId(null); // 让 MyBatis-Plus 自动生成新 ID
+                ruleMapper.insert(rule);
+            }
+        } catch (Exception e) {
+            log.warn("[ToolGuardRuleRegistry] Failed to overwrite local rules: {}", e.getMessage());
         }
     }
 

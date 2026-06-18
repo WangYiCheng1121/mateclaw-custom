@@ -387,7 +387,7 @@ Keeps secrets out of the database.
 
 ### "Command not found" (stdio)
 
-1. Confirm the command is in PATH of the user running MateClaw
+1. Confirm the command is in PATH of the user running GLClaw
 2. Verify: `which npx` or `npx --version`
 3. Docker: confirm command is installed in the container
 4. Use full path: `/usr/local/bin/npx`

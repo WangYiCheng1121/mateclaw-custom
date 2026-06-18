@@ -180,7 +180,7 @@ token 持久化和刷新走的是和浏览器回调流**完全相同**的代码�
 
 `设置 → 模型 → 添加供应商 → Anthropic Claude Code OAuth`。支持两种流程：
 
-- **浏览器回调** —— 本地安装，浏览器弹窗，点完授权 token 落到 MateClaw
+- **浏览器回调** —— 本地安装，浏览器弹窗，点完授权 token 落到 GLClaw
 - **MANUAL_PASTE** —— 远程服务器部署、浏览器到不了后端时，本地浏览器完成授权后把 token 粘回来
 
 通过 anti-abuse 反滥用门：注入 Claude Code 身份到系统 prompt，请求形态（UA / accept 头 / `system` 数组形式 / `mcp_` 工具名前缀）与 Claude Code 在线协议完全对齐，请求不会被拒绝。

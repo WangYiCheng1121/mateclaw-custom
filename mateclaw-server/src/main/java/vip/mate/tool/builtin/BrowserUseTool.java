@@ -156,15 +156,23 @@ public class BrowserUseTool {
 
     // ==================== Playwright Lifecycle ====================
 
+    /** Playwright driver init timeout (seconds). Driver extraction from the bundled JAR
+     *  normally takes 1-2s; a 10s ceiling catches stuck extractions without blocking the
+     *  tool-executor thread for long. */
+    private static final int PLAYWRIGHT_CREATE_TIMEOUT_SECONDS = 10;
+
     /**
      * 获取或创建共享 Playwright 实例（双重检查锁定）。
-     * 首次调用约 1-2s（启动 Node.js），后续调用 ~0ms。
+     * 首次调用约 1-2s（启动 Node.js 驱动），后续调用 ~0ms。
      *
-     * <p>Issue #40: Playwright.create() spawns a Node.js driver subprocess by extracting
-     * a bundled binary to a temp directory. On Windows this can fail when the user profile
-     * path contains non-ASCII characters or when antivirus quarantines the extracted exe.
-     * We wrap the failure with a message that points the LLM/user at action=diagnose so
-     * they don't get a bare stack trace.
+     * <p>Before calling {@code Playwright.create()} we set the env var
+     * {@code PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1} to prevent Playwright from ever
+     * attempting a browser download from cdn.playwright.dev (unreachable in mainland
+     * China). The {@link BrowserLauncher} only uses system browsers (Chrome/Edge via
+     * channel/path/external-CDP), so the bundled Chromium is never needed.
+     *
+     * <p>A {@link CompletableFuture} with a {@value #PLAYWRIGHT_CREATE_TIMEOUT_SECONDS}s
+     * deadline wraps the call so a stuck driver extraction cannot hang the tool executor.
      */
     private Playwright getOrCreatePlaywright() {
         Playwright pw = sharedPlaywright;
@@ -176,10 +184,30 @@ public class BrowserUseTool {
             if (pw != null) {
                 return pw;
             }
-            log.info("[BrowserUse] Creating shared Playwright instance...");
+            // Prevent Playwright from ever attempting a browser binary download.
+            // BrowserLauncher only uses system browsers, so bundled Chromium is not needed.
+            setEnvSkipBrowserDownload();
+            log.info("[BrowserUse] Creating shared Playwright instance (timeout={}s)...", PLAYWRIGHT_CREATE_TIMEOUT_SECONDS);
             long start = System.currentTimeMillis();
             try {
-                pw = Playwright.create();
+                pw = CompletableFuture.supplyAsync(Playwright::create)
+                        .get(PLAYWRIGHT_CREATE_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+            } catch (TimeoutException te) {
+                long elapsed = System.currentTimeMillis() - start;
+                log.error("[BrowserUse] Playwright.create() timed out after {}ms", elapsed);
+                throw new PlaywrightException(
+                        "Playwright driver start timed out after " + (elapsed / 1000) + "s."
+                                + " The driver binary extraction is stuck — check antivirus or %TEMP% permissions."
+                                + " Run action=diagnose for details.");
+            } catch (ExecutionException ee) {
+                Throwable cause = ee.getCause() != null ? ee.getCause() : ee;
+                String os = System.getProperty("os.name", "?");
+                log.error("[BrowserUse] Playwright.create() failed on {}: {}", os, cause.getMessage(), cause);
+                throw new PlaywrightException(
+                        "Failed to start Playwright driver on " + os + ": " + cause.getMessage()
+                                + ". Common causes on Windows: (a) user profile path contains non-ASCII chars,"
+                                + " (b) antivirus blocked the extracted driver exe, (c) %TEMP% is on a read-only volume."
+                                + " Run action=diagnose for a full report.", cause);
             } catch (Throwable t) {
                 String os = System.getProperty("os.name", "?");
                 log.error("[BrowserUse] Playwright.create() failed on {}: {}", os, t.getMessage(), t);
@@ -192,6 +220,61 @@ public class BrowserUseTool {
             sharedPlaywright = pw;
             log.info("[BrowserUse] Playwright instance created in {}ms", System.currentTimeMillis() - start);
             return pw;
+        }
+    }
+
+    /**
+     * Set {@code PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1} in the process environment so
+     * Playwright never attempts to download a browser binary from its CDN.
+     * Uses reflection because {@code System.getenv()} returns an unmodifiable map.
+     *
+     * <p>On Java 17+ the module system may block access to
+     * {@code java.lang.ProcessEnvironment}. In that case we log a prominent warning
+     * so the operator can add {@code --add-opens java.base/java.lang=ALL-UNNAMED}
+     * to the JVM args or set the env var at the OS level.
+     */
+    private static void setEnvSkipBrowserDownload() {
+        // Strategy 1: Already set at OS level — nothing to do.
+        String existing = System.getenv("PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD");
+        if ("1".equals(existing) || "true".equalsIgnoreCase(existing)) {
+            log.info("[BrowserUse] PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD already set — browser download disabled");
+            return;
+        }
+
+        // Strategy 2: Set via ProcessEnvironment reflection (Java ≤16).
+        if (trySetEnvViaProcessEnvironment()) {
+            log.info("[BrowserUse] Set PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 via ProcessEnvironment");
+            return;
+        }
+
+        // Strategy 3: Last resort — warn prominently so the operator can fix it.
+        // Without this env var Playwright's Node.js driver will try to download
+        // Chromium from cdn.playwright.dev (unreachable in mainland China), which
+        // causes the 10 s timeout on Playwright.create().
+        log.warn("[BrowserUse] ⚠ Cannot set PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 — "
+                + "Java module system blocked internal reflection. "
+                + "Playwright may try to download browsers from CDN (blocked in China) "
+                + "and time out after 10 s. Fix: add '--add-opens java.base/java.lang=ALL-UNNAMED' "
+                + "to JVM args, or set PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 as an OS environment variable.");
+    }
+
+    /**
+     * Try to inject {@code PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1} via
+     * {@code java.lang.ProcessEnvironment} reflection.  Returns {@code true}
+     * on success, {@code false} if the module system blocked the access.
+     */
+    private static boolean trySetEnvViaProcessEnvironment() {
+        try {
+            Class<?> processEnvClass = Class.forName("java.lang.ProcessEnvironment");
+            java.lang.reflect.Field theEnvField = processEnvClass.getDeclaredField("theEnvironment");
+            theEnvField.setAccessible(true);
+            @SuppressWarnings("unchecked")
+            java.util.Map<String, String> env = (java.util.Map<String, String>) theEnvField.get(null);
+            env.put("PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD", "1");
+            return true;
+        } catch (Exception e) {
+            log.debug("[BrowserUse] ProcessEnvironment reflection failed: {}", e.getMessage());
+            return false;
         }
     }
 
@@ -253,7 +336,9 @@ public class BrowserUseTool {
             JSONObject result = new JSONObject();
             result.set("ok", false);
             result.set("error", r.getFailureSummary());
-            result.set("hint", "Run action=diagnose for a detailed report and fix suggestions.");
+            result.set("hint", "未找到可用的浏览器。请安装 Chrome 或 Edge，"
+                    + "或运行 action=diagnose 查看详细诊断。"
+                    + " 系统会扫描以下路径: Chrome, Edge, Brave, 360, QQ浏览器, 搜狗浏览器。");
             return JSONUtil.toJsonPrettyStr(result);
         }
 

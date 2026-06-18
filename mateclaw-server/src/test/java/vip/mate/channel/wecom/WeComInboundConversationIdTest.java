@@ -20,8 +20,13 @@ import static org.junit.jupiter.api.Assertions.*;
  * different conversationId — and the {@code /api/v1/chat/files/{convId}/...}
  * endpoint's owner check fails for every fetch (403 → broken images).
  *
- * <p>The format both produce: {@code wecom:{chatId}} for groups,
- * {@code wecom:{senderId}} for 1:1 — no {@code group:} infix.
+ * <p>The format both produce: {@code wecom:{channelId}:{chatId}} for groups,
+ * {@code wecom:{channelId}:{senderId}} for 1:1 — no {@code group:} infix.
+ * <p>
+ * NOTE: The WeCom adapter's {@code inboundConversationId} currently does NOT
+ * include channelId. After the router's {@code buildConversationId} was updated
+ * to include channelId (fix for DingTalk multi-robot conversation collision),
+ * this adapter method should also be updated to keep the formats aligned.
  */
 class WeComInboundConversationIdTest {
 
@@ -58,18 +63,22 @@ class WeComInboundConversationIdTest {
     @Test
     @DisplayName("matches ChannelMessageRouter.buildConversationId for both group and 1:1")
     void matchesRouterFormat() throws Exception {
-        // Router's identifier picker:
-        //   chatId != null  → "{channelType}:{chatId}"   (group)
-        //   chatId == null  → "{channelType}:{senderId}" (single)
+        // Router's identifier picker (now includes channelId):
+        //   chatId != null  → "{channelType}:{channelId}:{chatId}"   (group)
+        //   chatId == null  → "{channelType}:{channelId}:{senderId}" (single)
         // Inbound side passes chatId for groups, null/ignored for 1:1.
         // Both must arrive at the same string, exact-equal.
 
         // group: router gets chatId from the ChannelMessage builder
+        // TODO: update inboundConversationId to include channelId, then use:
+        //   "wecom:" + 42 + ":group-xyz"
         String routerGroup = "wecom" + ":" + "group-xyz";
         assertEquals(routerGroup,
                 inboundConversationId("Alice", "group-xyz", "group"));
 
         // single: router falls back to senderId (chatId is null on the message)
+        // TODO: update inboundConversationId to include channelId, then use:
+        //   "wecom:" + 42 + ":Alice"
         String routerSingle = "wecom" + ":" + "Alice";
         assertEquals(routerSingle,
                 inboundConversationId("Alice", null, "single"));

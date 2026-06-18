@@ -669,7 +669,7 @@ public class ApprovalWorkflowService implements ApplicationRunner {
         // 推送状态变更至平台端（静默失败）
         try {
             platformSecurityClient.pushApprovalStatus(
-                    snapshot.getPendingId(), dbStatus, userId);
+                    snapshot.getPendingId(), dbStatus, userId, snapshot.getUserId());
         } catch (Exception e) {
             log.debug("[ApprovalWorkflow] Platform status push skipped: {}", e.getMessage());
         }

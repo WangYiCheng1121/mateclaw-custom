@@ -252,7 +252,7 @@ mateclaw:
 
 The **Skill Market** page (`/skills`) is where you browse, install, edit, and manage skills. Three sources:
 
-- **Built-in** — skills that ship with MateClaw
+- **Built-in** — skills that ship with GLClaw
 - **Your custom skills** — the ones you created
 - **ClawHub** — a community skill repository. Browse thousands of community skills, preview them, install with one click. Installed skills land as `custom` type.
 

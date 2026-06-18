@@ -117,6 +117,13 @@ public class SkillEntity {
     /** 是否系统内置（不可删除） */
     private Boolean builtin;
 
+    /**
+     * 平台端可见性状态（客户端本地跟踪字段，非平台下发）。
+     * NULL 正常 / "REMOVED" 平台已移除（禁用/删除/取消分配）。
+     * 非空时 toggle/install 被拦截，重新出现时重置为全新技能。
+     */
+    private String platformStatus;
+
     /** 标签（逗号分隔） */
     private String tags;
 
@@ -188,6 +195,4 @@ public class SkillEntity {
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     @TableField(fill = FieldFill.INSERT_UPDATE)
     private LocalDateTime updateTime;
-
-    private Integer deleted;
 }

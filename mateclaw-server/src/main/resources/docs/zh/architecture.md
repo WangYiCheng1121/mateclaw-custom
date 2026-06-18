@@ -1,8 +1,8 @@
 # 架构说明
 
-**MateClaw 是怎么拼起来的，一页讲完。**
+**GLClaw 是怎么拼起来的，一页讲完。**
 
-**用** MateClaw 的人看 [项目介绍](./intro)。**在 MateClaw 上面建东西**的人——加工具、新渠道、自定义记忆 provider、新的 Agent 图节点——看这一页。
+**用** GLClaw 的人看 [项目介绍](./intro)。**在 GLClaw 上面建东西**的人——加工具、新渠道、自定义记忆 provider、新的 Agent 图节点——看这一页。
 
 ---
 
@@ -10,7 +10,7 @@
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                         MateClaw                                 │
+│                         GLClaw                                 │
 │                                                                  │
 │  ┌──────────────┐  ┌──────────────┐  ┌─────────────────────┐   │
 │  │  Web 控制台  │  │   桌面端     │  │     IM 渠道          │   │
@@ -78,7 +78,7 @@
 mateclaw/
 ├── mateclaw-server/          # Spring Boot 后端（心脏）
 │   └── src/main/java/vip/mate/
-│       ├── MateClawApplication.java
+│       ├── GLClawApplication.java
 │       ├── agent/            # StateGraph 运行时、节点、边、状态
 │       ├── planning/         # Plan 和 SubPlan 持久化
 │       ├── workflow/         # 工作流引擎（1.3.0+）：DSL 编译、线性 runtime、payload spill
@@ -128,7 +128,7 @@ mateclaw/
 
 **这是你给后端贡献代码时最重要的事。**
 
-**MateClaw 的 Agent 运行时不是一个类层次。** 没有 `BaseAgent` → `ReActAgent` → `MyCustomAgent` 的继承链。运行时是一张**由节点和条件边组成的 StateGraph**（来自 `spring-ai-alibaba-graph`），在运行时由 `AgentGraphBuilder` 装配。
+**GLClaw 的 Agent 运行时不是一个类层次。** 没有 `BaseAgent` → `ReActAgent` → `MyCustomAgent` 的继承链。运行时是一张**由节点和条件边组成的 StateGraph**（来自 `spring-ai-alibaba-graph`），在运行时由 `AgentGraphBuilder` 装配。
 
 ### 关键文件
 
@@ -137,15 +137,15 @@ mateclaw/
 - `agent/graph/node/`——`ReasoningNode`、`ActionNode`、`ObservationNode`、`FinalAnswerNode`、`SummarizingNode`、`LimitExceededNode`、`GoalEvaluationNode`
 - `agent/graph/plan/node/`——`PlanGenerationNode`、`StepExecutionNode`、`PlanSummaryNode`、`DirectAnswerNode`
 - `agent/graph/edge/` + `plan/edge/`——基于状态决定下一个节点的 dispatcher 函数
-- `agent/graph/state/MateClawStateKeys.java`——共享 state 对象的 key
-- `agent/graph/state/MateClawStateAccessor.java`——state map 的类型化访问器（**别直接动 map**）
+- `agent/graph/state/GLClawStateKeys.java`——共享 state 对象的 key
+- `agent/graph/state/GLClawStateAccessor.java`——state map 的类型化访问器（**别直接动 map**）
 - `agent/graph/lifecycle/ReActLifecycleListener.java`——节点级插桩 hook
 - `agent/AgentGraphBuilder.java`——按 Agent 配置拼装节点和边的 builder
 - `agent/GraphEventPublisher.java` + `agent/graph/NodeStreamingChatHelper.java`——流式事件怎么从图里逃到 SSE 流里
 
 ### 怎么扩展
 
-**加 Agent 行为**——在 `agent/graph/node/` 创建新节点，或在 `agent/graph/edge/` 创建新边 dispatcher。把它接进 `AgentGraphBuilder`。通过 `MateClawStateAccessor` 读写 state。
+**加 Agent 行为**——在 `agent/graph/node/` 创建新节点，或在 `agent/graph/edge/` 创建新边 dispatcher。把它接进 `AgentGraphBuilder`。通过 `GLClawStateAccessor` 读写 state。
 
 **不要**创建新的 `XxxAgent` 类。你会把图已经在做的事情重新实现一遍。
 
@@ -254,13 +254,13 @@ public interface ChannelAdapter {
 
 ### Agent 图节点和边
 
-更深的定制——在 `agent/graph/node/` 加新节点或在 `agent/graph/edge/` 加新 dispatcher。在配置 flag 后面接进 `AgentGraphBuilder`。State 访问走 `MateClawStateAccessor`。
+更深的定制——在 `agent/graph/node/` 加新节点或在 `agent/graph/edge/` 加新 dispatcher。在配置 flag 后面接进 `AgentGraphBuilder`。State 访问走 `GLClawStateAccessor`。
 
 ---
 
 ## 持久化 —— 一份 schema，两种数据库
 
-MateClaw 用 **MyBatis Plus**（不是 JPA）做数据库访问。约定：
+GLClaw 用 **MyBatis Plus**（不是 JPA）做数据库访问。约定：
 
 - 所有表前缀 `mate_`
 - `snake_case` 列、`camelCase` Java 字段、自动映射
@@ -291,7 +291,7 @@ MateClaw 用 **MyBatis Plus**（不是 JPA）做数据库访问。约定：
 
 ## 流式 —— 为什么用 SSE 不用 WebFlux
 
-MateClaw 用 **Spring MVC**，不是 Spring WebFlux。**WebFlux 在依赖图里被明确排除。**
+GLClaw 用 **Spring MVC**，不是 Spring WebFlux。**WebFlux 在依赖图里被明确排除。**
 
 为什么：Spring MVC + SSE 足以把 LLM 响应流式到前端。它更容易推理、更容易调试、不强迫整个栈变成响应式。
 

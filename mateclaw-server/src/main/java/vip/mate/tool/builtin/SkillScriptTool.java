@@ -7,8 +7,12 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.ai.chat.model.ToolContext;
 import org.springframework.ai.tool.annotation.Tool;
+import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Component;
+import vip.mate.agent.binding.service.AgentBindingService;
+import vip.mate.agent.context.ChatOrigin;
 import vip.mate.skill.runtime.SkillFileAccessPolicy;
 import vip.mate.skill.runtime.SkillRuntimeService;
 import vip.mate.skill.runtime.SkillScriptExecutionService;
@@ -20,6 +24,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * 技能脚本执行工具
@@ -35,6 +40,7 @@ public class SkillScriptTool {
     private final SkillScriptExecutionService executionService;
     private final SkillSecretService skillSecretService;
     private final ObjectMapper objectMapper;
+    private final AgentBindingService agentBindingService;
 
     @vip.mate.tool.ConcurrencyUnsafe("script execution can have arbitrary side effects on the host process and filesystem")
     @Tool(description = """
@@ -44,12 +50,10 @@ public class SkillScriptTool {
         Parameters:
         - skillName: Name of the skill
         - scriptPath: Relative path to script under scripts/ directory (e.g., "scripts/run.py")
-        - args: Optional script arguments, given as ONE JSON-encoded string:
-                * a JSON array for multiple positional arguments, e.g. ["--verbose","input.txt"];
-                * a JSON object when the script expects a single JSON payload — it is
-                  forwarded as one argument, e.g. {"date":"2026-05-19","topic":"meeting"};
-                * any other plain text is forwarded verbatim as a single argument.
-                Pass the JSON object directly — do not wrap it in an array or escape it.
+        - args: Optional script arguments. Pass a JSON object directly (e.g. {"query":"hello"}) —
+                it will be forwarded as one JSON argument to the script.
+                You may also pass a JSON array for multiple positional arguments,
+                or a plain string for a single literal argument.
 
         Returns: JSON with exitCode, stdout, stderr
 
@@ -66,8 +70,10 @@ public class SkillScriptTool {
         String scriptPath,
 
         @JsonProperty(required = false)
-        @JsonPropertyDescription("Optional script arguments as ONE JSON-encoded string: a JSON array for multiple positional args, a JSON object for a single JSON payload, or plain text for one literal argument.")
-        String args
+        @JsonPropertyDescription("Optional script arguments. Pass a JSON string (e.g. '{\"query\":\"hello\"}'), a JSON array, or a plain string.")
+        String args,
+
+        @Nullable ToolContext ctx
     ) {
         log.info("Executing skill script: skill={}, script={}, args={}", skillName, scriptPath, args);
 
@@ -75,6 +81,10 @@ public class SkillScriptTool {
         ResolvedSkill skill = runtimeService.findActiveSkill(skillName);
         if (skill == null) {
             return formatError("Skill '" + skillName + "' not found or not enabled");
+        }
+        String bindingError = checkAgentBinding(skill, ctx);
+        if (bindingError != null) {
+            return formatError(bindingError);
         }
 
         // Must be a directory-backed skill.
@@ -166,6 +176,29 @@ public class SkillScriptTool {
                     return List.of(node.toString());
                 }
             } catch (Exception e) {
+                // Maybe Python-style single quotes (e.g. {'query':'hello'})?
+                // LLMs occasionally emit single-quoted JSON; convert to
+                // proper double-quoted JSON and retry before giving up.
+                if (trimmed.contains("'")) {
+                    try {
+                        String doubleQuoted = trimmed.replace('\'', '"');
+                        JsonNode retryNode = objectMapper.reader()
+                                .with(DeserializationFeature.FAIL_ON_TRAILING_TOKENS)
+                                .readTree(doubleQuoted);
+                        if (retryNode != null && retryNode.isArray()) {
+                            List<String> out = new ArrayList<>(retryNode.size());
+                            for (JsonNode el : retryNode) {
+                                out.add(el.isTextual() ? el.asText() : el.toString());
+                            }
+                            return out.isEmpty() ? null : out;
+                        }
+                        if (retryNode != null && retryNode.isObject()) {
+                            return List.of(retryNode.toString());
+                        }
+                    } catch (Exception ignored) {
+                        // Still broken — fall through to verbatim forwarding.
+                    }
+                }
                 // Looked like JSON but didn't parse — forward it unchanged so
                 // the script reports its own input error rather than us
                 // silently reshaping a malformed payload.
@@ -200,5 +233,23 @@ public class SkillScriptTool {
             .replace("\n", "\\n")
             .replace("\r", "\\r")
             .replace("\t", "\\t") + "\"";
+    }
+
+    private String checkAgentBinding(ResolvedSkill skill, @Nullable ToolContext ctx) {
+        if (skill == null) return null;
+        Long agentId = null;
+        if (ctx != null) {
+            ChatOrigin origin = ChatOrigin.from(ctx);
+            agentId = origin.agentId();
+        }
+        if (agentId == null) return null;
+        Set<Long> boundIds = agentBindingService.getBoundSkillIds(agentId);
+        if (boundIds == null) return null;
+        if (skill.getId() != null && boundIds.contains(skill.getId())) return null;
+        log.info("runSkillScript: skill '{}' (id={}) is not bound to agent {}; access denied",
+                skill.getName(), skill.getId(), agentId);
+        return "Skill '" + skill.getName()
+                + "' is not assigned to this agent. "
+                + "The agent's bound skill set does not include it.";
     }
 }

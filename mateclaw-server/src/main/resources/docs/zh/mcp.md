@@ -1,6 +1,6 @@
 ---
 title: MCP 协议集成 — Model Context Protocol 工具扩展
-description: MateClaw 作为 MCP 客户端，通过 Model Context Protocol 接入任意外部工具服务器。JSON-RPC 动态发现、SSE/stdio 双传输、与内置工具无缝统一。
+description: GLClaw 作为 MCP 客户端，通过 Model Context Protocol 接入任意外部工具服务器。JSON-RPC 动态发现、SSE/stdio 双传输、与内置工具无缝统一。
 head:
   - - meta
     - name: keywords
@@ -9,11 +9,11 @@ head:
 
 # MCP 协议
 
-**MCP 是 MateClaw 跟"别人写的工具"对话的方式。**
+**MCP 是 GLClaw 跟"别人写的工具"对话的方式。**
 
-Model Context Protocol 是 Anthropic 提出的一个开放标准，用来把 AI 模型和外部工具/数据连起来。一个 MCP 服务是一个进程——本地或远程——通过 JSON-RPC 向外宣告一组工具。MateClaw 扮演 MCP **客户端**：连接上去、通过 `tools/list` 发现工具、把它们当原生工具暴露给你的 Agent。**从 Agent 的视角，一个内置的 `@Tool` Spring bean 和一个从 MCP 服务来的工具，没有任何区别。**
+Model Context Protocol 是 Anthropic 提出的一个开放标准，用来把 AI 模型和外部工具/数据连起来。一个 MCP 服务是一个进程——本地或远程——通过 JSON-RPC 向外宣告一组工具。GLClaw 扮演 MCP **客户端**：连接上去、通过 `tools/list` 发现工具、把它们当原生工具暴露给你的 Agent。**从 Agent 的视角，一个内置的 `@Tool` Spring bean 和一个从 MCP 服务来的工具，没有任何区别。**
 
-这是 MateClaw 的**逃生口**。你需要一个 MateClaw 没自带的能力——沙盒目录的文件访问、Tavily 搜索、某个自定义的企业数据服务、一整套浏览器自动化——大概率已经有现成的 MCP 服务，你可以把它接进来，不用写一行 Java。
+这是 GLClaw 的**逃生口**。你需要一个 GLClaw 没自带的能力——沙盒目录的文件访问、Tavily 搜索、某个自定义的企业数据服务、一整套浏览器自动化——大概率已经有现成的 MCP 服务，你可以把它接进来，不用写一行 Java。
 
 ---
 
@@ -21,7 +21,7 @@ Model Context Protocol 是 Anthropic 提出的一个开放标准，用来把 AI 
 
 ```
 ┌───────────────────────┐              ┌───────────────────────┐
-│     MateClaw           │              │     MCP Server        │
+│     GLClaw           │              │     MCP Server        │
 │     (MCP Client)       │              │     (工具提供方)       │
 │                       │   JSON-RPC   │                       │
 │  Agent Engine  ───────┼──────────────┼──► Tool A             │
@@ -33,7 +33,7 @@ Model Context Protocol 是 Anthropic 提出的一个开放标准，用来把 AI 
 
 核心概念：
 
-- **MCP 客户端**——MateClaw，负责连接 MCP 服务、发现工具、转发工具调用
+- **MCP 客户端**——GLClaw，负责连接 MCP 服务、发现工具、转发工具调用
 - **MCP 服务**——第三方工具服务器
 - **工具发现**——客户端发送 `tools/list` 请求拿到服务器上所有工具
 - **工具调用**——Agent 决定调一个工具时，客户端转发给对应的 MCP 服务执行
@@ -46,10 +46,10 @@ Model Context Protocol 是 Anthropic 提出的一个开放标准，用来把 AI 
 
 ### stdio（标准 I/O）
 
-MateClaw 启动一个本地子进程，通过 stdin/stdout 交换 JSON-RPC 消息。
+GLClaw 启动一个本地子进程，通过 stdin/stdout 交换 JSON-RPC 消息。
 
 ```
-MateClaw  ── stdin ──►  MCP Server 子进程
+GLClaw  ── stdin ──►  MCP Server 子进程
           ◄─ stdout ──
 ```
 
@@ -62,7 +62,7 @@ MateClaw  ── stdin ──►  MCP Server 子进程
 标准 HTTP POST 发 JSON-RPC，响应通过 HTTP 流返回。**生产环境推荐。**
 
 ```
-MateClaw  ── HTTP POST ──►  远程 MCP 服务
+GLClaw  ── HTTP POST ──►  远程 MCP 服务
           ◄─ HTTP Stream ──
 ```
 
@@ -80,7 +80,7 @@ MateClaw  ── HTTP POST ──►  远程 MCP 服务
 | 部署 | 仅本地 | 本地或远程 | 本地或远程 |
 | 网络要求 | 无 | HTTP 可达 | HTTP 可达 |
 | 认证 | 环境变量 | HTTP Headers | HTTP Headers |
-| 进程管理 | MateClaw 管理子进程 | 外部 | 外部 |
+| 进程管理 | GLClaw 管理子进程 | 外部 | 外部 |
 | 推荐 | 本地工具 | 远程服务 | 遗留兼容 |
 
 ---
@@ -101,7 +101,7 @@ MateClaw  ── HTTP POST ──►  远程 MCP 服务
 - **连接超时**——默认 30 秒
 - **读取超时**——默认 30 秒
 
-保存。启用状态时 MateClaw 自动尝试连接并发现工具。
+保存。启用状态时 GLClaw 自动尝试连接并发现工具。
 
 ### 测试、启用、状态
 
@@ -383,7 +383,7 @@ API 响应里 `headers_json` 和 `env_json` 的值自动**脱敏**。`args_json`
 
 ### "命令找不到"（stdio）
 
-1. 确认命令在运行 MateClaw 的用户的 PATH 里
+1. 确认命令在运行 GLClaw 的用户的 PATH 里
 2. 验证：`which npx` 或 `npx --version`
 3. Docker：确认命令在容器里装了
 4. 用完整路径：`/usr/local/bin/npx`
@@ -418,7 +418,7 @@ API 响应里 `headers_json` 和 `env_json` 的值自动**脱敏**。`args_json`
 
 ### 孤儿子进程（stdio）
 
-`@PreDestroy` 钩子正常会清理。MateClaw 被强杀（`kill -9`）的话子进程可能残留。`ps aux | grep mcp` 找到并杀掉。
+`@PreDestroy` 钩子正常会清理。GLClaw 被强杀（`kill -9`）的话子进程可能残留。`ps aux | grep mcp` 找到并杀掉。
 
 ---
 

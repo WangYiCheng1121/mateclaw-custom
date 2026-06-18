@@ -140,7 +140,6 @@ public class AgentAuthoringTool {
         // Skills: builtin (global) + skills owned by this workspace, enabled only.
         List<SkillEntity> skills = skillMapper.selectList(new LambdaQueryWrapper<SkillEntity>()
                 .eq(SkillEntity::getEnabled, true)
-                .eq(SkillEntity::getDeleted, 0)
                 .orderByAsc(SkillEntity::getName));
         long effectiveWs = workspaceId == null ? 1L : workspaceId;
         List<Map<String, String>> skillCatalog = new ArrayList<>();
@@ -198,8 +197,7 @@ public class AgentAuthoringTool {
             String skillName = raw.trim();
             if (skillName.isEmpty()) continue;
             List<SkillEntity> matches = skillMapper.selectList(new LambdaQueryWrapper<SkillEntity>()
-                    .eq(SkillEntity::getName, skillName)
-                    .eq(SkillEntity::getDeleted, 0));
+                    .eq(SkillEntity::getName, skillName));
             SkillEntity chosen = matches.stream()
                     .filter(s -> {
                         if (Boolean.TRUE.equals(s.getBuiltin())) return true;

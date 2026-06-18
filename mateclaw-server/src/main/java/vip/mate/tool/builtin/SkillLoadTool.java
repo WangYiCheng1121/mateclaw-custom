@@ -7,8 +7,12 @@ import org.springframework.ai.tool.annotation.Tool;
 import org.springframework.ai.tool.annotation.ToolParam;
 import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Component;
+import vip.mate.agent.binding.service.AgentBindingService;
+import vip.mate.agent.context.ChatOrigin;
 import vip.mate.skill.runtime.SkillRuntimeService;
 import vip.mate.skill.runtime.model.ResolvedSkill;
+
+import java.util.Set;
 
 /**
  * Explicit skill-load entry point.
@@ -31,6 +35,7 @@ public class SkillLoadTool {
 
     private final SkillRuntimeService runtimeService;
     private final SkillFileTool skillFileTool;
+    private final AgentBindingService agentBindingService;
 
     @Tool(name = "load_skill", description = """
         Load a skill package's SKILL.md into the conversation.
@@ -65,10 +70,32 @@ public class SkillLoadTool {
             return "Error: Skill '" + skillName + "' not found or not enabled. "
                     + "Call listAvailableSkills(keyword=\"" + skillName + "\") to find the correct name.";
         }
+        String bindingError = checkAgentBinding(skill, ctx);
+        if (bindingError != null) {
+            return bindingError;
+        }
         String path = (filePath == null || filePath.isBlank()) ? "SKILL.md" : filePath;
         log.info("load_skill: loading skill='{}', path='{}'", skillName, path);
         // Delegate to the shared reader: it resolves the skill, paginates large
         // sub-files, and records usage. SKILL.md is returned in full by default.
         return skillFileTool.readSkillFile(skillName, path, null, null, ctx);
+    }
+
+    private String checkAgentBinding(ResolvedSkill skill, @Nullable ToolContext ctx) {
+        if (skill == null) return null;
+        Long agentId = null;
+        if (ctx != null) {
+            ChatOrigin origin = ChatOrigin.from(ctx);
+            agentId = origin.agentId();
+        }
+        if (agentId == null) return null;
+        Set<Long> boundIds = agentBindingService.getBoundSkillIds(agentId);
+        if (boundIds == null) return null;
+        if (skill.getId() != null && boundIds.contains(skill.getId())) return null;
+        log.info("load_skill: skill '{}' (id={}) is not bound to agent {}; access denied",
+                skill.getName(), skill.getId(), agentId);
+        return "Error: Skill '" + skill.getName()
+                + "' is not assigned to this agent. "
+                + "The agent's bound skill set does not include it.";
     }
 }

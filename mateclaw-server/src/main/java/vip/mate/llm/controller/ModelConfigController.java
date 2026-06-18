@@ -8,6 +8,8 @@ import org.springframework.web.bind.annotation.*;
 import vip.mate.common.result.R;
 import vip.mate.llm.model.*;
 import vip.mate.llm.platform.ModelSyncService;
+import vip.mate.llm.model.ModelProviderEntity;
+import vip.mate.llm.repository.ModelProviderMapper;
 import vip.mate.llm.service.ModelConfigService;
 import vip.mate.llm.service.ModelProviderService;
 import vip.mate.system.model.SystemSettingEntity;
@@ -61,6 +63,7 @@ public class ModelConfigController {
 
     private final ModelConfigService modelConfigService;
     private final ModelProviderService modelProviderService;
+    private final ModelProviderMapper modelProviderMapper;
     private final SystemSettingMapper systemSettingMapper;
     private final ModelSyncService modelSyncService;
 
@@ -84,7 +87,16 @@ public class ModelConfigController {
     @GetMapping("/enabled")
     @RequireWorkspaceRole("viewer")
     public R<List<ModelConfigEntity>> listEnabled() {
-        return R.ok(modelConfigService.listEnabledModels());
+        List<ModelConfigEntity> models = modelConfigService.listEnabledModels();
+        // 为每个模型填充供应商展示名称和存活状态
+        for (ModelConfigEntity model : models) {
+            ModelProviderEntity provider = modelProviderMapper.selectById(model.getProvider());
+            if (provider != null) {
+                model.setProviderName(provider.getName());
+            }
+            model.setLiveness(modelProviderService.getProviderLiveness(model.getProvider()));
+        }
+        return R.ok(models);
     }
 
     @Operation(summary = "获取默认模型")
@@ -100,7 +112,15 @@ public class ModelConfigController {
     public R<ActiveModelsInfo> getActiveModel() {
         ModelConfigEntity model = modelConfigService.getDefaultModel();
         ActiveModelsInfo info = new ActiveModelsInfo();
-        info.setActiveLlm(new ModelSlotConfig(model.getProvider(), model.getModelName()));
+        ModelSlotConfig slot = new ModelSlotConfig();
+        slot.setProviderId(model.getProvider());
+        slot.setModel(model.getModelName());
+        // Resolve provider display name for the frontend — avoids showing a raw id like "2062448656034361346"
+        ModelProviderEntity provider = modelProviderMapper.selectById(model.getProvider());
+        if (provider != null) {
+            slot.setProviderName(provider.getName());
+        }
+        info.setActiveLlm(slot);
         return R.ok(info);
     }
 

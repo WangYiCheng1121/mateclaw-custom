@@ -8,7 +8,7 @@
 
 ### 需要什么 Java 版本？
 
-**Java 17 或更高。** MateClaw 用了 Java 17 引入的特性。用 `java -version` 验证。
+**Java 17 或更高。** GLClaw 用了 Java 17 引入的特性。用 `java -version` 验证。
 
 用桌面端的话，**完全不需要装 Java**——安装器自带 JRE 21。
 
@@ -16,18 +16,18 @@
 
 不用。三条无 key 的路径：
 
-- **Ollama**——本地 GPU 推理；MateClaw 启动时在 `localhost:11434` 自动探测
+- **Ollama**——本地 GPU 推理；GLClaw 启动时在 `localhost:11434` 自动探测
 - **ChatGPT OAuth**——有 ChatGPT Plus 或 Pro 订阅的话走浏览器 OAuth 流程——**不需要 API Key**
 - **OpenRouter 免费档**——200+ 免费模型，一个 key 就能访问
 
-**启动 MateClaw 也不需要把任何 API Key 设成环境变量。** 所有供应商配置都在启动后通过 UI 的 `设置 → 模型` 来做。
+**启动 GLClaw 也不需要把任何 API Key 设成环境变量。** 所有供应商配置都在启动后通过 UI 的 `设置 → 模型` 来做。
 
 ### 怎么拿 DashScope API Key？
 
 1. 去[阿里云 DashScope 控制台](https://dashscope.console.aliyun.com/)
 2. 注册或登录
 3. 创建一个 API Key
-4. 在 MateClaw 里进 `设置 → 模型 → DashScope` 粘贴
+4. 在 GLClaw 里进 `设置 → 模型 → DashScope` 粘贴
 
 ### 后端起不来——18088 端口被占了
 
@@ -61,7 +61,7 @@ rm -rf data/
 
 ### 我的 JWT token 老过期
 
-MateClaw 实现了**滑动窗口续签**——token 剩余 25% 时服务器在响应头 `X-New-Token` 里发一个新 token。前端自动处理。
+GLClaw 实现了**滑动窗口续签**——token 剩余 25% 时服务器在响应头 `X-New-Token` 里发一个新 token。前端自动处理。
 
 手动调 API（curl、Postman）的话，读 `X-New-Token` header 用新值做后续请求。
 
@@ -83,7 +83,7 @@ UPDATE mate_user SET password = '$2a$10$...' WHERE username = 'admin';
 
 LLM API Key 不读环境变量——`DASHSCOPE_API_KEY` 之类的设置不会生效。容器零 Key 就能启动，登录后加供应商即可。
 
-### 怎么在 MateClaw 里用 GPT-4？
+### 怎么在 GLClaw 里用 GPT-4？
 
 `设置 → 模型 → 添加供应商`。要么粘你的 OpenAI API Key，要么如果你有 ChatGPT Plus/Pro 就用 **OpenAI OAuth**——浏览器窗口弹出让你登录。保存后从模型选择器挑 `gpt-4o`（或任何模型）。
 
@@ -301,9 +301,9 @@ docker exec mateclaw-mysql mysqldump -u root -p${MYSQL_ROOT_PASSWORD} mateclaw >
 
 **桌面端**数据在每个用户目录下：
 
-- macOS：`~/Library/Application Support/MateClaw/`
-- Windows：`%APPDATA%/MateClaw/`
-- Linux：`~/.local/share/MateClaw/`
+- macOS：`~/Library/Application Support/GLClaw/`
+- Windows：`%APPDATA%/GLClaw/`
+- Linux：`~/.local/share/GLClaw/`
 
 ---
 
@@ -313,9 +313,9 @@ docker exec mateclaw-mysql mysqldump -u root -p${MYSQL_ROOT_PASSWORD} mateclaw >
 
 安装器自带 JRE 21。看日志：
 
-- macOS：`~/Library/Logs/MateClaw/`
-- Windows：`%APPDATA%/MateClaw/logs/`
-- Linux：`~/.local/share/MateClaw/logs/`
+- macOS：`~/Library/Logs/GLClaw/`
+- Windows：`%APPDATA%/GLClaw/logs/`
+- Linux：`~/.local/share/GLClaw/logs/`
 
 从终端启动。Windows 右键 → 解除锁定。macOS "系统设置 → 隐私与安全性"允许未签名应用。
 

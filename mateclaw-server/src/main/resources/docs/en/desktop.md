@@ -2,7 +2,7 @@
 
 **Double-click. Wait thirty seconds. Log in. Use it.**
 
-That's the desktop app in four sentences. No Java to install. No browser to open. No docker compose file. No port to remember. MateClaw's desktop edition bundles Electron, a JRE 21 runtime, and the packaged Spring Boot server JAR into a single installer. **Your users never know Java is underneath.**
+That's the desktop app in four sentences. No Java to install. No browser to open. No docker compose file. No port to remember. GLClaw's desktop edition bundles Electron, a JRE 21 runtime, and the packaged Spring Boot server JAR into a single installer. **Your users never know Java is underneath.**
 
 This page is for people who want to run it, build it, or debug it.
 
@@ -208,9 +208,9 @@ Frontend assets can be **hot-updated independently** — a frontend-only fix doe
 
 | OS | Path |
 |-----|------|
-| macOS | `~/Library/Application Support/MateClaw/data/` |
-| Windows | `%APPDATA%/MateClaw/data/` |
-| Linux | `~/.local/share/MateClaw/data/` |
+| macOS | `~/Library/Application Support/GLClaw/data/` |
+| Windows | `%APPDATA%/GLClaw/data/` |
+| Linux | `~/.local/share/GLClaw/data/` |
 
 Logs, workspace files, skill scripts, wiki content all live alongside the database in the same user directory. Back it up before major changes.
 
@@ -256,15 +256,15 @@ The desktop app reads env vars the same way the standalone backend does. But the
 
 1. Installed app bundles JRE — you don't need Java. Dev build from source: verify `java -version` shows 21+.
 2. Check logs:
-   - macOS: `~/Library/Logs/MateClaw/`
-   - Windows: `%APPDATA%/MateClaw/logs/`
-   - Linux: `~/.local/share/MateClaw/logs/`
+   - macOS: `~/Library/Logs/GLClaw/`
+   - Windows: `%APPDATA%/GLClaw/logs/`
+   - Linux: `~/.local/share/GLClaw/logs/`
 3. Launch from terminal to see console output
 4. Confirm backend port isn't blocked
 
 ### WeCom auth popup
 
-The WeCom QR-code authorization flow **must open in an in-app popup** (not the system browser) so the `postMessage` callback works. MateClaw handles this in `setWindowOpenHandler` — `work.weixin.qq.com` domain opens as an in-app popup window.
+The WeCom QR-code authorization flow **must open in an in-app popup** (not the system browser) so the `postMessage` callback works. GLClaw handles this in `setWindowOpenHandler` — `work.weixin.qq.com` domain opens as an in-app popup window.
 
 ---
 

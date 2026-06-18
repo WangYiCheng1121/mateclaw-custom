@@ -221,8 +221,7 @@ public class BuiltinSkillSeedService implements ApplicationRunner {
         try {
             Long n = skillMapper.selectCount(
                     new LambdaQueryWrapper<SkillEntity>()
-                            .eq(SkillEntity::getSkillType, SKILL_TYPE_BUILTIN)
-                            .eq(SkillEntity::getDeleted, 0));
+                            .eq(SkillEntity::getSkillType, SKILL_TYPE_BUILTIN));
             return n != null ? n : 0L;
         } catch (Exception e) {
             log.debug("Failed to count builtin skills: {}", e.getMessage());
@@ -333,7 +332,6 @@ public class BuiltinSkillSeedService implements ApplicationRunner {
         LocalDateTime now = LocalDateTime.now();
         row.setCreateTime(now);
         row.setUpdateTime(now);
-        row.setDeleted(0);
         return row;
     }
 

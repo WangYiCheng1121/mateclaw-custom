@@ -35,6 +35,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
@@ -95,6 +97,15 @@ public class FeishuChannelAdapter extends AbstractChannelAdapter implements Stre
 
     /** WebSocket 静默断连看门狗：定期检查最近事件时间，超过阈值就强制重连 */
     private ScheduledFuture<?> silentDisconnectWatchdog;
+
+    /**
+     * 看门狗专用调度器（独立于 reconnectScheduler）。
+     * <p>
+     * 不能复用 {@code ensureReconnectScheduler()} 的单线程执行器，因为重连时
+     * {@code doReconnect() → startWebSocketSync() → wsClient.start()} 会阻塞该线程，
+     * 导致看门狗的 scheduleAtFixedRate 任务永远无法执行，静默断连无法被检测。
+     */
+    private ScheduledExecutorService watchdogExecutor;
 
     /** 是否已收到至少一个事件（用于避免新连接立即触发静默超时） */
     private volatile boolean hasReceivedFirstEvent = false;
@@ -302,6 +313,12 @@ public class FeishuChannelAdapter extends AbstractChannelAdapter implements Stre
         // 关闭 WebSocket
         stopWebSocket();
 
+        // 关闭看门狗专用调度器
+        if (watchdogExecutor != null && !watchdogExecutor.isShutdown()) {
+            watchdogExecutor.shutdownNow();
+            watchdogExecutor = null;
+        }
+
         this.httpClient = null;
         this.tenantAccessToken = null;
         // Reset bot-open-id state under the same lock getBotOpenId uses, so a
@@ -315,6 +332,19 @@ public class FeishuChannelAdapter extends AbstractChannelAdapter implements Stre
         this.nicknameCache.clear();
         this.quotedMessageCache.clear();
         log.info("[feishu] Feishu channel stopped");
+    }
+
+    /**
+     * 飞书 WebSocket 长连接使用 SDK 内置 ping/pong，代理/NAT 的 idle timeout
+     * 通常 2-5 分钟；设置 5 分钟 stale 阈值，配合 {@code ChannelHealthMonitor}
+     * 每 1 分钟扫描，确保断连后最多 5 分钟内被自动重启。
+     * <p>
+     * 同时有 {@link #startSilentDisconnectWatchdog()} 作为第二道防线：
+     * 看门狗每 60s 检查一次最近事件时间，默认 30 分钟无事件就触发重连。
+     */
+    @Override
+    public Duration stalenessThreshold() {
+        return Duration.ofMinutes(5);
     }
 
     @Override
@@ -487,6 +517,20 @@ public class FeishuChannelAdapter extends AbstractChannelAdapter implements Stre
     }
 
     /**
+     * 获取或创建看门狗专用调度器（独立于 reconnectScheduler）。
+     */
+    private ScheduledExecutorService ensureWatchdogExecutor() {
+        if (watchdogExecutor == null || watchdogExecutor.isShutdown()) {
+            watchdogExecutor = Executors.newSingleThreadScheduledExecutor(r -> {
+                Thread t = new Thread(r, getChannelType() + "-watchdog-" + channelEntity.getId());
+                t.setDaemon(true);
+                return t;
+            });
+        }
+        return watchdogExecutor;
+    }
+
+    /**
      * 启动静默断连看门狗。
      * <p>
      * SDK 内部有 ping/pong 心跳，正常情况下连接断开会触发 start() 返回 → onDisconnected。
@@ -499,6 +543,10 @@ public class FeishuChannelAdapter extends AbstractChannelAdapter implements Stre
      * <p>
      * 默认阈值 30 分钟。安静的渠道（一天没几条消息）建议调大到 1-2 小时；
      * 高频渠道可以调小到 5-10 分钟以更快发现问题。
+     * <p>
+     * <b>注意：</b>看门狗必须使用独立的 watchdogExecutor，不能复用
+     * {@code ensureReconnectScheduler()}。重连时 {@code wsClient.start()} 会阻塞
+     * reconnectScheduler 的单一线程，导致看门狗任务得不到调度。
      */
     private void startSilentDisconnectWatchdog() {
         long thresholdSec = getConfigLong("silent_disconnect_threshold_seconds",
@@ -510,7 +558,7 @@ public class FeishuChannelAdapter extends AbstractChannelAdapter implements Stre
         long thresholdMs = thresholdSec * 1000L;
 
         cancelSilentDisconnectWatchdog();
-        silentDisconnectWatchdog = ensureReconnectScheduler().scheduleAtFixedRate(() -> {
+        silentDisconnectWatchdog = ensureWatchdogExecutor().scheduleAtFixedRate(() -> {
             if (!running.get() || wsClient == null) return;
             if (!hasReceivedFirstEvent) return; // 没收到首个事件前不算静默
 
@@ -722,12 +770,14 @@ public class FeishuChannelAdapter extends AbstractChannelAdapter implements Stre
     // ==================== Token 管理 ====================
 
     /**
-     * 定时刷新 Token：每隔 (expireSeconds - 300) 秒刷新一次
+     * 定时刷新 Token：每隔 (expireSeconds - 300) 秒刷新一次。
+     * <p>
+     * 使用看门狗专用调度器，避免与重连调度器争抢单线程。
      */
     private void scheduleTokenRefresh() {
         // Token 默认有效期 7200s，提前 5 分钟刷新 => 周期 6900s
         long refreshIntervalSeconds = Math.max(300, 7200 - 300);
-        tokenRefreshFuture = ensureReconnectScheduler().scheduleAtFixedRate(() -> {
+        tokenRefreshFuture = ensureWatchdogExecutor().scheduleAtFixedRate(() -> {
             if (!running.get()) return;
             try {
                 refreshTenantAccessToken();

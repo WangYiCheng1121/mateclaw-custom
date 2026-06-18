@@ -1,15 +1,19 @@
-package vip.mate.tool.builtin;
+ package vip.mate.tool.builtin;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonPropertyDescription;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.model.ToolContext;
 import org.springframework.ai.tool.annotation.Tool;
 import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Component;
+import vip.mate.agent.binding.service.AgentBindingService;
 import vip.mate.agent.context.ChatOrigin;
 import vip.mate.agent.context.TokenEstimator;
+import vip.mate.skill.manifest.SkillManifest;
 import vip.mate.skill.runtime.SkillCatalogSort;
 import vip.mate.skill.runtime.SkillCatalogSorter;
 import vip.mate.skill.runtime.SkillFileAccessPolicy;
@@ -19,8 +23,11 @@ import vip.mate.skill.usage.SkillUsageService;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
@@ -38,6 +45,7 @@ public class SkillFileTool {
     private final SkillRuntimeService runtimeService;
     private final SkillFileAccessPolicy accessPolicy;
     private final SkillUsageService usageService;
+    private final AgentBindingService agentBindingService;
 
     @Tool(description = """
         Read a file from a skill's directory (SKILL.md, references/, scripts/, or templates/).
@@ -80,6 +88,10 @@ public class SkillFileTool {
         if (skill == null) {
             return "Error: Skill '" + skillName + "' not found or not enabled";
         }
+        String bindingError = checkAgentBinding(skill, ctx);
+        if (bindingError != null) {
+            return bindingError;
+        }
 
         // 特殊处理：读取 SKILL.md
         if ("SKILL.md".equals(filePath)) {
@@ -96,7 +108,7 @@ public class SkillFileTool {
                 // material the model loads on demand.
                 boolean paginationRequested = startLine != null || maxLines != null;
                 if (!paginationRequested) {
-                    return skill.getContent();
+                    return wrapWithRuntimeNotice(skill, skill.getContent());
                 }
                 return paginateSkillContent(skillName, "SKILL.md", skill.getContent(), startLine, maxLines);
             }
@@ -216,6 +228,125 @@ public class SkillFileTool {
                 TokenEstimator.estimateTokens(content));
     }
 
+    /**
+     * 当技能包含 scripts/ 目录时，在 SKILL.md 内容前自动注入运行时调用提示。
+     * <p>
+     * 引导 Agent 使用 {@code runSkillScript} 而非直接执行 shell 命令
+     * （如 {@code python3 scripts/...}）。只有通过 {@code runSkillScript}
+     * 调用，系统才会自动从数据库解密密钥并注入到脚本子进程的环境变量中。
+     * <p>
+     * 提示也注明技能声明的环境变量（来自 frontmatter）会被自动注入，
+     * 避免 Agent 因找不到环境变量而反复尝试配置。
+     * <p>
+     * 如果 SKILL.md body 中包含 shell 调用示例（如
+     * {@code python3 scripts/xxx.py '{"query":"hello"}'}），
+     * 自动提取 JSON 参数并转换为 {@code runSkillScript} 调用示例。
+     */
+    private String wrapWithRuntimeNotice(ResolvedSkill skill, String content) {
+        boolean hasScripts = skill.getScripts() != null && !skill.getScripts().isEmpty();
+        if (!hasScripts) {
+            return content;
+        }
+
+        StringBuilder sb = new StringBuilder();
+        sb.append("> **Runtime Notice** — This skill has executable scripts.\n");
+        sb.append("> Use `runSkillScript(skillName=\"").append(skill.getName())
+                .append("\", scriptPath=\"scripts/...\", args=...)`\n");
+        sb.append("> to execute them. Do **not** run shell commands like `python3 scripts/...` or `bash scripts/...`\n");
+        sb.append("> directly — only `runSkillScript` injects the skill's configured API keys as environment\n");
+        sb.append("> variables into the script subprocess.\n");
+
+        // Extract concrete call examples from the SKILL.md body.
+        // Matches lines like: python3 scripts/search.py '{"query":"hello"}'
+        // and converts them to runSkillScript calls with correct args format.
+        List<String> examples = extractRunSkillExamples(skill.getName(), content);
+        if (!examples.isEmpty()) {
+            sb.append("> \n");
+            sb.append("> **Examples from SKILL.md** (translated to runSkillScript):\n");
+            for (String ex : examples) {
+                sb.append(">   ").append(ex).append("\n");
+            }
+        }
+
+        // If manifest declares env vars, mention they are auto-injected
+        if (skill.getManifest() != null && skill.getManifest().getRequires() != null) {
+            List<String> envKeys = skill.getManifest().getRequires().stream()
+                    .filter(r -> "env_var".equals(r.getType()))
+                    .map(SkillManifest.RequirementDef::getKey)
+                    .filter(k -> k != null && !k.isBlank())
+                    .distinct()
+                    .toList();
+            if (!envKeys.isEmpty()) {
+                sb.append("> Environment variables auto-injected: `")
+                        .append(String.join("`, `", envKeys)).append("`\n");
+            }
+        }
+
+        sb.append(">\n");
+        sb.append(content);
+        return sb.toString();
+    }
+
+    /**
+     * 从 SKILL.md body 中提取 shell 调用示例，转换为 runSkillScript 调用格式。
+     * <p>
+     * 匹配模式：{@code python3 scripts/<name>.py '<json>'} 或
+     * {@code python scripts/<name>.py '<json>'}，提取 JSON 参数字符串。
+     */
+    private static final java.util.regex.Pattern SHELL_SCRIPT_EXAMPLE =
+            java.util.regex.Pattern.compile(
+                    "(?:python3?|python)\\s+scripts/([\\w.-]+)\\s+'([^']+)'",
+                    java.util.regex.Pattern.CASE_INSENSITIVE);
+
+    private List<String> extractRunSkillExamples(String skillName, String skillMdContent) {
+        if (skillMdContent == null || skillMdContent.isBlank()) return List.of();
+        java.util.regex.Matcher m = SHELL_SCRIPT_EXAMPLE.matcher(skillMdContent);
+        List<String> examples = new ArrayList<>();
+        java.util.LinkedHashSet<String> seen = new java.util.LinkedHashSet<>();
+        while (m.find()) {
+            String scriptFile = m.group(1);
+            String jsonArgs = m.group(2);
+            // Normalize the JSON: SKILL.md often has multi-line JSON with
+            // trailing commas; trim and compact for the example line.
+            String compacted = compactJsonString(jsonArgs);
+            if (compacted == null) continue;
+            StringBuilder ex = new StringBuilder()
+                .append("runSkillScript(skillName=")
+                .append('"').append(skillName).append('"')
+                .append(", scriptPath=")
+                .append('"').append("scripts/").append(scriptFile).append('"')
+                .append(", args=")
+                .append('"').append(escapeForNotice(compacted)).append('"')
+                .append(")");
+            String example = ex.toString();
+            if (seen.add(example)) {
+                examples.add(example);
+            }
+        }
+        return examples;
+    }
+
+    /**
+     * 尝试将可能的多行/带尾逗号的 JSON 压缩为紧凑形式。
+     * 返回 {@code null} 表示无法压缩（非 JSON 或格式错误）。
+     */
+    private String compactJsonString(String raw) {
+        if (raw == null || raw.isBlank()) return null;
+        try {
+            JsonNode node = new ObjectMapper()
+                    .readTree(raw);
+            return node.toString();
+        } catch (Exception e) {
+            // Not valid JSON (e.g., a plain string parameter), return as-is.
+            return raw.trim();
+        }
+    }
+
+    /** Escape double quotes for embedding in a Markdown code block / notice text. */
+    private static String escapeForNotice(String s) {
+        return s.replace("\\", "\\\\").replace("\"", "\\\"");
+    }
+
     @Tool(description = """
         List all files in a skill's references/ and scripts/ directories.
         Use this to explore what files are available in a skill before reading them.
@@ -235,6 +366,11 @@ public class SkillFileTool {
         ResolvedSkill skill = runtimeService.findActiveSkill(skillName);
         if (skill == null) {
             return "Error: Skill '" + skillName + "' not found or not enabled";
+        }
+        // listSkillFiles has no ToolContext — check via ThreadLocal fallback
+        String bindingError = checkAgentBinding(skill, null);
+        if (bindingError != null) {
+            return bindingError;
         }
 
         StringBuilder sb = new StringBuilder();
@@ -305,26 +441,22 @@ public class SkillFileTool {
 
         @JsonProperty(required = false)
         @JsonPropertyDescription("Maximum number of skills to return, default 20, max 50")
-        Integer limit
+        Integer limit,
+
+        @Nullable ToolContext ctx
     ) {
         log.info("Listing available skills");
 
         int safeLimit = limit == null || limit <= 0 ? 20 : Math.min(limit, 50);
         String kw = keyword == null ? "" : keyword.trim().toLowerCase();
-        // Push freshly installed skills to the top of the truncated page so
-        // a user who just installed something can still find it without
-        // remembering to pass keyword=. Same window the prompt catalog uses.
+        Set<Long> boundIds = resolveBoundSkillIds(ctx);
         java.time.LocalDateTime recencyCutoff = java.time.LocalDateTime.now()
                 .minus(SkillRuntimeService.NEW_SKILL_BOOST_WINDOW);
-        // sortResolved gives the RECOMMENDED ordering; the secondary sort
-        // below uses the JDK's stable sort to lift recently-installed skills
-        // to the top while preserving RECOMMENDED order among same-recency
-        // entries — no need to thread the (package-private) recommended
-        // comparator back through here.
         List<ResolvedSkill> activeSkills = SkillCatalogSorter.sortResolved(
                 runtimeService.getActiveSkills().stream()
                         .filter(s -> SkillCatalogSorter.sourceMatches(s, source))
                         .filter(s -> SkillCatalogSorter.runtimeMatches(s, status))
+                        .filter(s -> boundIds == null || (s.getId() != null && boundIds.contains(s.getId())))
                         .filter(s -> kw.isEmpty()
                                 || containsIgnoreCase(s.getName(), kw)
                                 || containsIgnoreCase(s.getDescription(), kw))
@@ -386,6 +518,32 @@ public class SkillFileTool {
         if (!skill.isEnabled()) return "disabled";
         if (!SkillRuntimeService.passesActiveGate(skill)) return "setup-needed";
         return "ready";
+    }
+
+    private String checkAgentBinding(ResolvedSkill skill, @Nullable ToolContext ctx) {
+        if (skill == null) return null;
+        Long agentId = null;
+        if (ctx != null) {
+            ChatOrigin origin = ChatOrigin.from(ctx);
+            agentId = origin.agentId();
+        }
+        if (agentId == null) return null;
+        Set<Long> boundIds = agentBindingService.getBoundSkillIds(agentId);
+        if (boundIds == null) return null;
+        if (skill.getId() != null && boundIds.contains(skill.getId())) return null;
+        log.info("Skill '{}' (id={}) is not bound to agent {}; access denied",
+                skill.getName(), skill.getId(), agentId);
+        return "Error: Skill '" + skill.getName()
+                + "' is not assigned to this agent. "
+                + "The agent's bound skill set does not include it.";
+    }
+
+    private Set<Long> resolveBoundSkillIds(@Nullable ToolContext ctx) {
+        if (ctx == null) return null;
+        ChatOrigin origin = ChatOrigin.from(ctx);
+        Long agentId = origin.agentId();
+        if (agentId == null) return null;
+        return agentBindingService.getBoundSkillIds(agentId);
     }
 
     @SuppressWarnings("unchecked")

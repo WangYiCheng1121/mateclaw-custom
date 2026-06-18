@@ -2,6 +2,7 @@ package vip.mate.tool.builtin;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import vip.mate.agent.binding.service.AgentBindingService;
 import vip.mate.skill.runtime.SkillFileAccessPolicy;
 import vip.mate.skill.runtime.SkillRuntimeService;
 import vip.mate.skill.runtime.model.ResolvedSkill;
@@ -24,13 +25,14 @@ class SkillFileToolTest {
         SkillRuntimeService runtimeService = mock(SkillRuntimeService.class);
         SkillFileAccessPolicy accessPolicy = mock(SkillFileAccessPolicy.class);
         SkillUsageService usageService = mock(SkillUsageService.class);
-        SkillFileTool tool = new SkillFileTool(runtimeService, accessPolicy, usageService);
+        AgentBindingService agentBindingService = mock(AgentBindingService.class);
+        SkillFileTool tool = new SkillFileTool(runtimeService, accessPolicy, usageService, agentBindingService);
         when(runtimeService.getActiveSkills()).thenReturn(List.of(
                 skill("apple-notes", "database", true),
                 skill("ckjia-shopping", "mcp", false),
                 skill("claude-code", "acp", false)));
 
-        String result = tool.listAvailableSkills("code", "acp", "ready", 1);
+        String result = tool.listAvailableSkills("code", "acp", "ready", 1, null);
 
         assertTrue(result.contains("claude-code"));
         assertFalse(result.contains("ckjia-shopping"));
@@ -43,7 +45,8 @@ class SkillFileToolTest {
         SkillRuntimeService runtimeService = mock(SkillRuntimeService.class);
         SkillFileAccessPolicy accessPolicy = mock(SkillFileAccessPolicy.class);
         SkillUsageService usageService = mock(SkillUsageService.class);
-        SkillFileTool tool = new SkillFileTool(runtimeService, accessPolicy, usageService);
+        AgentBindingService agentBindingService = mock(AgentBindingService.class);
+        SkillFileTool tool = new SkillFileTool(runtimeService, accessPolicy, usageService, agentBindingService);
         ResolvedSkill skill = skill("browser-cdp", "database", true);
         skill.setContent("# Browser CDP\nUse devtools.");
         when(runtimeService.findActiveSkill("browser-cdp")).thenReturn(skill);
@@ -65,7 +68,8 @@ class SkillFileToolTest {
         SkillRuntimeService runtimeService = mock(SkillRuntimeService.class);
         SkillFileAccessPolicy accessPolicy = mock(SkillFileAccessPolicy.class);
         SkillUsageService usageService = mock(SkillUsageService.class);
-        SkillFileTool tool = new SkillFileTool(runtimeService, accessPolicy, usageService);
+        AgentBindingService agentBindingService = mock(AgentBindingService.class);
+        SkillFileTool tool = new SkillFileTool(runtimeService, accessPolicy, usageService, agentBindingService);
         ResolvedSkill skill = skill("large-skill", "database", true);
         skill.setContent("line\n".repeat(500));
         when(runtimeService.findActiveSkill("large-skill")).thenReturn(skill);
@@ -89,7 +93,8 @@ class SkillFileToolTest {
         SkillRuntimeService runtimeService = mock(SkillRuntimeService.class);
         SkillFileAccessPolicy accessPolicy = mock(SkillFileAccessPolicy.class);
         SkillUsageService usageService = mock(SkillUsageService.class);
-        SkillFileTool tool = new SkillFileTool(runtimeService, accessPolicy, usageService);
+        AgentBindingService agentBindingService = mock(AgentBindingService.class);
+        SkillFileTool tool = new SkillFileTool(runtimeService, accessPolicy, usageService, agentBindingService);
         ResolvedSkill skill = skill("huge-line-skill", "database", true);
         // 12 KB single line — well past MAX_OUTPUT_CHARS (8KB).
         String hugeLine = "x".repeat(12_000);
@@ -121,7 +126,8 @@ class SkillFileToolTest {
         SkillRuntimeService runtimeService = mock(SkillRuntimeService.class);
         SkillFileAccessPolicy accessPolicy = mock(SkillFileAccessPolicy.class);
         SkillUsageService usageService = mock(SkillUsageService.class);
-        SkillFileTool tool = new SkillFileTool(runtimeService, accessPolicy, usageService);
+        AgentBindingService agentBindingService = mock(AgentBindingService.class);
+        SkillFileTool tool = new SkillFileTool(runtimeService, accessPolicy, usageService, agentBindingService);
         ResolvedSkill skill = skill("large-skill", "database", true);
         // 500 lines * 5 chars = 2500 chars; 250 lines is also above DEFAULT_MAX_LINES (200).
         String body = "line\n".repeat(500);

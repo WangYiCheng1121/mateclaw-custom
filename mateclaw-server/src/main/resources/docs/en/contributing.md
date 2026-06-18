@@ -2,7 +2,7 @@
 
 **Code you write here runs on other people's machines.**
 
-That's the only thing to remember. MateClaw is Apache 2.0, self-hosted, and shipped as a single JAR. Every line you add gets downloaded, unpacked, and executed by someone you'll never meet. Write the code you'd be happy to find yourself, six months from now, in someone else's logs at 2 AM.
+That's the only thing to remember. GLClaw is Apache 2.0, self-hosted, and shipped as a single JAR. Every line you add gets downloaded, unpacked, and executed by someone you'll never meet. Write the code you'd be happy to find yourself, six months from now, in someone else's logs at 2 AM.
 
 ---
 
@@ -130,7 +130,7 @@ Don't look for a `BaseAgent` class hierarchy — the agent runtime is a **StateG
 
 - **A node** (reasoning, action, observation, plan generation) — in `vip.mate.agent.graph.node` or `vip.mate.agent.graph.plan.node`
 - **An edge** or **dispatcher** — in `vip.mate.agent.graph.edge` or `vip.mate.agent.graph.plan.edge`
-- **A state key** — in `vip.mate.agent.graph.state.MateClawStateKeys`
+- **A state key** — in `vip.mate.agent.graph.state.GLClawStateKeys`
 
 The builder that wires it up is `AgentGraphBuilder`. Streaming events from nodes go through `GraphEventPublisher` and `NodeStreamingChatHelper`.
 
@@ -322,7 +322,7 @@ Before / After.
 
 When filing a bug:
 
-- MateClaw version (or commit hash)
+- GLClaw version (or commit hash)
 - Java version and OS
 - Exact steps to reproduce
 - Expected vs. actual behavior

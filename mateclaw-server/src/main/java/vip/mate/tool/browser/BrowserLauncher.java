@@ -92,12 +92,8 @@ public class BrowserLauncher {
             }
         }
 
-        // 6. Playwright's bundled Chromium (requires `playwright install`)
-        Result bundled = tryBundled(pw, headed, trace);
-        if (bundled != null) return bundled;
-
-        // 7. Last resort: spawn system chrome with --remote-debugging-port=0 and attach via CDP.
-        //    This bypasses Playwright's Node launcher entirely — useful when Playwright install is broken.
+        // 6. Last resort: spawn system chrome with --remote-debugging-port=0 and attach via CDP.
+        //    This bypasses Playwright's Node launcher entirely — no download needed.
         if (props.isAllowExternalCdpFallback()) {
             Result external = tryExternalCdpLaunch(pw, headed, trace);
             if (external != null) return external;
@@ -167,19 +163,6 @@ public class BrowserLauncher {
                     System.currentTimeMillis() - t0, trace);
         } catch (PlaywrightException e) {
             trace.add(Attempt.fail(strategy, "channel=" + channel,
-                    System.currentTimeMillis() - t0, e.getMessage()));
-            return null;
-        }
-    }
-
-    private Result tryBundled(Playwright pw, boolean headed, List<Attempt> trace) {
-        long t0 = System.currentTimeMillis();
-        try {
-            Browser browser = pw.chromium().launch(baseLaunchOptions(headed));
-            return wrapLocalBrowser(browser, Strategy.BUNDLED, "playwright-bundled-chromium",
-                    System.currentTimeMillis() - t0, trace);
-        } catch (PlaywrightException e) {
-            trace.add(Attempt.fail(Strategy.BUNDLED, "playwright-bundled-chromium",
                     System.currentTimeMillis() - t0, e.getMessage()));
             return null;
         }

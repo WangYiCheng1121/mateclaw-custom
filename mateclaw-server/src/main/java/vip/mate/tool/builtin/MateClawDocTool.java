@@ -28,8 +28,8 @@ public class MateClawDocTool {
     private static final String DOCS_BASE = "docs/";
 
     @Tool(description = """
-        Read MateClaw project documentation.
-        Use this tool to look up information about MateClaw's features, configuration, and usage.
+        Read GLClaw project documentation.
+        Use this tool to look up information about GLClaw's features, configuration, and usage.
 
         Parameters:
         - action: "list" to list all available doc files, "read" to read a specific doc
@@ -89,7 +89,7 @@ public class MateClawDocTool {
             }
 
             StringBuilder sb = new StringBuilder();
-            sb.append("MateClaw Documentation\n\n");
+            sb.append("GLClaw Documentation\n\n");
 
             sb.append("## 中文文档 (zh/)\n");
             if (zhDocs.isEmpty()) {

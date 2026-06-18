@@ -9,5 +9,6 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class ModelSlotConfig {
     private String providerId;
+    private String providerName;
     private String model;
 }

@@ -27,6 +27,10 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
 
 /**
  * 钉钉渠道适配器
@@ -67,6 +71,22 @@ public class DingTalkChannelAdapter extends AbstractChannelAdapter implements St
 
     /** 工具产生的可下载字节缓存（DocxRenderTool 等用，注入避免回调到自己的 HTTP API） */
     private final vip.mate.tool.document.GeneratedFileCache generatedFileCache;
+
+    /**
+     * 连接活性看门狗专用调度器。
+     * <p>
+     * 钉钉 Stream SDK 的连接管理对适配器透明（黑盒），当 SDK 内部重连失败或连接
+     * 处于半开状态时，适配器无法感知。看门狗每 60s 检查 {@code lastEventTimeMs}，
+     * 超过阈值则触发 {@code onDisconnected()} 让 {@code ChannelHealthMonitor} 接管重启。
+     */
+    private ScheduledExecutorService watchdogExecutor;
+    private ScheduledFuture<?> watchdogFuture;
+
+    /** 看门狗检查间隔（秒） */
+    private static final long WATCHDOG_INTERVAL_SECONDS = 60L;
+
+    /** 看门狗静默阈值（秒）：5 分钟无事件视为连接僵死 */
+    private static final long WATCHDOG_SILENT_THRESHOLD_SECONDS = 300L;
 
     public DingTalkChannelAdapter(ChannelEntity channelEntity,
                                   ChannelMessageRouter messageRouter,
@@ -122,6 +142,9 @@ public class DingTalkChannelAdapter extends AbstractChannelAdapter implements St
         } else {
             log.info("[dingtalk] Webhook mode: waiting for callbacks at /api/v1/channels/webhook/dingtalk");
         }
+
+        // 启动连接活性看门狗（SDK 连接管理对适配器透明，看门狗检测僵死连接）
+        startWatchdog();
 
         log.info("[dingtalk] DingTalk channel initialized: mode={}, clientId={}, robotCode={}, aiCard={}",
                 getConnectionMode(), clientId, getConfigString("robot_code"), isAICardEnabled());
@@ -300,6 +323,9 @@ public class DingTalkChannelAdapter extends AbstractChannelAdapter implements St
 
     @Override
     protected void doStop() {
+        // 关闭看门狗
+        stopWatchdog();
+
         // 关闭 Stream 客户端
         if (streamClient != null) {
             try {
@@ -1182,6 +1208,68 @@ public class DingTalkChannelAdapter extends AbstractChannelAdapter implements St
     }
 
     // ==================== Stream 断线重连 ====================
+
+    /**
+     * 钉钉 Stream SDK 的连接管理对适配器透明（黑盒）；
+     * 设置 5 分钟 stale 阈值，配合 {@code ChannelHealthMonitor} 每 1 分钟扫描，
+     * 确保 SDK 内部重连失败或连接僵死后最多 5 分钟内被自动重启。
+     * <p>
+     * 同时有 {@link #startWatchdog()} 作为适配器层看门狗，每 60s 检查
+     * {@code lastEventTimeMs}，超过 5 分钟无消息即触发重连。
+     */
+    @Override
+    public Duration stalenessThreshold() {
+        return Duration.ofMinutes(5);
+    }
+
+    // ==================== 连接活性看门狗 ====================
+
+    /**
+     * 启动看门狗：每 60s 检查 {@code lastEventTimeMs}，超过 5 分钟无活动
+     * 则触发 {@code onDisconnected()}，由 {@code ChannelHealthMonitor} 接管重启。
+     * <p>
+     * 钉钉 Stream SDK 的连接与重连对适配器完全透明；当 SDK 内部重连失败、
+     * 或 TCP 半开连接未被检测到时，适配器的 {@code connectionState} 仍为 CONNECTED，
+     * 而 {@code ChannelHealthMonitor} 默认需要 60 分钟才判定 stale。看门狗大幅缩短
+     * 这个时间窗口。
+     */
+    private void startWatchdog() {
+        if (watchdogExecutor == null || watchdogExecutor.isShutdown()) {
+            watchdogExecutor = Executors.newSingleThreadScheduledExecutor(r -> {
+                Thread t = new Thread(r, "dingtalk-watchdog-" + channelEntity.getId());
+                t.setDaemon(true);
+                return t;
+            });
+        }
+        cancelWatchdog();
+        watchdogFuture = watchdogExecutor.scheduleAtFixedRate(() -> {
+            if (!running.get()) return;
+            if (connectionState.get() != ConnectionState.CONNECTED) return;
+            long silentMs = System.currentTimeMillis() - lastEventTimeMs.get();
+            if (silentMs > WATCHDOG_SILENT_THRESHOLD_SECONDS * 1000L) {
+                log.warn("[dingtalk] Watchdog: no activity for {}s (threshold {}s), triggering disconnect",
+                        silentMs / 1000, WATCHDOG_SILENT_THRESHOLD_SECONDS);
+                onDisconnected("watchdog: silent connection, no events for " + (silentMs / 1000) + "s");
+            }
+        }, WATCHDOG_INTERVAL_SECONDS, WATCHDOG_INTERVAL_SECONDS, TimeUnit.SECONDS);
+        log.info("[dingtalk] Watchdog started (check every {}s, threshold {}s)",
+                WATCHDOG_INTERVAL_SECONDS, WATCHDOG_SILENT_THRESHOLD_SECONDS);
+    }
+
+    private void cancelWatchdog() {
+        if (watchdogFuture != null) {
+            watchdogFuture.cancel(false);
+            watchdogFuture = null;
+        }
+    }
+
+    private void stopWatchdog() {
+        cancelWatchdog();
+        if (watchdogExecutor != null && !watchdogExecutor.isShutdown()) {
+            watchdogExecutor.shutdownNow();
+            watchdogExecutor = null;
+        }
+    }
 
     /**
      * Stream 连接断开时由外部调用（或内部检测到断开时调用）

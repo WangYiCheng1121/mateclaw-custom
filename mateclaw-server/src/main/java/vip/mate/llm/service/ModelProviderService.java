@@ -631,6 +631,20 @@ public class ModelProviderService {
                 providerInitProbeProvider.getIfAvailable());
     }
 
+    /**
+     * RFC-073: 查询某个供应商的当前存活状态，供 ModelConfigController 等调用方使用。
+     *
+     * @param providerId 供应商 ID
+     * @return 存活状态；若供应商不存在则返回 {@code null}
+     */
+    public Liveness getProviderLiveness(String providerId) {
+        ModelProviderEntity provider = modelProviderMapper.selectById(providerId);
+        if (provider == null) return null;
+        boolean configured = isProviderConfigured(provider);
+        LivenessContext ctx = livenessContext();
+        return computeLiveness(provider, configured, ctx);
+    }
+
     private Liveness computeLiveness(ModelProviderEntity provider, boolean configured, LivenessContext ctx) {
         if (!configured) return Liveness.UNCONFIGURED;
         String id = provider.getProviderId();

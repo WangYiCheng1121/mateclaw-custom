@@ -2,7 +2,7 @@
 
 **同一个大脑，同一份记忆，跟着你的团队走到哪里就到哪里。**
 
-MateClaw 里的一个渠道是通往同一个 Agent 的另一扇门。团队在飞书里沟通？把 Agent 放进飞书。有人喜欢用 Telegram？同一个 Agent，同一份记忆，出现在 Telegram。Web 控制台给运维，钉钉给现场，Slack 给工程——**一次部署，九扇门**。
+GLClaw 里的一个渠道是通往同一个 Agent 的另一扇门。团队在飞书里沟通？把 Agent 放进飞书。有人喜欢用 Telegram？同一个 Agent，同一份记忆，出现在 Telegram。Web 控制台给运维，钉钉给现场，Slack 给工程——**一次部署，九扇门**。
 
 每一个渠道是一个适配器。适配器底下，Agent **不知道（也不在乎）**消息是从哪扇门进来的。
 
@@ -78,7 +78,7 @@ v1.4.0 把飞书做成了"一等公民"渠道——交互卡片、流式卡片�
 
 每一个活跃的 IM 渠道适配器都被一个健康监控盯着。当一个适配器连不上或者长连接断了，监控会启动**指数退避重连**（2s → 4s → 8s → …最大封顶 30s）。瞬时的网络抖动自己就恢复了；持续性的失败会在管理控制台的健康视图里暴露出来。
 
-这就是为什么 MateClaw 的渠道不会在一次抖动之后永远静默：**它们自己会回来。**
+这就是为什么 GLClaw 的渠道不会在一次抖动之后永远静默：**它们自己会回来。**
 
 ---
 
@@ -126,7 +126,7 @@ GET /api/v1/chat/{agentId}/stream
 会话 7 分钟内有效，过期自动失效重新生成。剩下的（连接模式、Agent、消息格式）按你的需求填。
 
 ::: tip 它在做什么
-背后走钉钉的 OAuth Device Flow——MateClaw 在 `oapi.dingtalk.com` 申请一个设备码，编成 QR；你确认后，凭证从轮询接口落地到表单。**整个过程没有 webhook，没有公网 IP 要求。**
+背后走钉钉的 OAuth Device Flow——GLClaw 在 `oapi.dingtalk.com` 申请一个设备码，编成 QR；你确认后，凭证从轮询接口落地到表单。**整个过程没有 webhook，没有公网 IP 要求。**
 :::
 
 ### 手动配置应用（备选）
@@ -148,7 +148,7 @@ GET /api/v1/chat/{agentId}/stream
 5. **基本信息 > 凭证** → 拿 **Client ID**（AppKey）和 **Client Secret**（AppSecret）
    ![凭证](/images/channels/dingtalk/06-credentials.png)
 
-### 在 MateClaw 里配置
+### 在 GLClaw 里配置
 
 ```bash
 curl -X POST http://localhost:18088/api/v1/channels \
@@ -495,7 +495,7 @@ WebSocket / 回调两种模式，官方机器人平台。
 4. 回到表单，**AppID 和 AppSecret 已自动回填**
 
 ::: tip 它在做什么
-背后走 QQ 开放平台的精简版（Lite）授权门户：MateClaw 生成一个临时会话，凭证通过 AES-256-GCM 加密交换落地到表单。会话 12 分钟内有效，过期自动失效。**整个过程没有手抄凭证这一步。**
+背后走 QQ 开放平台的精简版（Lite）授权门户：GLClaw 生成一个临时会话，凭证通过 AES-256-GCM 加密交换落地到表单。会话 12 分钟内有效，过期自动失效。**整个过程没有手抄凭证这一步。**
 :::
 
 ### 手动配置应用（备选）
@@ -643,7 +643,7 @@ IM 渠道（企业微信、微信、钉钉）都支持语音输入。语音识�
 
 ## 值得知道的事
 
-- **Webhook 模式需要 HTTPS。** 生产部署应该用 Nginx + SSL 挡在 MateClaw 前面。
+- **Webhook 模式需要 HTTPS。** 生产部署应该用 Nginx + SSL 挡在 GLClaw 前面。
 - **长连接模式不需要公网 IP。** Telegram Long-Polling、钉钉 Stream、飞书 WebSocket、Discord Gateway、Slack Socket mode、企业微信长连接——全都可以跑在 NAT 后面。
 - **一个渠道一个 Agent。** 不同渠道可以指向不同 Agent。
 - **凭证在 `mate_channel` 里加密存储。**

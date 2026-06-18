@@ -2,12 +2,12 @@
 layout: home
 
 hero:
-  name: MateClaw
+  name: GLClaw
   text: 公司允许部署的那一个 AI。
   tagline: 别的 AI 助手是给一个人用的。MateClaw 是给一个团队用的——多用户工作空间、敏感操作走审批、完整审计日志、生产级健康监控。一个 JAR 包跑在自己机器上，数据不出门。
   image:
     src: /logo.png
-    alt: MateClaw
+    alt: GLClaw
   actions:
     - theme: brand
       text: 开始使用 →

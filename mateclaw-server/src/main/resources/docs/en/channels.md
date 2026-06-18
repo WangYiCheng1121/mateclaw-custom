@@ -148,7 +148,7 @@ If the QR flow can't reach DingTalk on your network, or you need finer control o
 5. **Basic Info > Credentials** → get **Client ID** (AppKey) and **Client Secret** (AppSecret)
    ![Credentials](/images/channels/dingtalk/06-credentials.png)
 
-### Configure in MateClaw
+### Configure in GLClaw
 
 ```bash
 curl -X POST http://localhost:18088/api/v1/channels \

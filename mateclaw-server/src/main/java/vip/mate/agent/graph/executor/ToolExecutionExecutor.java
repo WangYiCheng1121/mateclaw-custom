@@ -458,7 +458,8 @@ public class ToolExecutionExecutor {
             // 2. ToolGuard 安全检查（replay 模式跳过）
             if (!isReplay) {
                 GuardDecision decision = evaluateGuard(toolCall, toolName, arguments,
-                        conversationId, agentId, toolCalls, i, events, requesterId);
+                        conversationId, agentId, toolCalls, i, events, requesterId,
+                        safeOrigin.channelType());
 
                 if (decision.blocked) {
                     allResponses.add(new ToolResponseMessage.ToolResponse(
@@ -898,8 +899,10 @@ public class ToolExecutionExecutor {
     private GuardDecision evaluateGuard(AssistantMessage.ToolCall toolCall, String toolName, String arguments,
                                          String conversationId, String agentId,
                                          List<AssistantMessage.ToolCall> allToolCalls, int currentIndex,
-                                         List<GraphEventPublisher.GraphEvent> events, String requesterId) {
-        ToolInvocationContext guardCtx = ToolInvocationContext.of(toolName, arguments, conversationId, agentId);
+                                         List<GraphEventPublisher.GraphEvent> events,
+                                         String requesterId, String channelType) {
+        ToolInvocationContext guardCtx = ToolInvocationContext.of(toolName, Map.of(), arguments,
+                conversationId, agentId, channelType, requesterId);
 
         if (toolGuardService != null) {
             GuardEvaluation evaluation = toolGuardService.evaluate(guardCtx);
@@ -1176,7 +1179,7 @@ public class ToolExecutionExecutor {
         String response = String.format(
                 "[auto-redirect] You called '%s' as a tool, but it's a Skill (documentation package). "
                 + "Its SKILL.md is loaded below — read the script invocation example, then call "
-                + "`runSkillScript(skillName=\"%s\", scriptPath=\"scripts/<file from SKILL.md>\", args=[...])` "
+                + "`runSkillScript(skillName=\"%s\", scriptPath=\"scripts/<file from SKILL.md>\", args=...)` "
                 + "to actually run it. Your original payload was: %s%n%n---%n%s",
                 toolName, toolName, safeArgs, skillMd == null ? "" : skillMd);
         return new SkillRedirect(response);
