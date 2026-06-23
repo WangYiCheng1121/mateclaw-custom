@@ -1,6 +1,7 @@
 package vip.mate.workspace.core.service;
 
 import org.junit.jupiter.api.Test;
+import vip.mate.agent.repository.AgentMapper;
 import vip.mate.exception.MateClawException;
 import vip.mate.workspace.conversation.repository.ConversationMapper;
 import vip.mate.workspace.core.model.WorkspaceEntity;
@@ -19,9 +20,10 @@ class WorkspaceServiceRoleValidationTest {
     private final WorkspaceMapper workspaceMapper = mock(WorkspaceMapper.class);
     private final WorkspaceMemberMapper memberMapper = mock(WorkspaceMemberMapper.class);
     private final ConversationMapper conversationMapper = mock(ConversationMapper.class);
+    private final AgentMapper agentMapper = mock(AgentMapper.class);
     private final WikiKnowledgeBaseService wikiKnowledgeBaseService = mock(WikiKnowledgeBaseService.class);
     private final WorkspaceService service = new WorkspaceService(
-            workspaceMapper, memberMapper, conversationMapper, wikiKnowledgeBaseService, null);
+            workspaceMapper, memberMapper, conversationMapper, agentMapper, wikiKnowledgeBaseService, null);
 
     @Test
     void addMemberRejectsOwnerRole() {

@@ -94,6 +94,7 @@ public class AuthService {
 
         // Step 2: 同步本地用户
         UserEntity user = findByUsername(request.getUsername());
+        boolean isNewUser = false;
         if (user == null) {
             // 本地不存在该用户 → 自动创建
             log.info("[PlatformLogin] 本地用户不存在，自动创建: {}", request.getUsername());
@@ -106,21 +107,24 @@ public class AuthService {
             user.setEnabled(true);
             userMapper.insert(user);
             log.info("[PlatformLogin] 本地用户创建成功: id={}, username={}", user.getId(), user.getUsername());
-            // 自动加入默认工作区
-            ensureDefaultWorkspaceMembership(user);
+            isNewUser = true;
         } else if (!Boolean.TRUE.equals(user.getEnabled())) {
             throw new MateClawException("err.auth.user_disabled", "用户已被禁用");
         }
 
-        // Step 3: 生成 MateClaw 本地 JWT token
+        // Step 3: 获取或创建用户个人工作区（按用户隔离数据）
+        Long workspaceId = workspaceService.getOrCreateUserWorkspace(user.getId(), user.getNickname());
+
+        // Step 4: 生成 MateClaw 本地 JWT token
         String token = generateToken(user);
 
-        // Step 4: 缓存平台 access_token，供 Platform*Client 调用平台 API 时携带认证头
+        // Step 5: 缓存平台 access_token，供 Platform*Client 调用平台 API 时携带认证头
         String clawAccessToken = platformResult != null ? platformResult.getAccessToken() : null;
         if (clawAccessToken != null) {
             platformTokenHolder.setAccessToken(clawAccessToken);
         }
-        return new LoginResponse(user.getId(), token, user.getUsername(), user.getNickname(), user.getRole(), clawAccessToken);
+        return new LoginResponse(user.getId(), token, user.getUsername(), user.getNickname(), user.getRole(),
+                workspaceId, clawAccessToken);
     }
 
     /**
@@ -136,7 +140,12 @@ public class AuthService {
         }
 
         String token = generateToken(user);
-        return new LoginResponse(user.getId(), token, user.getUsername(), user.getNickname(), user.getRole());
+
+        // 获取或创建用户个人工作区（按用户隔离数据）
+        Long workspaceId = workspaceService.getOrCreateUserWorkspace(user.getId(), user.getNickname());
+
+        return new LoginResponse(user.getId(), token, user.getUsername(), user.getNickname(), user.getRole(),
+                workspaceId, null);
     }
 
     /**
@@ -175,8 +184,8 @@ public class AuthService {
             user.setRole("user");
         }
         userMapper.insert(user);
-        // 自动加入默认工作区
-        ensureDefaultWorkspaceMembership(user);
+        // 自动创建用户个人工作区（按用户隔离数据）
+        workspaceService.getOrCreateUserWorkspace(user.getId(), user.getNickname());
         user.setPassword(null);
         return user;
     }
@@ -292,26 +301,23 @@ public class AuthService {
     }
 
     /**
-     * 确保用户加入默认工作区，并拥有正确的角色（注册/登录时调用）。
+     * 确保用户拥有个人工作区（注册/登录时调用）。
      * <p>
-     * 桌面安装包场景：平台认证用户即为本机使用者，给予 admin 角色。
-     * 如果用户已存在但角色低于期望（如旧版本分配的 member），自动升级。
+     * 桌面安装包场景：每个用户首次登录时自动创建专属工作区，
+     * 后续登录复用已有工作区。用户为 owner 角色。
+     * <p>
+     * 兼容旧版：如果用户已经存在于默认工作区（workspace=1），
+     * 则自动迁移到个人工作区。
      */
     private void ensureDefaultWorkspaceMembership(UserEntity user) {
         try {
-            // 先确保默认工作区存在（防御旧数据库/安装包未种子初始化）
+            // 确保默认工作区存在（防御旧数据库/安装包未种子初始化）
             workspaceService.ensureDefaultWorkspaceExists(user.getId());
-            // 本地 admin 用户给 owner 角色，平台用户给 admin 角色
-            String expectedRole = "admin".equalsIgnoreCase(user.getRole()) ? "owner" : "admin";
-            try {
-                workspaceService.addMember(1L, user.getId(), expectedRole);
-                log.info("[Auth] 用户已自动加入默认工作区: userId={}, role={}", user.getId(), expectedRole);
-            } catch (Exception e) {
-                // 用户已存在，检查是否需要升级角色
-                upgradeWorkspaceRoleIfNeeded(user.getId(), expectedRole);
-            }
+            // 获取或创建用户个人工作区
+            workspaceService.getOrCreateUserWorkspace(user.getId(), user.getNickname());
+            log.info("[Auth] 用户个人工作区已就绪: userId={}", user.getId());
         } catch (Exception e) {
-            log.warn("[Auth] 确保默认工作区成员关系失败: userId={}, msg={}", user.getId(), e.getMessage());
+            log.warn("[Auth] 确保用户工作区成员关系失败: userId={}, msg={}", user.getId(), e.getMessage());
         }
     }
 

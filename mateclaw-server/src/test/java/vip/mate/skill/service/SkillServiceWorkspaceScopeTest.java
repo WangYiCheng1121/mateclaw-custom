@@ -46,8 +46,8 @@ class SkillServiceWorkspaceScopeTest {
         long id = SKILL_ID_SEQ.getAndIncrement();
         jdbcTemplate.update(
                 "MERGE INTO mate_skill (id, name, skill_type, version, enabled, builtin, " +
-                        "workspace_id, create_time, update_time, deleted) " +
-                        "KEY(id) VALUES (?, ?, ?, '1.0.0', TRUE, ?, ?, " +
+                        "installed, workspace_id, create_time, update_time, deleted) " +
+                        "KEY(id) VALUES (?, ?, ?, '1.0.0', TRUE, ?, TRUE, ?, " +
                         "CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0)",
                 id, name, builtin ? "builtin" : "dynamic", builtin, workspaceId);
         return id;

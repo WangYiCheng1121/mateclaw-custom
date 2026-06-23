@@ -205,7 +205,19 @@ public class WorkspaceAccessInterceptor implements HandlerInterceptor {
             try {
                 return Long.parseLong(header.trim());
             } catch (NumberFormatException e) {
-                return DEFAULT_WORKSPACE_ID;
+                // fall through to resolve from user
+            }
+        }
+        // 兜底：从认证用户的 JWT 中解析 userId，查找其个人工作区
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth != null && auth.isAuthenticated() && !"anonymousUser".equals(auth.getPrincipal())) {
+            try {
+                UserEntity user = authService.findByUsername(auth.getName());
+                if (user != null) {
+                    return workspaceService.getDefaultWorkspaceId(user.getId());
+                }
+            } catch (Exception e) {
+                log.debug("Failed to resolve default workspace for user {}: {}", auth.getName(), e.getMessage());
             }
         }
         return DEFAULT_WORKSPACE_ID;

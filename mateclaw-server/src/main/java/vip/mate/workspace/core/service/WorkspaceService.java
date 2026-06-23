@@ -7,6 +7,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import vip.mate.agent.model.AgentEntity;
+import vip.mate.agent.repository.AgentMapper;
 import vip.mate.exception.MateClawException;
 import vip.mate.i18n.I18nService;
 import vip.mate.wiki.service.WikiKnowledgeBaseService;
@@ -40,16 +42,26 @@ public class WorkspaceService {
     private final WorkspaceMapper workspaceMapper;
     private final WorkspaceMemberMapper memberMapper;
     private final ConversationMapper conversationMapper;
+    private final AgentMapper agentMapper;
     private final WikiKnowledgeBaseService wikiKnowledgeBaseService;
     private final I18nService i18n;
 
     /** 默认工作区 slug */
     public static final String DEFAULT_SLUG = "default";
 
+    /** 用户个人工作区 slug 前缀 */
+    private static final String USER_WORKSPACE_PREFIX = "user_";
+
     /** 成员资格缓存：key = "workspaceId:userId"，value = role string（null 表示非成员） */
     private final Cache<String, String> membershipCache = Caffeine.newBuilder()
             .expireAfterWrite(Duration.ofSeconds(60))
             .maximumSize(1000)
+            .build();
+
+    /** 用户默认工作区缓存：key = userId，value = workspaceId */
+    private final Cache<Long, Long> userWorkspaceCache = Caffeine.newBuilder()
+            .expireAfterWrite(Duration.ofMinutes(5))
+            .maximumSize(500)
             .build();
 
     // ==================== 工作区 CRUD ====================
@@ -209,6 +221,44 @@ public class WorkspaceService {
         }
     }
 
+    /**
+     * 为新工作区种子一个默认「通用助手」Agent。
+     * <p>
+     * 从默认工作区（workspace_id=1）复制通用助手的基本配置，仅修改 workspace_id。
+     * 使用 MyBatis Plus 的 ASSIGN_ID 策略自动生成新 ID。
+     *
+     * @param workspaceId 目标工作区 ID
+     */
+    private void seedDefaultAgent(Long workspaceId) {
+        if (workspaceId == null) return;
+        try {
+            // 查找默认工作区的通用助手（id=1000000001，种子数据固定 ID）
+            AgentEntity template = agentMapper.selectById(1000000001L);
+            if (template == null) {
+                log.warn("[WorkspaceService] Default agent (id=1000000001) not found, skip seeding for workspace {}",
+                        workspaceId);
+                return;
+            }
+            AgentEntity agent = new AgentEntity();
+            agent.setName(template.getName());
+            agent.setDescription(template.getDescription());
+            agent.setAgentType(template.getAgentType());
+            agent.setSystemPrompt(template.getSystemPrompt());
+            agent.setModelName(template.getModelName());
+            agent.setMaxIterations(template.getMaxIterations());
+            agent.setEnabled(true);
+            agent.setIcon(template.getIcon());
+            agent.setTags(template.getTags());
+            agent.setWorkspaceId(workspaceId);
+            agentMapper.insert(agent);
+            log.info("[WorkspaceService] Seeded default agent '{}' (id={}) for workspace {}",
+                    agent.getName(), agent.getId(), workspaceId);
+        } catch (Exception e) {
+            log.warn("[WorkspaceService] Failed to seed default agent for workspace {}: {}",
+                    workspaceId, e.getMessage());
+        }
+    }
+
     public WorkspaceEntity update(WorkspaceEntity entity) {
         WorkspaceEntity existing = getById(entity.getId());
         // slug 为 null 时保留原值，不做修改
@@ -273,6 +323,82 @@ public class WorkspaceService {
         log.info("Auto-created default workspace (id=1, owner={})", currentUserId);
     }
 
+    /**
+     * 获取或创建用户个人工作区。
+     * <p>
+     * 每个用户首次登录时自动创建专属工作区（slug = "user_{userId}"），
+     * 后续登录时直接返回已有工作区。工作区以用户昵称或用户名命名。
+     * <p>
+     * 使用 Caffeine 缓存（5 分钟 TTL）减少高频登录场景下的数据库查询。
+     *
+     * @param userId   用户 ID
+     * @param nickname 用户昵称（用于工作区名称），可为 null
+     * @return 用户个人工作区 ID（总是 > 0）
+     */
+    @Transactional
+    public Long getOrCreateUserWorkspace(Long userId, String nickname) {
+        // 先查缓存
+        Long cached = userWorkspaceCache.getIfPresent(userId);
+        if (cached != null) {
+            return cached;
+        }
+
+        String slug = USER_WORKSPACE_PREFIX + userId;
+        WorkspaceEntity ws = getBySlug(slug);
+        if (ws != null) {
+            // 已存在：刷新缓存并返回
+            userWorkspaceCache.put(userId, ws.getId());
+            return ws.getId();
+        }
+
+        // 不存在：创建个人工作区
+        String displayName = (nickname != null && !nickname.isBlank())
+                ? nickname + "的工作区"
+                : "用户" + userId + "的工作区";
+
+        WorkspaceEntity entity = new WorkspaceEntity();
+        entity.setName(displayName);
+        entity.setSlug(slug);
+        entity.setDescription("用户个人工作区，自动隔离");
+        entity.setOwnerId(userId);
+        workspaceMapper.insert(entity);
+
+        // 用户自动成为 owner
+        WorkspaceMemberEntity member = new WorkspaceMemberEntity();
+        member.setWorkspaceId(entity.getId());
+        member.setUserId(userId);
+        member.setRole("owner");
+        memberMapper.insert(member);
+
+        // 从默认工作区复制「通用助手」Agent 到新工作区
+        seedDefaultAgent(entity.getId());
+
+        userWorkspaceCache.put(userId, entity.getId());
+        log.info("Created personal workspace for user {}: id={}, slug={}", userId, entity.getId(), slug);
+        return entity.getId();
+    }
+
+    /**
+     * 获取用户的默认工作区 ID（带缓存）。
+     * 优先返回用户个人工作区，如果不存在则尝试按 slug 查找。
+     *
+     * @param userId 用户 ID
+     * @return 工作区 ID，兜底返回 1L
+     */
+    public Long getDefaultWorkspaceId(Long userId) {
+        Long cached = userWorkspaceCache.getIfPresent(userId);
+        if (cached != null) {
+            return cached;
+        }
+        // 尝试按 slug 查找
+        WorkspaceEntity ws = getBySlug(USER_WORKSPACE_PREFIX + userId);
+        if (ws != null) {
+            userWorkspaceCache.put(userId, ws.getId());
+            return ws.getId();
+        }
+        // 兜底：返回默认工作区（旧数据/未迁移场景）
+        return 1L;
+    }
 
     public List<WorkspaceMemberEntity> listMembers(Long workspaceId) {
         return memberMapper.selectList(

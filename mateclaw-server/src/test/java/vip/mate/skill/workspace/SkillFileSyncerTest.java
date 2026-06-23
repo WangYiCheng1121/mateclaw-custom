@@ -1,5 +1,6 @@
 package vip.mate.skill.workspace;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -52,7 +53,7 @@ class SkillFileSyncerTest {
         SkillWorkspaceProperties props = new SkillWorkspaceProperties();
         props.setRoot(tmp.toString());
         workspaceManager = new SkillWorkspaceManager(props, mock(ApplicationEventPublisher.class));
-        syncer = new SkillFileSyncer(skillService, fileService, workspaceManager);
+        syncer = new SkillFileSyncer(skillService, fileService, workspaceManager, new ObjectMapper());
     }
 
     @Test
