@@ -134,7 +134,7 @@ mateclaw:
     client-id: ${PLATFORM_CLIENT_ID:J8Kq169h56tm}
     client-secret: ${PLATFORM_CLIENT_SECRET:dd1492ee1c6e2c0cc72f963134534375}
     redirect-uri: /login
-    login-path: /uni/login/system
+    login-path: /esp-user/v1/user/claw/login
     authorize-path: /uni/oauth/authorize
     token-path: /uni/oauth/token
     connect-timeout: 5000
