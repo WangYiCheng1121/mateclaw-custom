@@ -10,21 +10,21 @@ tags:
 - meta
 author: ported
 ---
-# Authoring MateClaw Skills
+# Authoring GLClaw Skills
 
 ## Overview
 
 A skill is a `SKILL.md` file — YAML frontmatter plus a markdown body of reusable instructions. There are two places a SKILL.md can live, and they have different creation paths:
 
-1. **Builtin (in-repo):** `mateclaw-server/src/main/resources/skills/<name>/SKILL.md` — committed, shipped inside the server JAR. On every startup `BuiltinSkillSeedService` scans `classpath*:skills/*/SKILL.md`, parses each frontmatter, and upserts a row into `mate_skill` keyed by `name`. The SKILL.md is the single source of truth — no SQL seed entry is required.
-2. **Custom (runtime):** created by an agent or user through the `skill_manage` tool. Stored as a `mate_skill` row with `skill_type=custom` and exported to the workspace at `~/.mateclaw/skills/<name>/`. Not committed; lives per-installation.
+1. **Builtin (in-repo):** `glclaw-server/src/main/resources/skills/<name>/SKILL.md` — committed, shipped inside the server JAR. On every startup `BuiltinSkillSeedService` scans `classpath*:skills/*/SKILL.md`, parses each frontmatter, and upserts a row into `mate_skill` keyed by `name`. The SKILL.md is the single source of truth — no SQL seed entry is required.
+2. **Custom (runtime):** created by an agent or user through the `skill_manage` tool. Stored as a `mate_skill` row with `skill_type=custom` and exported to the workspace at `~/.glclaw/skills/<name>/`. Not committed; lives per-installation.
 
 This skill covers both. Note that `skill_manage` does NOT write into the in-repo `skills/` tree — builtin skills are authored by writing the file directly and restarting.
 
 ## When to Use
 
-- You're adding a reusable workflow that should ship with MateClaw → builtin.
-- You're editing an existing builtin skill under `mateclaw-server/src/main/resources/skills/`.
+- You're adding a reusable workflow that should ship with GLClaw → builtin.
+- You're editing an existing builtin skill under `glclaw-server/src/main/resources/skills/`.
 - An agent finished a complex task and wants to persist the approach → custom, via `skill_manage`.
 - You're reviewing a SKILL.md for correct frontmatter and structure.
 
@@ -74,7 +74,7 @@ Fields `BuiltinSkillSeedService` projects onto the `mate_skill` row:
 | `description` | shown in skill lists | empty |
 | `version` | `mate_skill.version` | `1.0.0` |
 | `icon` | emoji, or a `/skill-assets/...` path | `🛠️` |
-| `author` | attribution | `MateClaw` |
+| `author` | attribution | `GLClaw` |
 | `tags` | YAML list or CSV string | skill name |
 | `nameZh` / `nameEn` | bilingual display names | none |
 | `optional: true` | seeds the skill **disabled** — user opts in from the Skills page | `false` (enabled) |
@@ -93,7 +93,7 @@ Shipped skills follow roughly:
 ## Overview          — one or two paragraphs: what and why.
 ## When to Use       — bulleted triggers, plus a "Don't use for:" counter-trigger.
 ## <Topic sections>  — quick-reference tables, exact commands, concrete recipes
-                       (mvn test, paths under mateclaw-server/, etc.).
+                       (mvn test, paths under glclaw-server/, etc.).
 ## Common Pitfalls   — numbered mistakes paired with their fixes.
 ## Verification Checklist — checkbox list of post-action checks.
 ```
@@ -103,14 +103,14 @@ Not every section is mandatory, but `Overview` + `When to Use` + an actionable b
 ## Directory Placement
 
 ```
-mateclaw-server/src/main/resources/skills/<skill-name>/SKILL.md
+glclaw-server/src/main/resources/skills/<skill-name>/SKILL.md
 ```
 
 The `skills/` tree is **flat** — no category subdirectories. The seed glob `classpath*:skills/*/SKILL.md` matches exactly one level deep, so a skill nested under a category directory would never be scanned. The directory name SHOULD equal the frontmatter `name`. Supporting files go in `references/` and `scripts/` subdirectories (see below).
 
 ## Builtin Workflow (in-repo)
 
-1. **Survey peers:** `ls mateclaw-server/src/main/resources/skills/` and read 2-3 SKILL.md files close to your topic — match tone and structure.
+1. **Survey peers:** `ls glclaw-server/src/main/resources/skills/` and read 2-3 SKILL.md files close to your topic — match tone and structure.
 2. **Create** `skills/<name>/SKILL.md` with the file tools.
 3. **Validate** that the frontmatter parses — see the checklist below.
 4. **Restart the server.** `BuiltinSkillSeedService` seeds the new row only at startup; a running server will not see it. The service also skips re-seeding when no SKILL.md's size/mtime changed, so rebuilding the JAR is what makes a change land.
@@ -154,7 +154,7 @@ Beyond `SKILL.md`, a skill directory may carry:
 
 ## Verification Checklist
 
-- [ ] File at `mateclaw-server/src/main/resources/skills/<name>/SKILL.md` (builtin); the directory name equals the frontmatter `name`
+- [ ] File at `glclaw-server/src/main/resources/skills/<name>/SKILL.md` (builtin); the directory name equals the frontmatter `name`
 - [ ] Frontmatter starts at byte 0 with `---`, closes with a `---` line, and the body is non-empty
 - [ ] `name` matches `^[a-z0-9][a-z0-9._-]{0,63}$`; `description` is a single line
 - [ ] `version`, `tags`, `author` present (peer-matched shape)

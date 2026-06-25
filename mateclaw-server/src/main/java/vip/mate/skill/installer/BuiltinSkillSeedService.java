@@ -61,7 +61,7 @@ import java.util.TreeMap;
 public class BuiltinSkillSeedService implements ApplicationRunner {
 
     private static final String SKILL_GLOB = "classpath*:skills/*/SKILL.md";
-    private static final String DEFAULT_AUTHOR = "MateClaw";
+    private static final String DEFAULT_AUTHOR = "GLClaw";
     private static final String DEFAULT_ICON = "🛠️";
     private static final String DEFAULT_VERSION = "1.0.0";
     private static final String SKILL_TYPE_BUILTIN = "builtin";
@@ -76,7 +76,7 @@ public class BuiltinSkillSeedService implements ApplicationRunner {
     /** Workspace root, used as the parent of the snapshot file. Mirrors
      *  {@code SkillWorkspaceProperties#root} so we don't drag the whole
      *  properties bean in for one path lookup. */
-    @Value("${mateclaw.skill.workspace.root:#{systemProperties['user.home'] + '/.mateclaw/skills'}}")
+    @Value("${glclaw.skill.workspace.root:#{systemProperties['user.home'] + '/.glclaw/skills'}}")
     private String workspaceRoot;
 
     @Override

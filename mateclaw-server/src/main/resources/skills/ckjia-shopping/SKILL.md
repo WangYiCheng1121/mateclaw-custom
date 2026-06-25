@@ -99,7 +99,7 @@ tags:
 - 同一个 query 不要在一次对话里反复调用 —— ckjia 侧已有缓存，重复调用浪费配额
 - 用户未登录时不必填 `user_id`；当前 Phase 1 所有调用以 API key owner 身份执行
 - `mate_mcp_server` 里预置的 localhost URL 只用于本地开发/测试；生产启用前必须在 `Settings ▸ MCP Connections` 改成 ckjia 官方 SaaS 域名或私有部署域名
-- API key 由管理员在 ckjia 控制台申请后填入 mateclaw `Settings ▸ MCP Connections` 的 `headers_json`，使用 `${CKJIA_MCP_KEY}` 环境变量占位符避免明文落库
+- API key 由管理员在 ckjia 控制台申请后填入 glclaw `Settings ▸ MCP Connections` 的 `headers_json`，使用 `${CKJIA_MCP_KEY}` 环境变量占位符避免明文落库
 - 触发 429 `rate_limited` 时按 `Retry-After` 等待一次，再失败就汇总现有结果而不是无限重试
 
 ## 如何申请 API Key
@@ -107,5 +107,5 @@ tags:
 1. 访问 ckjia 控制台 `https://ckjia.com/console/mcp-keys`（自助申请页面 P2 落地后开放；Phase 1 需联系运维手工签发）
 2. 选 `free` / `standard` tier 与勾选所需 scopes
 3. 一次性获得明文 key（形如 `ckjia_mcp_live_5fK8j2nQ…`）
-4. 在 mateclaw 部署环境配 `CKJIA_MCP_KEY=ckjia_mcp_live_xxx`
+4. 在 glclaw 部署环境配 `CKJIA_MCP_KEY=ckjia_mcp_live_xxx`
 5. Settings ▸ MCP Connections 将 `ckjia-shopping` 的 URL 改为生产域名后再启用

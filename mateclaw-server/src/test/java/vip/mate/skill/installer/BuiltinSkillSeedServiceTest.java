@@ -54,7 +54,7 @@ class BuiltinSkillSeedServiceTest {
         assertEquals("builtin", built.getSkillType());
         assertEquals(Boolean.TRUE, built.getBuiltin());
         assertEquals(Boolean.TRUE, built.getEnabled());
-        assertEquals("MateClaw", built.getAuthor(), "default author");
+        assertEquals("GLClaw", built.getAuthor(), "default author");
         assertEquals("🛠️", built.getIcon(), "default icon");
         assertEquals("my_skill", built.getTags(), "default tag = name");
         assertNotNull(built.getSkillContent());
@@ -72,11 +72,11 @@ class BuiltinSkillSeedServiceTest {
         existing.setVersion("1.0.0");
         existing.setIcon("⏰");
         existing.setTags("cron,schedule");
-        existing.setAuthor("MateClaw");
+        existing.setAuthor("GLClaw");
         existing.setSkillType("builtin");
         existing.setBuiltin(true);
         existing.setSkillContent("OLD CONTENT");
-        existing.setConfigJson("{\"upstream\":\"mateclaw\",\"entryFile\":\"SKILL.md\"}");
+        existing.setConfigJson("{\"upstream\":\"glclaw\",\"entryFile\":\"SKILL.md\"}");
 
         String md = """
                 ---
@@ -95,7 +95,7 @@ class BuiltinSkillSeedServiceTest {
         // Frontmatter omitted these — DB values preserved:
         assertEquals("⏰", existing.getIcon(), "icon preserved when frontmatter silent");
         assertEquals("cron,schedule", existing.getTags(), "tags preserved when frontmatter silent");
-        assertEquals("MateClaw", existing.getAuthor(), "author preserved when frontmatter silent");
+        assertEquals("GLClaw", existing.getAuthor(), "author preserved when frontmatter silent");
         // skill_content always re-syncs from bundled SKILL.md:
         assertTrue(existing.getSkillContent().contains("# cron body"));
     }
@@ -111,9 +111,9 @@ class BuiltinSkillSeedServiceTest {
         existing.setBuiltin(true);
         existing.setIcon("⏰");
         existing.setTags("cron");
-        existing.setAuthor("MateClaw");
+        existing.setAuthor("GLClaw");
         // The configJson the service produces for this frontmatter (no tools, no platforms)
-        existing.setConfigJson("{\"upstream\":\"mateclaw\",\"entryFile\":\"SKILL.md\"}");
+        existing.setConfigJson("{\"upstream\":\"glclaw\",\"entryFile\":\"SKILL.md\"}");
         String md = """
                 ---
                 name: cron
@@ -199,9 +199,9 @@ class BuiltinSkillSeedServiceTest {
         existing.setBuiltin(true);
         existing.setIcon("🛠️");
         existing.setTags("heavy_skill");
-        existing.setAuthor("MateClaw");
+        existing.setAuthor("GLClaw");
         existing.setEnabled(true); // user activated it
-        existing.setConfigJson("{\"upstream\":\"mateclaw\",\"entryFile\":\"SKILL.md\"}");
+        existing.setConfigJson("{\"upstream\":\"glclaw\",\"entryFile\":\"SKILL.md\"}");
         String md = """
                 ---
                 name: heavy_skill

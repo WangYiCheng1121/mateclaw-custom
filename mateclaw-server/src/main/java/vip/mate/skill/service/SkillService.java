@@ -168,9 +168,7 @@ public class SkillService {
         if (lifecycleState != null && !lifecycleState.isBlank()) {
             wrapper.eq(SkillEntity::getLifecycleState, lifecycleState.trim().toLowerCase());
         } else {
-            // Default catalog view hides archived skills — they have their own tab.
-            wrapper.and(w -> w.isNull(SkillEntity::getLifecycleState)
-                    .or().ne(SkillEntity::getLifecycleState, "archived"));
+            applyDefaultLifecycleFilter(wrapper);
         }
         if (categoryIds != null && !categoryIds.isEmpty()) {
             wrapper.in(SkillEntity::getCategoryId, categoryIds);
@@ -232,11 +230,15 @@ public class SkillService {
      * rollup. Feeds the SkillMarket tab badges without pulling every row.
      * Scoped to {@code workspaceId}: builtin skills count for every
      * workspace, all other skills only for their owning workspace.
+     * <p>
+     * Excludes archived skills by default — consistent with
+     * {@link #pageSkills} default catalog view.
      */
     public Map<String, Long> countByType(Long workspaceId) {
         Map<String, Long> result = new LinkedHashMap<>();
         LambdaQueryWrapper<SkillEntity> allWrapper = new LambdaQueryWrapper<>();
         applyWorkspaceScope(allWrapper, workspaceId);
+        applyDefaultLifecycleFilter(allWrapper);
         result.put("all", skillMapper.selectCount(allWrapper));
         for (String type : List.of("builtin", "mcp", "dynamic")) {
             LambdaQueryWrapper<SkillEntity> wrapper = new LambdaQueryWrapper<SkillEntity>()
@@ -246,9 +248,23 @@ public class SkillService {
                 wrapper.eq(SkillEntity::getInstalled, true);
             }
             applyWorkspaceScope(wrapper, workspaceId);
+            applyDefaultLifecycleFilter(wrapper);
             result.put(type, skillMapper.selectCount(wrapper));
         }
         return result;
+    }
+
+    /**
+     * Exclude archived skills, mirroring {@link #pageSkills} default catalog view.
+     * <p>
+     * Uses {@code apply()} with a raw SQL fragment rather than
+     * {@code and(Consumer)} so that {@code selectCount} and
+     * {@code selectPage} interpret the condition identically.
+     * Some MyBatis-Plus versions (≤ 3.5.9) silently drop nested
+     * {@code and(Consumer)} groups during count optimisation.
+     */
+    private static void applyDefaultLifecycleFilter(LambdaQueryWrapper<SkillEntity> wrapper) {
+        wrapper.apply("(lifecycle_state IS NULL OR lifecycle_state <> 'archived')");
     }
 
     /**

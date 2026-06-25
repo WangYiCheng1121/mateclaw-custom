@@ -1,17 +1,17 @@
 ---
 name: guidance
 version: "1.2.0"
-description: "回答用户关于 MateClaw 安装与配置的问题。优先定位并阅读本地文档，再提炼答案；文档不足时访问官网。"
+description: "回答用户关于 GLClaw 安装与配置的问题。优先定位并阅读本地文档，再提炼答案；文档不足时访问官网。"
 dependencies:
   tools:
-    - readMateClawDoc
+    - readGLClawDoc
     - read_file
     - search
 ---
 
-# MateClaw 安装与配置问答
+# GLClaw 安装与配置问答
 
-当用户询问 MateClaw 的安装、初始化、环境配置、依赖要求、常见配置项时使用本技能。
+当用户询问 GLClaw 的安装、初始化、环境配置、依赖要求、常见配置项时使用本技能。
 
 **核心原则**：先查文档，再回答；不臆测；回答语言与提问语言一致。
 
@@ -20,7 +20,7 @@ dependencies:
 ### 第一步：查文档目录
 
 ```
-readMateClawDoc(action="list")
+readGLClawDoc(action="list")
 ```
 
 浏览返回的文件列表，找到与用户问题最相关的文档（如 `zh/quickstart.md`、`en/config.md`）。
@@ -28,7 +28,7 @@ readMateClawDoc(action="list")
 ### 第二步：读取相关文档
 
 ```
-readMateClawDoc(action="read", path="zh/quickstart.md")
+readGLClawDoc(action="read", path="zh/quickstart.md")
 ```
 
 文档较长时只读相关章节；如多个文档都相关，按优先级依次读取。
@@ -44,7 +44,7 @@ readMateClawDoc(action="read", path="zh/quickstart.md")
 
 如本地文档信息不足：
 ```
-search(query="MateClaw 安装配置 <关键词>", language="zh-CN", count=5)
+search(query="GLClaw 安装配置 <关键词>", language="zh-CN", count=5)
 ```
 
 参考搜索结果补充回答，并注明信息来自官网搜索。

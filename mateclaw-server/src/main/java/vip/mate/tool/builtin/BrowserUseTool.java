@@ -995,6 +995,8 @@ public class BrowserUseTool {
                 try {
                     if (browser != null) browser.close();
                 } catch (Exception ignored) {}
+                // Issue #40: clean up the isolated user-data-dir we created for local launch
+                BrowserLauncher.deleteQuietly(userDataDir);
             }
         }
     }

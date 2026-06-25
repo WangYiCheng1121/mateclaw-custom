@@ -280,7 +280,7 @@ public class OpenAiCompatibleChatModelBuilder implements ChatModelBuilder {
         String completionsPath = proxyProperties.getCompletionsPath();
 
         MultiValueMap<String, String> headers = new LinkedMultiValueMap<>();
-        headers.add("User-Agent", "MateClaw/1.0");
+        headers.add("User-Agent", "GLClaw/1.0");
 
         RestClient.Builder restClientBuilder = applyHttpTimeouts(
                 restClientBuilderProvider.getIfAvailable(RestClient::builder), readTimeoutOverride);
@@ -532,7 +532,7 @@ public class OpenAiCompatibleChatModelBuilder implements ChatModelBuilder {
 
     private MultiValueMap<String, String> buildOpenAiHeaders(Map<String, Object> kwargs) {
         LinkedMultiValueMap<String, String> headers = new LinkedMultiValueMap<>();
-        headers.add("User-Agent", "MateClaw/1.0");
+        headers.add("User-Agent", "GLClaw/1.0");
         Object headerObject = kwargs.get("headers");
         if (headerObject instanceof Map<?, ?> headerMap) {
             headerMap.forEach((key, value) -> {

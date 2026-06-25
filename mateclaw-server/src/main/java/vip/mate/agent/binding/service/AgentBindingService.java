@@ -626,7 +626,7 @@ public class AgentBindingService implements AgentBindingResolver {
             "extract_document_text",
             "extract_pdf_text",
             "extract_docx_text",
-            "readMateClawDoc",
+            "readGLClawDoc",
             // Wiki knowledge-base tools. These are agent-wide capabilities
             // tied to whichever knowledge base is attached to the agent, and
             // are never declared inside any skill manifest. Like the document

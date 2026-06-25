@@ -1,15 +1,15 @@
--- MateClaw 初始数据 - 中文版（H2 MERGE INTO 语法，幂等插入）
+-- GLClaw 初始数据 - 中文版（H2 MERGE INTO 语法，幂等插入）
 
 -- 默认管理员（密码：admin123，BCrypt加密）
 MERGE INTO mate_user (id, username, password, nickname, role, enabled, create_time, update_time, deleted)
 KEY (id)
-VALUES (1, 'admin', '$2a$10$7JB720yubVSZvUI0rEqK/.VqGOZTH.ulu33dHOiBE8ByOhJIrdAu2', 'MateClaw Admin', 'admin', TRUE, NOW(), NOW(), 0);
+VALUES (1, 'admin', '$2a$10$7JB720yubVSZvUI0rEqK/.VqGOZTH.ulu33dHOiBE8ByOhJIrdAu2', 'GLClaw Admin', 'admin', TRUE, NOW(), NOW(), 0);
 
 -- 默认数字员工：通用助手（ReAct 模式）
 MERGE INTO mate_agent (id, name, description, agent_type, system_prompt, model_name, max_iterations, enabled, icon, tags, create_time, update_time, deleted)
 KEY (id)
 VALUES (1000000001, '通用助手', '日常问答、数据分析、工具调用都能搞定的全能助手', 'react',
-        '你是 MateClaw 的通用助手。你可以帮助用户回答问题、分析数据、调用工具完成任务。请用中文回复，保持专业、友好的态度。',
+        '你是 GLClaw 的通用助手。你可以帮助用户回答问题、分析数据、调用工具完成任务。请用中文回复，保持专业、友好的态度。',
         NULL, 100, TRUE, 'pi:robot-face-happy', 'default,assistant', NOW(), NOW(), 0);
 
 -- 默认数字员工：任务规划师（Plan-Execute 模式）
@@ -473,10 +473,10 @@ MERGE INTO mate_tool (id, name, display_name, description, tool_type, bean_name,
 KEY (id)
 VALUES (1000000012, 'BrowserUseTool', '浏览器控制', '启动和控制浏览器，支持打开网页、截图、点击、输入、执行JS等自动化操作。配合 browser_visible / browser_cdp 技能使用。', 'builtin', 'browserUseTool', '🌐', TRUE, TRUE, NOW(), NOW(), 0);
 
--- 内置工具：MateClaw 项目文档读取
+-- 内置工具：GLClaw 项目文档读取
 MERGE INTO mate_tool (id, name, display_name, description, tool_type, bean_name, icon, enabled, builtin, create_time, update_time, deleted)
 KEY (id)
-VALUES (1000000013, 'MateClawDocTool', 'MateClaw 文档', '读取 MateClaw 内置项目文档。action=list 列出所有文档，action=read 读取指定文档内容（如 zh/config.md）。', 'builtin', 'mateClawDocTool', '📚', TRUE, TRUE, NOW(), NOW(), 0);
+VALUES (1000000013, 'GLClawDocTool', 'GLClaw 文档', '读取 GLClaw 内置项目文档。action=list 列出所有文档，action=read 读取指定文档内容（如 zh/config.md）。', 'builtin', 'glClawDocTool', '📚', TRUE, TRUE, NOW(), NOW(), 0);
 
 -- 内置工具：Agent 委派（多 Agent 协作）
 MERGE INTO mate_tool (id, name, display_name, description, tool_type, bean_name, icon, enabled, builtin, create_time, update_time, deleted)
@@ -521,7 +521,7 @@ MERGE INTO mate_tool (id, name, display_name, description, tool_type, bean_name,
 KEY (id)
 VALUES (1000000022, 'PdfRenderTool', 'PDF 渲染', '将 Markdown 渲染为最终交付形态的 .pdf 并返回一次性下载链接。双 backend 自动切换（优先 LibreOffice，不可用时回落到进程内 OpenPDF + Flying Saucer）；通过 YAML frontmatter 控制封面、页眉、页脚。', 'builtin', 'pdfRenderTool', '📄', TRUE, TRUE, NOW(), NOW(), 0);
 
--- 示例 MCP Server：Filesystem（参考 MateClaw 文档中的 mcpServers.filesystem）
+-- 示例 MCP Server：Filesystem（参考 GLClaw 文档中的 mcpServers.filesystem）
 MERGE INTO mate_mcp_server (
     id, name, description, transport, url, headers_json, command, args_json, env_json, cwd,
     enabled, connect_timeout_seconds, read_timeout_seconds, last_status, last_error,
@@ -531,7 +531,7 @@ KEY (id)
 VALUES (
     1000000901,
     'filesystem',
-    'Filesystem MCP for MateClaw workspace',
+    'Filesystem MCP for GLClaw workspace',
     'stdio',
     NULL,
     NULL,
@@ -583,7 +583,7 @@ VALUES (
     0
 );
 
--- 内置技能：从 MateClaw 迁移的技能元数据
+-- 内置技能：从 GLClaw 迁移的技能元数据
 -- DEPRECATED (RFC-044 §4.2): The authoritative source for builtin skills is now
 -- classpath:skills/<name>/SKILL.md, upserted on startup by BuiltinSkillSeedService.
 -- These MERGE blocks remain as a one-version compatibility shim and will be
@@ -591,79 +591,79 @@ VALUES (
 -- SKILL.md under skills/<name>/ and the seed service will register it.
 MERGE INTO mate_skill (id, name, description, skill_type, icon, version, author, config_json, enabled, builtin, tags, create_time, update_time, deleted)
 KEY (id)
-VALUES (1000000001, 'cron', '定时任务管理。通过命令或控制台创建、查询、暂停、恢复、删除任务，按时间表执行并把结果发到频道。', 'builtin', '⏰', '1.0.0', 'MateClaw', '{"upstream":"mateclaw","entryFile":"SKILL.md"}', TRUE, TRUE, 'cron,schedule,automation', NOW(), NOW(), 0);
+VALUES (1000000001, 'cron', '定时任务管理。通过命令或控制台创建、查询、暂停、恢复、删除任务，按时间表执行并把结果发到频道。', 'builtin', '⏰', '1.0.0', 'GLClaw', '{"upstream":"glclaw","entryFile":"SKILL.md"}', TRUE, TRUE, 'cron,schedule,automation', NOW(), NOW(), 0);
 
 MERGE INTO mate_skill (id, name, description, skill_type, icon, version, author, config_json, enabled, builtin, tags, create_time, update_time, deleted)
 KEY (id)
-VALUES (1000000002, 'file_reader', '读取与摘要文本类文件，如 txt、md、json、csv、log、代码文件等。PDF 与 Office 文件由专用技能处理。', 'builtin', '📄', '1.0.0', 'MateClaw', '{"upstream":"mateclaw","entryFile":"SKILL.md"}', TRUE, TRUE, 'file,reader,text,summary', NOW(), NOW(), 0);
+VALUES (1000000002, 'file_reader', '读取与摘要文本类文件，如 txt、md、json、csv、log、代码文件等。PDF 与 Office 文件由专用技能处理。', 'builtin', '📄', '1.0.0', 'GLClaw', '{"upstream":"glclaw","entryFile":"SKILL.md"}', TRUE, TRUE, 'file,reader,text,summary', NOW(), NOW(), 0);
 
 MERGE INTO mate_skill (id, name, description, skill_type, icon, version, author, config_json, enabled, builtin, tags, create_time, update_time, deleted)
 KEY (id)
-VALUES (1000000003, 'dingtalk_channel_connect', '辅助完成钉钉频道接入流程，支持可视浏览器、登录暂停和发布前检查。', 'builtin', '🤖', '1.0.0', 'MateClaw', '{"upstream":"mateclaw","entryFile":"SKILL.md"}', TRUE, TRUE, 'dingtalk,channel,browser,automation', NOW(), NOW(), 0);
+VALUES (1000000003, 'dingtalk_channel_connect', '辅助完成钉钉频道接入流程，支持可视浏览器、登录暂停和发布前检查。', 'builtin', '🤖', '1.0.0', 'GLClaw', '{"upstream":"glclaw","entryFile":"SKILL.md"}', TRUE, TRUE, 'dingtalk,channel,browser,automation', NOW(), NOW(), 0);
 
 MERGE INTO mate_skill (id, name, description, skill_type, icon, version, author, config_json, enabled, builtin, tags, create_time, update_time, deleted)
 KEY (id)
-VALUES (1000000004, 'himalaya', '通过 CLI 管理邮件，支持多账户 IMAP/SMTP、搜索、阅读、回复和附件处理。', 'builtin', '📧', '1.0.0', 'MateClaw', '{"upstream":"mateclaw","entryFile":"SKILL.md","homepage":"https://github.com/pimalaya/himalaya"}', TRUE, TRUE, 'email,imap,smtp,cli', NOW(), NOW(), 0);
+VALUES (1000000004, 'himalaya', '通过 CLI 管理邮件，支持多账户 IMAP/SMTP、搜索、阅读、回复和附件处理。', 'builtin', '📧', '1.0.0', 'GLClaw', '{"upstream":"glclaw","entryFile":"SKILL.md","homepage":"https://github.com/pimalaya/himalaya"}', TRUE, TRUE, 'email,imap,smtp,cli', NOW(), NOW(), 0);
 
 MERGE INTO mate_skill (id, name, description, skill_type, icon, version, author, config_json, enabled, builtin, tags, create_time, update_time, deleted)
 KEY (id)
-VALUES (1000000005, 'news', '从互联网查询最新新闻。支持政治、财经、社会、国际、科技、体育、娱乐等分类。自动适配内置搜索和工具搜索。', 'builtin', '📰', '2.0.0', 'MateClaw', '{"upstream":"mateclaw","entryFile":"SKILL.md"}', TRUE, TRUE, 'news,web,search,summary', NOW(), NOW(), 0);
+VALUES (1000000005, 'news', '从互联网查询最新新闻。支持政治、财经、社会、国际、科技、体育、娱乐等分类。自动适配内置搜索和工具搜索。', 'builtin', '📰', '2.0.0', 'GLClaw', '{"upstream":"glclaw","entryFile":"SKILL.md"}', TRUE, TRUE, 'news,web,search,summary', NOW(), NOW(), 0);
 
 MERGE INTO mate_skill (id, name, description, skill_type, icon, version, author, config_json, enabled, builtin, tags, create_time, update_time, deleted)
 KEY (id)
-VALUES (1000000006, 'pdf', 'PDF 相关操作：阅读、提取文字和表格、合并拆分、旋转、水印、填表、加密解密、OCR 等。内含表单字段提取、填充、边界框校验和 PDF 转图片等脚本。', 'builtin', '📕', '1.0.0', 'Anthropic Skills', '{"upstream":"mateclaw","entryFile":"SKILL.md"}', TRUE, TRUE, 'pdf,ocr,forms,document', NOW(), NOW(), 0);
+VALUES (1000000006, 'pdf', 'PDF 相关操作：阅读、提取文字和表格、合并拆分、旋转、水印、填表、加密解密、OCR 等。内含表单字段提取、填充、边界框校验和 PDF 转图片等脚本。', 'builtin', '📕', '1.0.0', 'Anthropic Skills', '{"upstream":"glclaw","entryFile":"SKILL.md"}', TRUE, TRUE, 'pdf,ocr,forms,document', NOW(), NOW(), 0);
 
 MERGE INTO mate_skill (id, name, description, skill_type, icon, version, author, config_json, enabled, builtin, tags, create_time, update_time, deleted)
 KEY (id)
-VALUES (1000000007, 'docx', 'Word 文档的创建、阅读、编辑，支持目录、页眉页脚、表格、图片、修订与批注。内含 XML 解包/打包、Schema 校验、修订处理和 LibreOffice 集成等脚本。', 'builtin', '📝', '1.0.0', 'Anthropic Skills', '{"upstream":"mateclaw","entryFile":"SKILL.md"}', TRUE, TRUE, 'docx,word,document,office', NOW(), NOW(), 0);
+VALUES (1000000007, 'docx', 'Word 文档的创建、阅读、编辑，支持目录、页眉页脚、表格、图片、修订与批注。内含 XML 解包/打包、Schema 校验、修订处理和 LibreOffice 集成等脚本。', 'builtin', '📝', '1.0.0', 'Anthropic Skills', '{"upstream":"glclaw","entryFile":"SKILL.md"}', TRUE, TRUE, 'docx,word,document,office', NOW(), NOW(), 0);
 
 MERGE INTO mate_skill (id, name, description, skill_type, icon, version, author, config_json, enabled, builtin, tags, create_time, update_time, deleted)
 KEY (id)
-VALUES (1000000008, 'pptx', 'PPT 的创建、阅读、编辑，支持模板、版式、备注与批注。内含幻灯片操作、缩略图生成、XML 校验和 LibreOffice 集成等脚本。', 'builtin', '📊', '1.0.0', 'Anthropic Skills', '{"upstream":"mateclaw","entryFile":"SKILL.md"}', TRUE, TRUE, 'pptx,presentation,slides,office', NOW(), NOW(), 0);
+VALUES (1000000008, 'pptx', 'PPT 的创建、阅读、编辑，支持模板、版式、备注与批注。内含幻灯片操作、缩略图生成、XML 校验和 LibreOffice 集成等脚本。', 'builtin', '📊', '1.0.0', 'Anthropic Skills', '{"upstream":"glclaw","entryFile":"SKILL.md"}', TRUE, TRUE, 'pptx,presentation,slides,office', NOW(), NOW(), 0);
 
 MERGE INTO mate_skill (id, name, description, skill_type, icon, version, author, config_json, enabled, builtin, tags, create_time, update_time, deleted)
 KEY (id)
-VALUES (1000000009, 'xlsx', '表格文件的读取、编辑、创建与格式整理，支持公式、数据清洗和分析。内含公式重算、XML 解包/打包、Schema 校验和 LibreOffice 集成等脚本。', 'builtin', '📈', '1.0.0', 'Anthropic Skills', '{"upstream":"mateclaw","entryFile":"SKILL.md"}', TRUE, TRUE, 'xlsx,excel,csv,spreadsheet,data', NOW(), NOW(), 0);
+VALUES (1000000009, 'xlsx', '表格文件的读取、编辑、创建与格式整理，支持公式、数据清洗和分析。内含公式重算、XML 解包/打包、Schema 校验和 LibreOffice 集成等脚本。', 'builtin', '📈', '1.0.0', 'Anthropic Skills', '{"upstream":"glclaw","entryFile":"SKILL.md"}', TRUE, TRUE, 'xlsx,excel,csv,spreadsheet,data', NOW(), NOW(), 0);
 
 MERGE INTO mate_skill (id, name, description, skill_type, icon, version, author, config_json, enabled, builtin, tags, create_time, update_time, deleted)
 KEY (id)
-VALUES (1000000010, 'browser_visible', '以可见模式启动真实浏览器窗口，适用于演示、调试或需要人工参与的场景。', 'builtin', '🖥️', '1.0.0', 'MateClaw', '{"upstream":"mateclaw","entryFile":"SKILL.md"}', TRUE, TRUE, 'browser,visible,headed,automation', NOW(), NOW(), 0);
+VALUES (1000000010, 'browser_visible', '以可见模式启动真实浏览器窗口，适用于演示、调试或需要人工参与的场景。', 'builtin', '🖥️', '1.0.0', 'GLClaw', '{"upstream":"glclaw","entryFile":"SKILL.md"}', TRUE, TRUE, 'browser,visible,headed,automation', NOW(), NOW(), 0);
 
 MERGE INTO mate_skill (id, name, description, skill_type, icon, version, author, config_json, enabled, builtin, tags, create_time, update_time, deleted)
 KEY (id)
-VALUES (1000000012, 'browser_cdp', '通过 Chrome DevTools Protocol (CDP) 连接或启动 Chrome，用于远程调试、共享浏览器或与外部工具协作。', 'builtin', '🔌', '1.0.0', 'MateClaw', '{"upstream":"mateclaw","entryFile":"SKILL.md"}', TRUE, TRUE, 'browser,cdp,chrome,debugging,automation', NOW(), NOW(), 0);
+VALUES (1000000012, 'browser_cdp', '通过 Chrome DevTools Protocol (CDP) 连接或启动 Chrome，用于远程调试、共享浏览器或与外部工具协作。', 'builtin', '🔌', '1.0.0', 'GLClaw', '{"upstream":"glclaw","entryFile":"SKILL.md"}', TRUE, TRUE, 'browser,cdp,chrome,debugging,automation', NOW(), NOW(), 0);
 
 MERGE INTO mate_skill (id, name, description, skill_type, icon, version, author, config_json, enabled, builtin, tags, create_time, update_time, deleted)
 KEY (id)
-VALUES (1000000011, 'guidance', '回答用户关于 MateClaw 安装与配置的问题，优先定位并阅读本地文档，再提炼答案。', 'builtin', '🧭', '1.0.0', 'MateClaw', '{"upstream":"mateclaw","entryFile":"SKILL.md"}', TRUE, TRUE, 'docs,guidance,configuration,qa', NOW(), NOW(), 0);
+VALUES (1000000011, 'guidance', '回答用户关于 GLClaw 安装与配置的问题，优先定位并阅读本地文档，再提炼答案。', 'builtin', '🧭', '1.0.0', 'GLClaw', '{"upstream":"glclaw","entryFile":"SKILL.md"}', TRUE, TRUE, 'docs,guidance,configuration,qa', NOW(), NOW(), 0);
 
 MERGE INTO mate_skill (id, name, description, skill_type, icon, version, author, config_json, enabled, builtin, tags, create_time, update_time, deleted)
 KEY (id)
-VALUES (1000000013, 'mateclaw_source_index', '将用户问题映射到 MateClaw 文档路径与源码入口，减少盲目搜索。', 'builtin', '🗂️', '1.0.0', 'MateClaw', '{"upstream":"mateclaw","entryFile":"SKILL.md"}', TRUE, TRUE, 'docs,index,source,qa', NOW(), NOW(), 0);
+VALUES (1000000013, 'glclaw_source_index', '将用户问题映射到 GLClaw 文档路径与源码入口，减少盲目搜索。', 'builtin', '🗂️', '1.0.0', 'GLClaw', '{"upstream":"glclaw","entryFile":"SKILL.md"}', TRUE, TRUE, 'docs,index,source,qa', NOW(), NOW(), 0);
 
 MERGE INTO mate_skill (id, name, description, skill_type, icon, version, author, config_json, enabled, builtin, tags, create_time, update_time, deleted)
 KEY (id)
-VALUES (1000000014, 'sql_query', '自然语言查询数据库。发现表结构、生成 SQL 并在外部数据源上执行只读查询。', 'builtin', '📊', '1.0.0', 'MateClaw', '{"upstream":"mateclaw","entryFile":"SKILL.md"}', TRUE, TRUE, 'sql,database,query,data,查数', NOW(), NOW(), 0);
+VALUES (1000000014, 'sql_query', '自然语言查询数据库。发现表结构、生成 SQL 并在外部数据源上执行只读查询。', 'builtin', '📊', '1.0.0', 'GLClaw', '{"upstream":"glclaw","entryFile":"SKILL.md"}', TRUE, TRUE, 'sql,database,query,data,查数', NOW(), NOW(), 0);
 
 MERGE INTO mate_skill (id, name, description, skill_type, icon, version, author, config_json, enabled, builtin, tags, create_time, update_time, deleted)
 KEY (id)
-VALUES (1000000015, 'steve_jobs_perspective', '史蒂夫·乔布斯思维操作系统。以乔布斯视角审视产品、评估决策、提供反馈，运用其六大心智模型和独特表达风格。', 'builtin', '🍎', '1.0.0', 'MateClaw', '{"upstream":"mateclaw","entryFile":"SKILL.md"}', TRUE, TRUE, 'persona,jobs,product,strategy,thinking', NOW(), NOW(), 0);
+VALUES (1000000015, 'steve_jobs_perspective', '史蒂夫·乔布斯思维操作系统。以乔布斯视角审视产品、评估决策、提供反馈，运用其六大心智模型和独特表达风格。', 'builtin', '🍎', '1.0.0', 'GLClaw', '{"upstream":"glclaw","entryFile":"SKILL.md"}', TRUE, TRUE, 'persona,jobs,product,strategy,thinking', NOW(), NOW(), 0);
 
 MERGE INTO mate_skill (id, name, description, skill_type, icon, version, author, config_json, enabled, builtin, tags, create_time, update_time, deleted)
 KEY (id)
-VALUES (1000000016, 'make_plan', '当任务需要多步拆解或不确定执行路径时，向更强 Agent 请求一份分步可落地的执行计划，由当前 Agent 自己执行。', 'builtin', '🗺️', '1.3.0', 'MateClaw', '{"upstream":"mateclaw","entryFile":"SKILL.md"}', TRUE, TRUE, 'plan,delegate,agent,collaboration', NOW(), NOW(), 0);
+VALUES (1000000016, 'make_plan', '当任务需要多步拆解或不确定执行路径时，向更强 Agent 请求一份分步可落地的执行计划，由当前 Agent 自己执行。', 'builtin', '🗺️', '1.3.0', 'GLClaw', '{"upstream":"glclaw","entryFile":"SKILL.md"}', TRUE, TRUE, 'plan,delegate,agent,collaboration', NOW(), NOW(), 0);
 
 MERGE INTO mate_skill (id, name, description, skill_type, icon, version, author, config_json, enabled, builtin, tags, create_time, update_time, deleted)
 KEY (id)
-VALUES (1000000017, 'chat_with_agent', '当需要咨询其他 Agent、寻求帮助或用户明确要求某个 Agent 参与时，使用本技能进行单次或并行委托。', 'builtin', '💬', '1.2.0', 'MateClaw', '{"upstream":"mateclaw","entryFile":"SKILL.md"}', TRUE, TRUE, 'agent,chat,collaborate,delegate', NOW(), NOW(), 0);
+VALUES (1000000017, 'chat_with_agent', '当需要咨询其他 Agent、寻求帮助或用户明确要求某个 Agent 参与时，使用本技能进行单次或并行委托。', 'builtin', '💬', '1.2.0', 'GLClaw', '{"upstream":"glclaw","entryFile":"SKILL.md"}', TRUE, TRUE, 'agent,chat,collaborate,delegate', NOW(), NOW(), 0);
 
 MERGE INTO mate_skill (id, name, description, skill_type, icon, version, author, config_json, enabled, builtin, tags, create_time, update_time, deleted)
 KEY (id)
-VALUES (1000000018, 'channel_message', '当需要主动向用户、会话或渠道单向推送消息时使用。任务完成通知、定时提醒、异步结果回推等场景。', 'builtin', '📤', '1.3.0', 'MateClaw', '{"upstream":"mateclaw","entryFile":"SKILL.md"}', TRUE, TRUE, 'channel,message,push,notify,dingtalk,feishu', NOW(), NOW(), 0);
+VALUES (1000000018, 'channel_message', '当需要主动向用户、会话或渠道单向推送消息时使用。任务完成通知、定时提醒、异步结果回推等场景。', 'builtin', '📤', '1.3.0', 'GLClaw', '{"upstream":"glclaw","entryFile":"SKILL.md"}', TRUE, TRUE, 'channel,message,push,notify,dingtalk,feishu', NOW(), NOW(), 0);
 
 MERGE INTO mate_skill (id, name, description, skill_type, icon, version, author, config_json, enabled, builtin, tags, create_time, update_time, deleted)
 KEY (id)
-VALUES (1000000019, 'multi_agent_collaboration', '当任务需要多个 Agent 的专业能力协同完成时，编排多 Agent 并行或串行协作，整合各方结果。', 'builtin', '🤝', '1.4.0', 'MateClaw', '{"upstream":"mateclaw","entryFile":"SKILL.md"}', TRUE, TRUE, 'multi-agent,collaboration,orchestration,parallel', NOW(), NOW(), 0);
+VALUES (1000000019, 'multi_agent_collaboration', '当任务需要多个 Agent 的专业能力协同完成时，编排多 Agent 并行或串行协作，整合各方结果。', 'builtin', '🤝', '1.4.0', 'GLClaw', '{"upstream":"glclaw","entryFile":"SKILL.md"}', TRUE, TRUE, 'multi-agent,collaboration,orchestration,parallel', NOW(), NOW(), 0);
 
 -- RFC-042 §2.2 — bilingual display names for the 19 builtin skills.
 -- Identical across all four data-*.sql files because name_zh / name_en are
@@ -681,7 +681,7 @@ UPDATE mate_skill SET name_zh = 'Excel 表格',     name_en = 'Excel'           
 UPDATE mate_skill SET name_zh = '可见浏览器',     name_en = 'Visible Browser'          WHERE name = 'browser_visible';
 UPDATE mate_skill SET name_zh = '浏览器 CDP',     name_en = 'Browser CDP'              WHERE name = 'browser_cdp';
 UPDATE mate_skill SET name_zh = '安装指引',       name_en = 'Setup Guidance'           WHERE name = 'guidance';
-UPDATE mate_skill SET name_zh = '源码索引',       name_en = 'Source Index'             WHERE name = 'mateclaw_source_index';
+UPDATE mate_skill SET name_zh = '源码索引',       name_en = 'Source Index'             WHERE name = 'glclaw_source_index';
 UPDATE mate_skill SET name_zh = 'SQL 查询',       name_en = 'SQL Query'                WHERE name = 'sql_query';
 UPDATE mate_skill SET name_zh = '乔布斯视角',     name_en = 'Steve Jobs Perspective'   WHERE name = 'steve_jobs_perspective';
 UPDATE mate_skill SET name_zh = '制定计划',       name_en = 'Make Plan'                WHERE name = 'make_plan';
@@ -1027,7 +1027,7 @@ description: |
   支持政治、财经、社会、国际、科技、体育、娱乐等分类。自动适配内置搜索和工具搜索两种模式。
 metadata:
   builtin_skill_version: "2.0"
-  mateclaw:
+  glclaw:
     emoji: "📰"
     requires: {}
 ---
@@ -1112,17 +1112,17 @@ metadata:
 
 UPDATE mate_skill SET skill_content = '---
 name: guidance
-description: "回答用户关于 MateClaw 安装、配置、使用的问题：优先读取内置文档，再提炼答案。"
+description: "回答用户关于 GLClaw 安装、配置、使用的问题：优先读取内置文档，再提炼答案。"
 metadata:
   builtin_skill_version: "1.0"
-  mateclaw:
+  glclaw:
     emoji: "🧭"
     requires: {}
 ---
 
-# MateClaw 使用问答指南
+# GLClaw 使用问答指南
 
-当用户询问 **MateClaw 的安装、配置、功能使用、架构原理** 时，使用本 skill。
+当用户询问 **GLClaw 的安装、配置、功能使用、架构原理** 时，使用本 skill。
 
 核心原则：
 
@@ -1137,7 +1137,7 @@ metadata:
 调用工具列出所有可用文档：
 
 ```tool
-readMateClawDoc(action="list")
+readGLClawDoc(action="list")
 ```
 
 ### 第二步：根据关键词匹配文档
@@ -1172,7 +1172,7 @@ readMateClawDoc(action="list")
 - 英文问题 → `en/<topic>.md`
 
 ```tool
-readMateClawDoc(action="read", path="zh/config.md")
+readGLClawDoc(action="read", path="zh/config.md")
 ```
 
 如果一个文档不够，可以读取多个相关文档。
@@ -1193,23 +1193,23 @@ readMateClawDoc(action="read", path="zh/config.md")
 ' WHERE id = 1000000011;
 
 UPDATE mate_skill SET skill_content = '---
-name: mateclaw_source_index
-description: "将用户问题中的主题、关键词映射到 MateClaw 文档路径与 Java 源码入口，减少盲目搜索。"
+name: glclaw_source_index
+description: "将用户问题中的主题、关键词映射到 GLClaw 文档路径与 Java 源码入口，减少盲目搜索。"
 metadata:
   builtin_skill_version: "1.0"
-  mateclaw:
+  glclaw:
     emoji: "🗂️"
     requires: {}
 ---
 
-# MateClaw 文档与源码速查
+# GLClaw 文档与源码速查
 
 回答 **安装、配置、行为原理** 类问题时，先 **按关键词归类**，再按下表 **打开 1～2 个最可能命中的路径** 阅读，避免长时间无目的遍历。
 
 ## 使用步骤
 
 1. 从用户问题中提取主题（对照下表左列或同类词）。
-2. **先读文档**：调用 `readMateClawDoc(action="read", path="zh/<专题>.md")` 或 `en/<专题>.md`。
+2. **先读文档**：调用 `readGLClawDoc(action="read", path="zh/<专题>.md")` 或 `en/<专题>.md`。
 3. 若文档不足以回答，再参考表中 **源码入口** 用 `readFile` 工具阅读源码。
 
 ## 主题 / 关键词 → 优先文档与源码
@@ -1217,7 +1217,7 @@ metadata:
 | 主题或关键词（示例） | 文档（docs/） | Java 源码入口（vip.mate.*） |
 |---------------------|-------------|---------------------------|
 | 安装、部署、Docker | `quickstart.md` | README.md, docker-compose.yml |
-| 项目介绍、架构 | `intro.md` | MateClaw_Design.md |
+| 项目介绍、架构 | `intro.md` | GLClaw_Design.md |
 | 配置、环境变量 | `config.md` | application.yml, config/ |
 | Agent、ReAct、状态机 | `agents.md` | agent/ReActAgent.java, agent/BaseAgent.java |
 | 工具、@Tool | `tools.md` | tool/builtin/, tool/ToolRegistry.java |
@@ -1227,9 +1227,9 @@ metadata:
 | 聊天、消息、SSE | `chat.md` | workspace/conversation/ |
 | 模型、Qwen、Ollama | `models.md` | llm/ |
 | 安全、JWT | `security.md` | auth/, tool/guard/ |
-| 控制台、前端 | `console.md` | mateclaw-ui/src/views/ |
+| 控制台、前端 | `console.md` | glclaw-ui/src/views/ |
 | 记忆、Memory | `memory.md` | memory/ |
-| 桌面应用 | `desktop.md` | mateclaw-desktop/ |
+| 桌面应用 | `desktop.md` | glclaw-desktop/ |
 | 报错、FAQ | `faq.md` | — |
 | 路线图 | `roadmap.md` | — |
 | 贡献、开发 | `contributing.md` | CLAUDE.md |
@@ -1237,7 +1237,7 @@ metadata:
 
 ## 约定
 
-- 文档通过 `readMateClawDoc` 工具读取，路径格式：`zh/<专题>.md` 或 `en/<专题>.md`
+- 文档通过 `readGLClawDoc` 工具读取，路径格式：`zh/<专题>.md` 或 `en/<专题>.md`
 - 表中 **源码入口** 为起点；应用 `readFile` 工具阅读，不要一次性通读大目录
 - 本 skill **不替代** 实际阅读：锁定候选路径后应立即读取并核对
 ' WHERE id = 1000000013;
@@ -1313,12 +1313,12 @@ MERGE INTO mate_cron_job (id, name, cron_expression, timezone, agent_id, task_ty
 KEY (id)
 VALUES (1000100012, '记忆整合', '0 2 * * *', 'Asia/Shanghai', 1000000003, 'text', '请回顾你最近的 memory/ 日记文件，将反复出现的重要信息（用户偏好、稳定事实、经验教训、工作流）提炼整合到 MEMORY.md 中。保留日记原文不动，只更新 MEMORY.md。完成后简要说明做了哪些整合。', NULL, TRUE, NOW(), NOW(), 0);
 
--- ==================== 工作区文件种子数据（参考 MateClaw md_files/zh） ====================
+-- ==================== 工作区文件种子数据（参考 GLClaw md_files/zh） ====================
 -- 每个 Agent 拥有独立的工作区文档集合：AGENTS.md / SOUL.md / PROFILE.md / MEMORY.md
 -- AGENTS.md / SOUL.md / PROFILE.md / MEMORY.md 默认 enabled=TRUE，纳入系统提示词构建
 -- PROFILE.md / MEMORY.md 提供轻量长期记忆；daily note 仍按需创建为 memory/YYYY-MM-DD.md
 --
--- Agent 1000000001 (MateClaw Assistant)
+-- Agent 1000000001 (GLClaw Assistant)
 
 MERGE INTO mate_workspace_file (id, agent_id, filename, content, file_size, enabled, sort_order, create_time, update_time, deleted)
 KEY (id)
@@ -1326,7 +1326,7 @@ VALUES (
     1000200001, 1000000001, 'AGENTS.md',
     '## 记忆
 
-MateClaw 的持久记忆基于数据库工作区文件，而不是本地磁盘文件系统。当前 Agent 的长期上下文由以下文档组成：
+GLClaw 的持久记忆基于数据库工作区文件，而不是本地磁盘文件系统。当前 Agent 的长期上下文由以下文档组成：
 
 - `PROFILE.md`：用户画像、偏好、协作方式、稳定身份信息
 - `MEMORY.md`：长期记忆、稳定事实、经验教训、工作流、反复出现的规律
@@ -1551,7 +1551,7 @@ VALUES (
     1000200011, 1000000002, 'AGENTS.md',
     '## 记忆
 
-MateClaw 的记忆存储在数据库工作区文件中。对任务规划器来说，记忆不是装饰，而是避免重复规划和保持策略连续性的基础。
+GLClaw 的记忆存储在数据库工作区文件中。对任务规划器来说，记忆不是装饰，而是避免重复规划和保持策略连续性的基础。
 
 - `PROFILE.md`：用户偏好、沟通方式、协作习惯
 - `MEMORY.md`：长期约束、规划经验、稳定决策模式、常见执行套路

@@ -27,13 +27,15 @@ import java.util.Set;
  *
  * <p>安全说明：
  * <ul>
- *   <li>URL 经过 {@link UrlSafetyChecker} SSRF 防护检查</li>
+ *   <li>URL 经过 {@link UrlSafetyChecker} SSRF 防护检查（初始 URL + 所有重定向目标）</li>
  *   <li>仅允许 http:// 和 https:// 协议</li>
- *   <li>禁止访问内网地址、云元数据端点等</li>
- *   <li>响应体最大 100KB，超时 15 秒</li>
+ *   <li>禁止访问内网地址、云元数据端点、本地回环地址等</li>
+ *   <li>手动处理重定向链（最多 5 次），每次跳转都进行安全校验</li>
+ *   <li>响应体最大 100KB，超时 15 秒（可配置 1-30 秒）</li>
+ *   <li>支持三种提取模式：text（纯文本）、markdown、html（原始源码）</li>
  * </ul>
  *
- * @author MateClaw Team
+ * @author GLClaw Team
  */
 @Slf4j
 @Component
@@ -72,6 +74,8 @@ public class WebFetchTool {
             - text (default): clean plain text with basic structure preserved
             - markdown: best-effort markdown conversion (headings, links, images)
             - html: raw HTML source
+            
+            Security: All URLs and redirect targets are validated against SSRF attacks.
             """)
     public String web_fetch(
             @ToolParam(description = "Full URL to fetch (must start with http:// or https://)") String url,
@@ -87,7 +91,7 @@ public class WebFetchTool {
         }
         String trimmedUrl = url.trim();
 
-        // SSRF 安全校验
+        // SSRF 安全校验（初始 URL）
         try {
             UrlSafetyChecker.check(trimmedUrl);
         } catch (SecurityException e) {
@@ -106,19 +110,75 @@ public class WebFetchTool {
             mode = "text";
         }
 
-        // ── 2. 发起 HTTP 请求 ──
+        // ── 2. 发起 HTTP 请求（手动处理重定向以确保安全） ──
         log.info("[WebFetch] Fetching URL: {}, mode={}, timeout={}ms", trimmedUrl, mode, timeout);
 
         HttpResponse response;
+        String finalUrl = trimmedUrl;
+        int redirectCount = 0;
+        final int MAX_REDIRECTS = 5;
+
         try {
+            // 禁用自动重定向，手动校验每个跳转目标
             response = HttpRequest.get(trimmedUrl)
                     .header("User-Agent", USER_AGENT)
                     .header("Accept", "text/html,application/xhtml+xml,text/plain,*/*;q=0.8")
                     .timeout(timeout)
-                    .setFollowRedirects(true)
+                    .setFollowRedirects(false)  // 关键：禁用自动重定向
                     .execute();
+
+            // 手动处理重定向链
+            while (isRedirect(response.getStatus()) && redirectCount < MAX_REDIRECTS) {
+                String location = response.header("Location");
+                if (location == null || location.isBlank()) {
+                    log.warn("[WebFetch] Redirect without Location header at {}", finalUrl);
+                    break;
+                }
+
+                // 解析重定向目标（可能是相对路径）
+                String redirectUrl = resolveRedirectUrl(finalUrl, location);
+                log.info("[WebFetch] Redirect {} -> {} (count={})", finalUrl, redirectUrl, redirectCount + 1);
+
+                // SSRF 校验重定向目标
+                try {
+                    UrlSafetyChecker.check(redirectUrl);
+                } catch (SecurityException e) {
+                    log.warn("[WebFetch] SSRF blocked on redirect: {} — {}", redirectUrl, e.getMessage());
+                    return errorResult(trimmedUrl, 
+                            "Redirect blocked to unsafe target: " + redirectUrl + " — " + e.getMessage());
+                }
+
+                // 额外检查：如果重定向目标是 IP 地址，进行二次校验
+                String redirectHost = extractHost(redirectUrl);
+                if (redirectHost != null && isIpAddress(redirectHost)) {
+                    if (UrlSafetyChecker.isUnsafeIp(redirectHost)) {
+                        log.warn("[WebFetch] Redirect blocked to unsafe IP: {}", redirectHost);
+                        return errorResult(trimmedUrl,
+                                "Redirect blocked to restricted IP: " + redirectHost);
+                    }
+                }
+
+                finalUrl = redirectUrl;
+                redirectCount++;
+
+                // 发起下一次请求
+                response.close();  // 关闭前一个响应
+                response = HttpRequest.get(finalUrl)
+                        .header("User-Agent", USER_AGENT)
+                        .header("Accept", "text/html,application/xhtml+xml,text/plain,*/*;q=0.8")
+                        .timeout(timeout)
+                        .setFollowRedirects(false)
+                        .execute();
+            }
+
+            if (redirectCount >= MAX_REDIRECTS) {
+                log.warn("[WebFetch] Max redirects exceeded: {}", trimmedUrl);
+                return errorResult(trimmedUrl, 
+                        "Too many redirects (max " + MAX_REDIRECTS + ")");
+            }
+
         } catch (Exception e) {
-            log.error("[WebFetch] HTTP request failed: {} — {}", trimmedUrl, e.getMessage());
+            log.error("[WebFetch] HTTP request failed: {} — {}", finalUrl, e.getMessage());
             return errorResult(trimmedUrl, "HTTP request failed: " + e.getMessage());
         }
 
@@ -130,12 +190,19 @@ public class WebFetchTool {
         }
         result.set("statusCode", statusCode);
         result.set("contentType", contentType);
+        
+        // 记录最终 URL（如果有重定向）
+        if (!finalUrl.equals(trimmedUrl)) {
+            result.set("finalUrl", finalUrl);
+            result.set("redirectCount", redirectCount);
+        }
 
         if (statusCode < 200 || statusCode >= 400) {
             if (statusCode >= 300 && statusCode < 400) {
                 String location = response.header("Location");
                 result.set("redirectLocation", location != null ? location : "");
             }
+            response.close();
             return errorResult(trimmedUrl, "HTTP " + statusCode);
         }
 
@@ -199,10 +266,72 @@ public class WebFetchTool {
         result.set("extractMode", actualMode);
         result.set("content", content);
 
-        log.info("[WebFetch] Fetched {}: status={}, contentType={}, length={}, mode={}",
-                trimmedUrl, statusCode, contentType, content.length(), actualMode);
+        log.info("[WebFetch] Fetched {}: status={}, contentType={}, length={}, mode={}, redirects={}",
+                finalUrl, statusCode, contentType, content.length(), actualMode, redirectCount);
 
+        response.close();
         return JSONUtil.toJsonPrettyStr(result);
+    }
+
+    // ──────────────── 重定向处理方法 ────────────────
+
+    /**
+     * 判断 HTTP 状态码是否为重定向
+     */
+    private static boolean isRedirect(int statusCode) {
+        return statusCode == 301 || statusCode == 302 || statusCode == 303 ||
+               statusCode == 307 || statusCode == 308;
+    }
+
+    /**
+     * 解析重定向 URL（处理相对路径和绝对路径）
+     */
+    private static String resolveRedirectUrl(String baseUrl, String location) {
+        try {
+            java.net.URI baseUri = java.net.URI.create(baseUrl);
+            java.net.URI locationUri = java.net.URI.create(location);
+            
+            // 如果是相对路径，解析为绝对路径
+            if (!locationUri.isAbsolute()) {
+                locationUri = baseUri.resolve(locationUri);
+            }
+            
+            return locationUri.toString();
+        } catch (Exception e) {
+            log.warn("[WebFetch] Failed to resolve redirect URL: {} + {} — {}", 
+                    baseUrl, location, e.getMessage());
+            return location;  // 降级：直接返回原始 location
+        }
+    }
+
+    /**
+     * 从 URL 中提取 host
+     */
+    private static String extractHost(String url) {
+        try {
+            java.net.URI uri = java.net.URI.create(url);
+            return uri.getHost();
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    /**
+     * 判断字符串是否为 IP 地址（IPv4 或 IPv6）
+     */
+    private static boolean isIpAddress(String host) {
+        if (host == null || host.isBlank()) {
+            return false;
+        }
+        // IPv4 简单检查
+        if (host.matches("\\d{1,3}(\\.\\d{1,3}){3}")) {
+            return true;
+        }
+        // IPv6 简单检查（包含冒号）
+        if (host.contains(":") || (host.startsWith("[") && host.endsWith("]"))) {
+            return true;
+        }
+        return false;
     }
 
     // ──────────────── HTML 提取方法 ────────────────

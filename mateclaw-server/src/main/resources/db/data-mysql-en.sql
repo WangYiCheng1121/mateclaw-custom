@@ -526,7 +526,7 @@ ON DUPLICATE KEY UPDATE name=VALUES(name), display_name=VALUES(display_name), de
 
 -- Built-in tool: GLClaw Docs
 INSERT INTO mate_tool (id, name, display_name, description, tool_type, bean_name, icon, enabled, builtin, create_time, update_time, deleted)
-VALUES (1000000013, 'GLClawDocTool', 'GLClaw Docs', 'Read built-in GLClaw project documentation. action=list to list docs, action=read to read specific doc.', 'builtin', 'mateClawDocTool', '📚', TRUE, TRUE, NOW(), NOW(), 0)
+VALUES (1000000013, 'GLClawDocTool', 'GLClaw Docs', 'Read built-in GLClaw project documentation. action=list to list docs, action=read to read specific doc.', 'builtin', 'glClawDocTool', '📚', TRUE, TRUE, NOW(), NOW(), 0)
 ON DUPLICATE KEY UPDATE name=VALUES(name), display_name=VALUES(display_name), description=VALUES(description), tool_type=VALUES(tool_type), bean_name=VALUES(bean_name), icon=VALUES(icon), enabled=VALUES(enabled), builtin=VALUES(builtin), update_time=VALUES(update_time), deleted=VALUES(deleted);
 
 -- Built-in tool: Agent Delegation (Multi-Agent Collaboration)
@@ -638,79 +638,79 @@ ON DUPLICATE KEY UPDATE name=VALUES(name), description=VALUES(description), tran
 -- be removed in the next release. New skills should NOT be added here — drop a
 -- SKILL.md under skills/<name>/ and the seed service will register it.
 INSERT INTO mate_skill (id, name, description, skill_type, icon, version, author, config_json, enabled, builtin, tags, create_time, update_time, deleted)
-VALUES (1000000001, 'cron', 'Cron job management. Create, query, pause, resume, delete tasks via commands or console. Execute on schedule and send results to channels.', 'builtin', '⏰', '1.0.0', 'GLClaw', '{"upstream":"mateclaw","entryFile":"SKILL.md"}', TRUE, TRUE, 'cron,schedule,automation', NOW(), NOW(), 0)
+VALUES (1000000001, 'cron', 'Cron job management. Create, query, pause, resume, delete tasks via commands or console. Execute on schedule and send results to channels.', 'builtin', '⏰', '1.0.0', 'GLClaw', '{"upstream":"glclaw","entryFile":"SKILL.md"}', TRUE, TRUE, 'cron,schedule,automation', NOW(), NOW(), 0)
 ON DUPLICATE KEY UPDATE name=VALUES(name), description=VALUES(description), skill_type=VALUES(skill_type), icon=VALUES(icon), version=VALUES(version), author=VALUES(author), config_json=VALUES(config_json), enabled=VALUES(enabled), builtin=VALUES(builtin), tags=VALUES(tags), update_time=VALUES(update_time), deleted=VALUES(deleted);
 
 INSERT INTO mate_skill (id, name, description, skill_type, icon, version, author, config_json, enabled, builtin, tags, create_time, update_time, deleted)
-VALUES (1000000002, 'file_reader', 'Read and summarize text files such as txt, md, json, csv, log, and code files. PDF and Office files are handled by dedicated skills.', 'builtin', '📄', '1.0.0', 'GLClaw', '{"upstream":"mateclaw","entryFile":"SKILL.md"}', TRUE, TRUE, 'file,reader,text,summary', NOW(), NOW(), 0)
+VALUES (1000000002, 'file_reader', 'Read and summarize text files such as txt, md, json, csv, log, and code files. PDF and Office files are handled by dedicated skills.', 'builtin', '📄', '1.0.0', 'GLClaw', '{"upstream":"glclaw","entryFile":"SKILL.md"}', TRUE, TRUE, 'file,reader,text,summary', NOW(), NOW(), 0)
 ON DUPLICATE KEY UPDATE name=VALUES(name), description=VALUES(description), skill_type=VALUES(skill_type), icon=VALUES(icon), version=VALUES(version), author=VALUES(author), config_json=VALUES(config_json), enabled=VALUES(enabled), builtin=VALUES(builtin), tags=VALUES(tags), update_time=VALUES(update_time), deleted=VALUES(deleted);
 
 INSERT INTO mate_skill (id, name, description, skill_type, icon, version, author, config_json, enabled, builtin, tags, create_time, update_time, deleted)
-VALUES (1000000003, 'dingtalk_channel_connect', 'Assist with DingTalk channel setup, supporting visible browser, login pause, and pre-publish checks.', 'builtin', '🤖', '1.0.0', 'GLClaw', '{"upstream":"mateclaw","entryFile":"SKILL.md"}', TRUE, TRUE, 'dingtalk,channel,browser,automation', NOW(), NOW(), 0)
+VALUES (1000000003, 'dingtalk_channel_connect', 'Assist with DingTalk channel setup, supporting visible browser, login pause, and pre-publish checks.', 'builtin', '🤖', '1.0.0', 'GLClaw', '{"upstream":"glclaw","entryFile":"SKILL.md"}', TRUE, TRUE, 'dingtalk,channel,browser,automation', NOW(), NOW(), 0)
 ON DUPLICATE KEY UPDATE name=VALUES(name), description=VALUES(description), skill_type=VALUES(skill_type), icon=VALUES(icon), version=VALUES(version), author=VALUES(author), config_json=VALUES(config_json), enabled=VALUES(enabled), builtin=VALUES(builtin), tags=VALUES(tags), update_time=VALUES(update_time), deleted=VALUES(deleted);
 
 INSERT INTO mate_skill (id, name, description, skill_type, icon, version, author, config_json, enabled, builtin, tags, create_time, update_time, deleted)
-VALUES (1000000004, 'himalaya', 'Manage emails via CLI with multi-account IMAP/SMTP, search, read, reply, and attachment handling.', 'builtin', '📧', '1.0.0', 'GLClaw', '{"upstream":"mateclaw","entryFile":"SKILL.md","homepage":"https://github.com/pimalaya/himalaya"}', TRUE, TRUE, 'email,imap,smtp,cli', NOW(), NOW(), 0)
+VALUES (1000000004, 'himalaya', 'Manage emails via CLI with multi-account IMAP/SMTP, search, read, reply, and attachment handling.', 'builtin', '📧', '1.0.0', 'GLClaw', '{"upstream":"glclaw","entryFile":"SKILL.md","homepage":"https://github.com/pimalaya/himalaya"}', TRUE, TRUE, 'email,imap,smtp,cli', NOW(), NOW(), 0)
 ON DUPLICATE KEY UPDATE name=VALUES(name), description=VALUES(description), skill_type=VALUES(skill_type), icon=VALUES(icon), version=VALUES(version), author=VALUES(author), config_json=VALUES(config_json), enabled=VALUES(enabled), builtin=VALUES(builtin), tags=VALUES(tags), update_time=VALUES(update_time), deleted=VALUES(deleted);
 
 INSERT INTO mate_skill (id, name, description, skill_type, icon, version, author, config_json, enabled, builtin, tags, create_time, update_time, deleted)
-VALUES (1000000005, 'news', 'Query latest news from the internet. Supports politics, finance, society, international, tech, sports, entertainment categories. Auto-adapts to built-in and tool search.', 'builtin', '📰', '2.0.0', 'GLClaw', '{"upstream":"mateclaw","entryFile":"SKILL.md"}', TRUE, TRUE, 'news,web,search,summary', NOW(), NOW(), 0)
+VALUES (1000000005, 'news', 'Query latest news from the internet. Supports politics, finance, society, international, tech, sports, entertainment categories. Auto-adapts to built-in and tool search.', 'builtin', '📰', '2.0.0', 'GLClaw', '{"upstream":"glclaw","entryFile":"SKILL.md"}', TRUE, TRUE, 'news,web,search,summary', NOW(), NOW(), 0)
 ON DUPLICATE KEY UPDATE name=VALUES(name), description=VALUES(description), skill_type=VALUES(skill_type), icon=VALUES(icon), version=VALUES(version), author=VALUES(author), config_json=VALUES(config_json), enabled=VALUES(enabled), builtin=VALUES(builtin), tags=VALUES(tags), update_time=VALUES(update_time), deleted=VALUES(deleted);
 
 INSERT INTO mate_skill (id, name, description, skill_type, icon, version, author, config_json, enabled, builtin, tags, create_time, update_time, deleted)
-VALUES (1000000006, 'pdf', 'PDF operations: read, extract text and tables, merge/split, rotate, watermark, fill forms, encrypt/decrypt, OCR. Includes scripts for form field extraction, filling, bounding box validation, and PDF-to-image conversion.', 'builtin', '📕', '1.0.0', 'Anthropic Skills', '{"upstream":"mateclaw","entryFile":"SKILL.md"}', TRUE, TRUE, 'pdf,ocr,forms,document', NOW(), NOW(), 0)
+VALUES (1000000006, 'pdf', 'PDF operations: read, extract text and tables, merge/split, rotate, watermark, fill forms, encrypt/decrypt, OCR. Includes scripts for form field extraction, filling, bounding box validation, and PDF-to-image conversion.', 'builtin', '📕', '1.0.0', 'Anthropic Skills', '{"upstream":"glclaw","entryFile":"SKILL.md"}', TRUE, TRUE, 'pdf,ocr,forms,document', NOW(), NOW(), 0)
 ON DUPLICATE KEY UPDATE name=VALUES(name), description=VALUES(description), skill_type=VALUES(skill_type), icon=VALUES(icon), version=VALUES(version), author=VALUES(author), config_json=VALUES(config_json), enabled=VALUES(enabled), builtin=VALUES(builtin), tags=VALUES(tags), update_time=VALUES(update_time), deleted=VALUES(deleted);
 
 INSERT INTO mate_skill (id, name, description, skill_type, icon, version, author, config_json, enabled, builtin, tags, create_time, update_time, deleted)
-VALUES (1000000007, 'docx', 'Create, read, and edit Word documents with TOC, headers/footers, tables, images, revisions and comments. Includes scripts for XML unpack/pack, schema validation, tracked changes, and LibreOffice integration.', 'builtin', '📝', '1.0.0', 'Anthropic Skills', '{"upstream":"mateclaw","entryFile":"SKILL.md"}', TRUE, TRUE, 'docx,word,document,office', NOW(), NOW(), 0)
+VALUES (1000000007, 'docx', 'Create, read, and edit Word documents with TOC, headers/footers, tables, images, revisions and comments. Includes scripts for XML unpack/pack, schema validation, tracked changes, and LibreOffice integration.', 'builtin', '📝', '1.0.0', 'Anthropic Skills', '{"upstream":"glclaw","entryFile":"SKILL.md"}', TRUE, TRUE, 'docx,word,document,office', NOW(), NOW(), 0)
 ON DUPLICATE KEY UPDATE name=VALUES(name), description=VALUES(description), skill_type=VALUES(skill_type), icon=VALUES(icon), version=VALUES(version), author=VALUES(author), config_json=VALUES(config_json), enabled=VALUES(enabled), builtin=VALUES(builtin), tags=VALUES(tags), update_time=VALUES(update_time), deleted=VALUES(deleted);
 
 INSERT INTO mate_skill (id, name, description, skill_type, icon, version, author, config_json, enabled, builtin, tags, create_time, update_time, deleted)
-VALUES (1000000008, 'pptx', 'Create, read, and edit PowerPoint presentations with templates, layouts, notes and comments. Includes scripts for slide manipulation, thumbnail generation, XML validation, and LibreOffice integration.', 'builtin', '📊', '1.0.0', 'Anthropic Skills', '{"upstream":"mateclaw","entryFile":"SKILL.md"}', TRUE, TRUE, 'pptx,presentation,slides,office', NOW(), NOW(), 0)
+VALUES (1000000008, 'pptx', 'Create, read, and edit PowerPoint presentations with templates, layouts, notes and comments. Includes scripts for slide manipulation, thumbnail generation, XML validation, and LibreOffice integration.', 'builtin', '📊', '1.0.0', 'Anthropic Skills', '{"upstream":"glclaw","entryFile":"SKILL.md"}', TRUE, TRUE, 'pptx,presentation,slides,office', NOW(), NOW(), 0)
 ON DUPLICATE KEY UPDATE name=VALUES(name), description=VALUES(description), skill_type=VALUES(skill_type), icon=VALUES(icon), version=VALUES(version), author=VALUES(author), config_json=VALUES(config_json), enabled=VALUES(enabled), builtin=VALUES(builtin), tags=VALUES(tags), update_time=VALUES(update_time), deleted=VALUES(deleted);
 
 INSERT INTO mate_skill (id, name, description, skill_type, icon, version, author, config_json, enabled, builtin, tags, create_time, update_time, deleted)
-VALUES (1000000009, 'xlsx', 'Read, edit, create and format spreadsheets with formula support, data cleaning and analysis. Includes scripts for formula recalculation, XML unpack/pack, schema validation, and LibreOffice integration.', 'builtin', '📈', '1.0.0', 'Anthropic Skills', '{"upstream":"mateclaw","entryFile":"SKILL.md"}', TRUE, TRUE, 'xlsx,excel,csv,spreadsheet,data', NOW(), NOW(), 0)
+VALUES (1000000009, 'xlsx', 'Read, edit, create and format spreadsheets with formula support, data cleaning and analysis. Includes scripts for formula recalculation, XML unpack/pack, schema validation, and LibreOffice integration.', 'builtin', '📈', '1.0.0', 'Anthropic Skills', '{"upstream":"glclaw","entryFile":"SKILL.md"}', TRUE, TRUE, 'xlsx,excel,csv,spreadsheet,data', NOW(), NOW(), 0)
 ON DUPLICATE KEY UPDATE name=VALUES(name), description=VALUES(description), skill_type=VALUES(skill_type), icon=VALUES(icon), version=VALUES(version), author=VALUES(author), config_json=VALUES(config_json), enabled=VALUES(enabled), builtin=VALUES(builtin), tags=VALUES(tags), update_time=VALUES(update_time), deleted=VALUES(deleted);
 
 INSERT INTO mate_skill (id, name, description, skill_type, icon, version, author, config_json, enabled, builtin, tags, create_time, update_time, deleted)
-VALUES (1000000010, 'browser_visible', 'Launch a visible browser window for demos, debugging, or scenarios requiring human interaction.', 'builtin', '🖥️', '1.0.0', 'GLClaw', '{"upstream":"mateclaw","entryFile":"SKILL.md"}', TRUE, TRUE, 'browser,visible,headed,automation', NOW(), NOW(), 0)
+VALUES (1000000010, 'browser_visible', 'Launch a visible browser window for demos, debugging, or scenarios requiring human interaction.', 'builtin', '🖥️', '1.0.0', 'GLClaw', '{"upstream":"glclaw","entryFile":"SKILL.md"}', TRUE, TRUE, 'browser,visible,headed,automation', NOW(), NOW(), 0)
 ON DUPLICATE KEY UPDATE name=VALUES(name), description=VALUES(description), skill_type=VALUES(skill_type), icon=VALUES(icon), version=VALUES(version), author=VALUES(author), config_json=VALUES(config_json), enabled=VALUES(enabled), builtin=VALUES(builtin), tags=VALUES(tags), update_time=VALUES(update_time), deleted=VALUES(deleted);
 
 INSERT INTO mate_skill (id, name, description, skill_type, icon, version, author, config_json, enabled, builtin, tags, create_time, update_time, deleted)
-VALUES (1000000012, 'browser_cdp', 'Connect or launch Chrome via CDP for remote debugging, browser sharing, or external tool collaboration.', 'builtin', '🔌', '1.0.0', 'GLClaw', '{"upstream":"mateclaw","entryFile":"SKILL.md"}', TRUE, TRUE, 'browser,cdp,chrome,debugging,automation', NOW(), NOW(), 0)
+VALUES (1000000012, 'browser_cdp', 'Connect or launch Chrome via CDP for remote debugging, browser sharing, or external tool collaboration.', 'builtin', '🔌', '1.0.0', 'GLClaw', '{"upstream":"glclaw","entryFile":"SKILL.md"}', TRUE, TRUE, 'browser,cdp,chrome,debugging,automation', NOW(), NOW(), 0)
 ON DUPLICATE KEY UPDATE name=VALUES(name), description=VALUES(description), skill_type=VALUES(skill_type), icon=VALUES(icon), version=VALUES(version), author=VALUES(author), config_json=VALUES(config_json), enabled=VALUES(enabled), builtin=VALUES(builtin), tags=VALUES(tags), update_time=VALUES(update_time), deleted=VALUES(deleted);
 
 INSERT INTO mate_skill (id, name, description, skill_type, icon, version, author, config_json, enabled, builtin, tags, create_time, update_time, deleted)
-VALUES (1000000011, 'guidance', 'Answer user questions about GLClaw installation and configuration by reading local docs first.', 'builtin', '🧭', '1.0.0', 'GLClaw', '{"upstream":"mateclaw","entryFile":"SKILL.md"}', TRUE, TRUE, 'docs,guidance,configuration,qa', NOW(), NOW(), 0)
+VALUES (1000000011, 'guidance', 'Answer user questions about GLClaw installation and configuration by reading local docs first.', 'builtin', '🧭', '1.0.0', 'GLClaw', '{"upstream":"glclaw","entryFile":"SKILL.md"}', TRUE, TRUE, 'docs,guidance,configuration,qa', NOW(), NOW(), 0)
 ON DUPLICATE KEY UPDATE name=VALUES(name), description=VALUES(description), skill_type=VALUES(skill_type), icon=VALUES(icon), version=VALUES(version), author=VALUES(author), config_json=VALUES(config_json), enabled=VALUES(enabled), builtin=VALUES(builtin), tags=VALUES(tags), update_time=VALUES(update_time), deleted=VALUES(deleted);
 
 INSERT INTO mate_skill (id, name, description, skill_type, icon, version, author, config_json, enabled, builtin, tags, create_time, update_time, deleted)
-VALUES (1000000013, 'mateclaw_source_index', 'Map user questions to GLClaw doc paths and source code entry points to reduce blind searching.', 'builtin', '🗂️', '1.0.0', 'GLClaw', '{"upstream":"mateclaw","entryFile":"SKILL.md"}', TRUE, TRUE, 'docs,index,source,qa', NOW(), NOW(), 0)
+VALUES (1000000013, 'glclaw_source_index', 'Map user questions to GLClaw doc paths and source code entry points to reduce blind searching.', 'builtin', '🗂️', '1.0.0', 'GLClaw', '{"upstream":"glclaw","entryFile":"SKILL.md"}', TRUE, TRUE, 'docs,index,source,qa', NOW(), NOW(), 0)
 ON DUPLICATE KEY UPDATE name=VALUES(name), description=VALUES(description), skill_type=VALUES(skill_type), icon=VALUES(icon), version=VALUES(version), author=VALUES(author), config_json=VALUES(config_json), enabled=VALUES(enabled), builtin=VALUES(builtin), tags=VALUES(tags), update_time=VALUES(update_time), deleted=VALUES(deleted);
 
 INSERT INTO mate_skill (id, name, description, skill_type, icon, version, author, config_json, enabled, builtin, tags, create_time, update_time, deleted)
-VALUES (1000000014, 'sql_query', 'Query databases using natural language. Discover schemas, generate SQL, and execute read-only queries against configured external datasources.', 'builtin', '📊', '1.0.0', 'GLClaw', '{"upstream":"mateclaw","entryFile":"SKILL.md"}', TRUE, TRUE, 'sql,database,query,data', NOW(), NOW(), 0)
+VALUES (1000000014, 'sql_query', 'Query databases using natural language. Discover schemas, generate SQL, and execute read-only queries against configured external datasources.', 'builtin', '📊', '1.0.0', 'GLClaw', '{"upstream":"glclaw","entryFile":"SKILL.md"}', TRUE, TRUE, 'sql,database,query,data', NOW(), NOW(), 0)
 ON DUPLICATE KEY UPDATE name=VALUES(name), description=VALUES(description), skill_type=VALUES(skill_type), icon=VALUES(icon), version=VALUES(version), author=VALUES(author), config_json=VALUES(config_json), enabled=VALUES(enabled), builtin=VALUES(builtin), tags=VALUES(tags), update_time=VALUES(update_time), deleted=VALUES(deleted);
 
 INSERT INTO mate_skill (id, name, description, skill_type, icon, version, author, config_json, enabled, builtin, tags, create_time, update_time, deleted)
-VALUES (1000000015, 'steve_jobs_perspective', 'Steve Jobs thinking OS. Analyze products, evaluate decisions, and give feedback through Jobs'' perspective, using his six mental models and distinctive expression style.', 'builtin', '🍎', '1.0.0', 'GLClaw', '{"upstream":"mateclaw","entryFile":"SKILL.md"}', TRUE, TRUE, 'persona,jobs,product,strategy,thinking', NOW(), NOW(), 0)
+VALUES (1000000015, 'steve_jobs_perspective', 'Steve Jobs thinking OS. Analyze products, evaluate decisions, and give feedback through Jobs'' perspective, using his six mental models and distinctive expression style.', 'builtin', '🍎', '1.0.0', 'GLClaw', '{"upstream":"glclaw","entryFile":"SKILL.md"}', TRUE, TRUE, 'persona,jobs,product,strategy,thinking', NOW(), NOW(), 0)
 ON DUPLICATE KEY UPDATE name=VALUES(name), description=VALUES(description), skill_type=VALUES(skill_type), icon=VALUES(icon), version=VALUES(version), author=VALUES(author), config_json=VALUES(config_json), enabled=VALUES(enabled), builtin=VALUES(builtin), tags=VALUES(tags), update_time=VALUES(update_time), deleted=VALUES(deleted);
 
 INSERT INTO mate_skill (id, name, description, skill_type, icon, version, author, config_json, enabled, builtin, tags, create_time, update_time, deleted)
-VALUES (1000000016, 'make_plan', 'When a task requires multi-step breakdown or uncertain execution path, request a step-by-step actionable plan from a stronger Agent, then execute it yourself.', 'builtin', '🗺️', '1.3.0', 'GLClaw', '{"upstream":"mateclaw","entryFile":"SKILL.md"}', TRUE, TRUE, 'plan,delegate,agent,collaboration', NOW(), NOW(), 0)
+VALUES (1000000016, 'make_plan', 'When a task requires multi-step breakdown or uncertain execution path, request a step-by-step actionable plan from a stronger Agent, then execute it yourself.', 'builtin', '🗺️', '1.3.0', 'GLClaw', '{"upstream":"glclaw","entryFile":"SKILL.md"}', TRUE, TRUE, 'plan,delegate,agent,collaboration', NOW(), NOW(), 0)
 ON DUPLICATE KEY UPDATE name=VALUES(name), description=VALUES(description), skill_type=VALUES(skill_type), icon=VALUES(icon), version=VALUES(version), author=VALUES(author), config_json=VALUES(config_json), enabled=VALUES(enabled), builtin=VALUES(builtin), tags=VALUES(tags), update_time=VALUES(update_time), deleted=VALUES(deleted);
 
 INSERT INTO mate_skill (id, name, description, skill_type, icon, version, author, config_json, enabled, builtin, tags, create_time, update_time, deleted)
-VALUES (1000000017, 'chat_with_agent', 'When you need to consult another Agent, seek help, or the user explicitly requests an Agent to participate, use this skill for single or parallel delegation.', 'builtin', '💬', '1.2.0', 'GLClaw', '{"upstream":"mateclaw","entryFile":"SKILL.md"}', TRUE, TRUE, 'agent,chat,collaborate,delegate', NOW(), NOW(), 0)
+VALUES (1000000017, 'chat_with_agent', 'When you need to consult another Agent, seek help, or the user explicitly requests an Agent to participate, use this skill for single or parallel delegation.', 'builtin', '💬', '1.2.0', 'GLClaw', '{"upstream":"glclaw","entryFile":"SKILL.md"}', TRUE, TRUE, 'agent,chat,collaborate,delegate', NOW(), NOW(), 0)
 ON DUPLICATE KEY UPDATE name=VALUES(name), description=VALUES(description), skill_type=VALUES(skill_type), icon=VALUES(icon), version=VALUES(version), author=VALUES(author), config_json=VALUES(config_json), enabled=VALUES(enabled), builtin=VALUES(builtin), tags=VALUES(tags), update_time=VALUES(update_time), deleted=VALUES(deleted);
 
 INSERT INTO mate_skill (id, name, description, skill_type, icon, version, author, config_json, enabled, builtin, tags, create_time, update_time, deleted)
-VALUES (1000000018, 'channel_message', 'Use when you need to proactively push one-way messages to users, sessions, or channels. For task completion notifications, scheduled reminders, and async result delivery.', 'builtin', '📤', '1.3.0', 'GLClaw', '{"upstream":"mateclaw","entryFile":"SKILL.md"}', TRUE, TRUE, 'channel,message,push,notify,dingtalk,feishu', NOW(), NOW(), 0)
+VALUES (1000000018, 'channel_message', 'Use when you need to proactively push one-way messages to users, sessions, or channels. For task completion notifications, scheduled reminders, and async result delivery.', 'builtin', '📤', '1.3.0', 'GLClaw', '{"upstream":"glclaw","entryFile":"SKILL.md"}', TRUE, TRUE, 'channel,message,push,notify,dingtalk,feishu', NOW(), NOW(), 0)
 ON DUPLICATE KEY UPDATE name=VALUES(name), description=VALUES(description), skill_type=VALUES(skill_type), icon=VALUES(icon), version=VALUES(version), author=VALUES(author), config_json=VALUES(config_json), enabled=VALUES(enabled), builtin=VALUES(builtin), tags=VALUES(tags), update_time=VALUES(update_time), deleted=VALUES(deleted);
 
 INSERT INTO mate_skill (id, name, description, skill_type, icon, version, author, config_json, enabled, builtin, tags, create_time, update_time, deleted)
-VALUES (1000000019, 'multi_agent_collaboration', 'When a task requires the professional capabilities of multiple Agents, orchestrate parallel or serial multi-agent collaboration and integrate results.', 'builtin', '🤝', '1.4.0', 'GLClaw', '{"upstream":"mateclaw","entryFile":"SKILL.md"}', TRUE, TRUE, 'multi-agent,collaboration,orchestration,parallel', NOW(), NOW(), 0)
+VALUES (1000000019, 'multi_agent_collaboration', 'When a task requires the professional capabilities of multiple Agents, orchestrate parallel or serial multi-agent collaboration and integrate results.', 'builtin', '🤝', '1.4.0', 'GLClaw', '{"upstream":"glclaw","entryFile":"SKILL.md"}', TRUE, TRUE, 'multi-agent,collaboration,orchestration,parallel', NOW(), NOW(), 0)
 ON DUPLICATE KEY UPDATE name=VALUES(name), description=VALUES(description), skill_type=VALUES(skill_type), icon=VALUES(icon), version=VALUES(version), author=VALUES(author), config_json=VALUES(config_json), enabled=VALUES(enabled), builtin=VALUES(builtin), tags=VALUES(tags), update_time=VALUES(update_time), deleted=VALUES(deleted);
 
 -- RFC-042 §2.2 — bilingual display names for the 19 builtin skills.
@@ -729,7 +729,7 @@ UPDATE mate_skill SET name_zh = 'Excel 表格',     name_en = 'Excel'           
 UPDATE mate_skill SET name_zh = '可见浏览器',     name_en = 'Visible Browser'          WHERE name = 'browser_visible';
 UPDATE mate_skill SET name_zh = '浏览器 CDP',     name_en = 'Browser CDP'              WHERE name = 'browser_cdp';
 UPDATE mate_skill SET name_zh = '安装指引',       name_en = 'Setup Guidance'           WHERE name = 'guidance';
-UPDATE mate_skill SET name_zh = '源码索引',       name_en = 'Source Index'             WHERE name = 'mateclaw_source_index';
+UPDATE mate_skill SET name_zh = '源码索引',       name_en = 'Source Index'             WHERE name = 'glclaw_source_index';
 UPDATE mate_skill SET name_zh = 'SQL 查询',       name_en = 'SQL Query'                WHERE name = 'sql_query';
 UPDATE mate_skill SET name_zh = '乔布斯视角',     name_en = 'Steve Jobs Perspective'   WHERE name = 'steve_jobs_perspective';
 UPDATE mate_skill SET name_zh = '制定计划',       name_en = 'Make Plan'                WHERE name = 'make_plan';
@@ -1075,7 +1075,7 @@ description: |
   Supports politics, finance, society, international, tech, sports, entertainment categories. Auto-adapts to built-in and tool search modes.
 metadata:
   builtin_skill_version: "2.0"
-  mateclaw:
+  glclaw:
     emoji: "📰"
     requires: {}
 ---
@@ -1163,7 +1163,7 @@ name: guidance
 description: "Answer user questions about GLClaw installation, configuration, and usage: read built-in docs first, then distill answers."
 metadata:
   builtin_skill_version: "1.0"
-  mateclaw:
+  glclaw:
     emoji: "🧭"
     requires: {}
 ---
@@ -1241,11 +1241,11 @@ Extract key information from docs, organize into actionable answers:
 ' WHERE id = 1000000011;
 
 UPDATE mate_skill SET skill_content = '---
-name: mateclaw_source_index
+name: glclaw_source_index
 description: "Map user question topics and keywords to GLClaw doc paths and Java source code entry points to reduce blind searching."
 metadata:
   builtin_skill_version: "1.0"
-  mateclaw:
+  glclaw:
     emoji: "🗂️"
     requires: {}
 ---
@@ -1275,9 +1275,9 @@ When answering **installation, configuration, behavior** questions, first **clas
 | chat, message, SSE | `chat.md` | workspace/conversation/ |
 | model, Qwen, Ollama | `models.md` | llm/ |
 | security, JWT | `security.md` | auth/, tool/guard/ |
-| console, frontend | `console.md` | mateclaw-ui/src/views/ |
+| console, frontend | `console.md` | glclaw-ui/src/views/ |
 | memory, Memory | `memory.md` | memory/ |
-| desktop app | `desktop.md` | mateclaw-desktop/ |
+| desktop app | `desktop.md` | glclaw-desktop/ |
 | error, FAQ | `faq.md` | — |
 | roadmap | `roadmap.md` | — |
 | contribute, develop | `contributing.md` | CLAUDE.md |

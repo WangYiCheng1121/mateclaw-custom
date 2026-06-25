@@ -17,6 +17,8 @@ import vip.mate.skill.runtime.SkillRuntimeService;
 import vip.mate.skill.secret.SkillSecretService;
 import vip.mate.skill.workspace.SkillFileSyncer;
 import vip.mate.skill.workspace.SkillWorkspaceManager;
+import vip.mate.workspace.core.model.WorkspaceEntity;
+import vip.mate.workspace.core.repository.WorkspaceMapper;
 
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
@@ -51,6 +53,7 @@ public class SkillSyncService {
     private final SkillSecretService skillSecretService;
     private final SkillFileSyncer skillFileSyncer;
     private final SkillFrontmatterParser frontmatterParser;
+    private final WorkspaceMapper workspaceMapper;
 
     /**
      * AES 加密密钥，与 {@link SkillSecretService} 共用同一把 key，
@@ -118,7 +121,10 @@ public class SkillSyncService {
     }
 
     /**
-     * 从平台同步技能数据
+     * 从平台同步技能数据。
+     * <p>
+     * 平台下发的技能会复制到<b>所有</b>现有工作区，每个工作区拥有一份独立副本，
+     * 可独立安装/启用/禁用。内置技能（builtin）不参与同步。
      *
      * @return 同步结果摘要
      */
@@ -136,6 +142,22 @@ public class SkillSyncService {
             return new SyncResult(false, "Platform unreachable", 0, 0, 0);
         }
 
+        // 获取所有未删除的工作区 ID
+        List<Long> workspaceIds = workspaceMapper.selectList(
+                new LambdaQueryWrapper<WorkspaceEntity>()
+                        .eq(WorkspaceEntity::getDeleted, 0)
+                        .select(WorkspaceEntity::getId))
+                .stream()
+                .map(WorkspaceEntity::getId)
+                .toList();
+
+        if (workspaceIds.isEmpty()) {
+            log.warn("No workspaces found, skip sync");
+            return new SyncResult(false, "No workspaces", 0, 0, 0);
+        }
+
+        log.info("Syncing to {} workspace(s): {}", workspaceIds.size(), workspaceIds);
+
         int inserted = 0, updated = 0, disabled = 0;
 
         // 获取本地所有非内置技能（内置技能不参与平台同步）
@@ -143,10 +165,16 @@ public class SkillSyncService {
                 new LambdaQueryWrapper<SkillEntity>()
                         .eq(SkillEntity::getBuiltin, false));
 
-        Map<String, SkillEntity> localByName = localSkills.stream()
-                .collect(java.util.stream.Collectors.toMap(SkillEntity::getName, s -> s, (a, b) -> a));
+        // 构建复合索引：(name, workspaceId) → SkillEntity
+        Map<String, Map<Long, SkillEntity>> localByNameAndWs = new HashMap<>();
+        for (SkillEntity s : localSkills) {
+            long wsId = s.getWorkspaceId() == null ? 1L : s.getWorkspaceId();
+            localByNameAndWs.computeIfAbsent(s.getName(), k -> new HashMap<>()).put(wsId, s);
+        }
 
         Set<String> remoteNames = new HashSet<>();
+        // 跟踪已完成一次性操作（工作区初始化、文件物化）的技能名，避免每个 workspace 重复执行
+        Set<String> onetimeDone = new HashSet<>();
 
         for (SkillEntity remote : remoteSkills) {
             // 跳过 builtin 技能：内置技能由种子数据管理，不参与平台同步
@@ -155,139 +183,158 @@ public class SkillSyncService {
             }
 
             remoteNames.add(remote.getName());
-            SkillEntity local = localByName.get(remote.getName());
 
-            if (local == null) {
-                // 新增：平台有，本地无
-                remote.setBuiltin(false);
-                // 平台同步过来的技能默认未安装且不启用，
-                // 需用户在前端执行"安装"操作后（installed=true）方可启用/禁用。
-                remote.setInstalled(false);
-                remote.setEnabled(false);
-                // 密钥：加密后存入 mate_skill.secret，同时写入 mate_skill_secret 供运行时使用
-                // 注意：storePlatformSecret 必须先于 encryptAndStoreSecret 调用，
-                // 因为后者会原地替换 remote.secret 为密文，导致 mate_skill_secret 二次加密。
-                String plaintextSecret = remote.getSecret();
-                encryptAndStoreSecret(remote);
-                skillMapper.insert(remote);
-                storePlatformSecret(remote.getId(), plaintextSecret);
-                // 将平台密钥映射到脚本声明的 env var 名称（如 BAIDU_API_KEY），
-                // 让脚本通过 os.getenv("BAIDU_API_KEY") 能拿到密钥。
-                storePlatformSecretUnderEnvVars(remote.getId(), remote.getSkillContent(), plaintextSecret);
-                // 初始化工作区
-                if (remote.getSkillContent() != null) {
-                    workspaceManager.initWorkspace(remote.getName(), remote.getSkillContent());
-                }
-                // 物化脚本/引用文件：将 configJson 中内联的 scripts/references
-                // 提取到 mate_skill_file 表并写入磁盘 workspace 目录
-                try {
-                    skillFileSyncer.syncOne(remote);
-                } catch (Exception e) {
-                    log.warn("Skill file sync failed for new skill '{}': {}", remote.getName(), e.getMessage());
-                }
-                inserted++;
-                log.debug("Synced new skill from platform: {}", remote.getName());
-            } else {
-                // === 平台恢复检测 ===
-                // 如果之前被标记为 REMOVED，现在重新出现在平台列表中 → 当作全新技能处理
-                boolean wasRemoved = "REMOVED".equals(local.getPlatformStatus());
-                if (wasRemoved) {
-                    // 重置为全新技能状态：清除标记、强制覆盖所有平台字段、重置安装状态
-                    local.setPlatformStatus(null);
-                    local.setInstalled(false);
-                    local.setEnabled(false);
-                    // 覆盖全部平台字段（不依赖 needsUpdate，强制全量覆盖）
-                    local.setDescription(remote.getDescription());
-                    local.setSkillContent(remote.getSkillContent());
-                    local.setVersion(remote.getVersion());
-                    local.setConfigJson(remote.getConfigJson());
-                    local.setIcon(remote.getIcon());
-                    local.setTags(remote.getTags());
-                    local.setAuthor(remote.getAuthor());
-                    local.setDescriptionZh(remote.getDescriptionZh());
-                    local.setNameZh(remote.getNameZh());
-                    local.setNameEn(remote.getNameEn());
-                    local.setCategoryId(remote.getCategoryId());
-                    local.setCategoryName(remote.getCategoryName());
-                    if (remote.getSecret() != null) {
-                        local.setSecret(encryptSecret(remote.getSecret()));
-                    } else {
-                        local.setSecret(null);
-                    }
-                    skillMapper.updateById(local);
-                    // 物化脚本/引用文件
-                    try {
-                        skillFileSyncer.syncOne(local);
-                    } catch (Exception e) {
-                        log.warn("Skill file sync failed for restored skill '{}': {}", local.getName(), e.getMessage());
-                    }
-                    // 重新初始化工作区
-                    if (remote.getSkillContent() != null) {
-                        workspaceManager.initWorkspace(local.getName(), remote.getSkillContent());
-                    }
-                    updated++;
-                    log.info("Skill {} restored by platform, treated as new install", local.getName());
-                }
+            // 提前保存明文密钥（encryptAndStoreSecret 会原地替换 remote.secret）
+            String plaintextSecret = remote.getSecret();
+            // 预计算加密后的密钥，所有 workspace 副本共用
+            String encryptedSecret = plaintextSecret != null && !plaintextSecret.isEmpty()
+                    ? encryptSecret(plaintextSecret) : null;
 
-                // 更新：比对内容是否变化（不覆盖客户端本地的 enabled 状态，尊重用户本地决策）
-                // 密钥：先加密远程明文再与本地密文比对
-                if (!wasRemoved && needsUpdate(local, remote)) {
-                    local.setDescription(remote.getDescription());
-                    local.setSkillContent(remote.getSkillContent());
-                    local.setVersion(remote.getVersion());
-                    local.setConfigJson(remote.getConfigJson());
-                    local.setIcon(remote.getIcon());
-                    local.setTags(remote.getTags());
-                    local.setAuthor(remote.getAuthor());
-                    local.setDescriptionZh(remote.getDescriptionZh());
-                    local.setCategoryId(remote.getCategoryId());
-                    local.setCategoryName(remote.getCategoryName());
-                    // 密钥：加密后存入本地
-                    if (remote.getSecret() != null) {
-                        local.setSecret(encryptSecret(remote.getSecret()));
-                    } else {
-                        local.setSecret(null);
+            for (Long wsId : workspaceIds) {
+                Map<Long, SkillEntity> wsMap = localByNameAndWs.getOrDefault(
+                        remote.getName(), Collections.emptyMap());
+                SkillEntity local = wsMap.get(wsId);
+
+                if (local == null) {
+                    // === 新增：该工作区尚无此技能 → 插入独立副本 ===
+                    SkillEntity copy = new SkillEntity();
+                    copy.setName(remote.getName());
+                    copy.setDescription(remote.getDescription());
+                    copy.setSkillType(remote.getSkillType() != null ? remote.getSkillType() : "dynamic");
+                    copy.setIcon(remote.getIcon());
+                    copy.setVersion(remote.getVersion());
+                    copy.setAuthor(remote.getAuthor());
+                    copy.setConfigJson(remote.getConfigJson());
+                    copy.setSkillContent(remote.getSkillContent());
+                    copy.setTags(remote.getTags());
+                    copy.setDescriptionZh(remote.getDescriptionZh());
+                    copy.setNameZh(remote.getNameZh());
+                    copy.setNameEn(remote.getNameEn());
+                    copy.setCategoryId(remote.getCategoryId());
+                    copy.setCategoryName(remote.getCategoryName());
+                    copy.setSecret(encryptedSecret);
+                    copy.setBuiltin(false);
+                    copy.setInstalled(false);
+                    copy.setEnabled(false);
+                    copy.setWorkspaceId(wsId);
+
+                    skillMapper.insert(copy);
+                    storePlatformSecret(copy.getId(), plaintextSecret);
+                    storePlatformSecretUnderEnvVars(copy.getId(),
+                            copy.getSkillContent(), plaintextSecret);
+                    inserted++;
+                    log.debug("Synced new skill '{}' to workspace {}", remote.getName(), wsId);
+
+                    // 以下操作只需对每个技能名执行一次（与 workspace 无关）
+                    if (onetimeDone.add(remote.getName())) {
+                        if (remote.getSkillContent() != null) {
+                            workspaceManager.initWorkspace(remote.getName(), remote.getSkillContent());
+                        }
+                        try {
+                            skillFileSyncer.syncOne(copy);
+                        } catch (Exception e) {
+                            log.warn("Skill file sync failed for new skill '{}': {}",
+                                    remote.getName(), e.getMessage());
+                        }
                     }
-                    // 注意：不设置 enabled，保留客户端本地状态
-                    skillMapper.updateById(local);
-                    // 物化脚本/引用文件
-                    try {
-                        skillFileSyncer.syncOne(local);
-                    } catch (Exception e) {
-                        log.warn("Skill file sync failed for updated skill '{}': {}", local.getName(), e.getMessage());
+                } else {
+                    // === 平台恢复检测 ===
+                    // 如果该工作区副本之前被标记为 REMOVED，重新出现 → 当作全新安装
+                    boolean wasRemoved = "REMOVED".equals(local.getPlatformStatus());
+                    if (wasRemoved) {
+                        local.setPlatformStatus(null);
+                        local.setInstalled(false);
+                        local.setEnabled(false);
+                        local.setDescription(remote.getDescription());
+                        local.setSkillContent(remote.getSkillContent());
+                        local.setVersion(remote.getVersion());
+                        local.setConfigJson(remote.getConfigJson());
+                        local.setIcon(remote.getIcon());
+                        local.setTags(remote.getTags());
+                        local.setAuthor(remote.getAuthor());
+                        local.setDescriptionZh(remote.getDescriptionZh());
+                        local.setNameZh(remote.getNameZh());
+                        local.setNameEn(remote.getNameEn());
+                        local.setCategoryId(remote.getCategoryId());
+                        local.setCategoryName(remote.getCategoryName());
+                        local.setSecret(encryptedSecret);
+                        skillMapper.updateById(local);
+                        updated++;
+                        log.info("Skill '{}' restored in workspace {}, treated as new install",
+                                local.getName(), wsId);
+
+                        // 一次性操作
+                        if (onetimeDone.add(remote.getName())) {
+                            try {
+                                skillFileSyncer.syncOne(local);
+                            } catch (Exception e) {
+                                log.warn("Skill file sync failed for restored skill '{}': {}",
+                                        local.getName(), e.getMessage());
+                            }
+                            if (remote.getSkillContent() != null) {
+                                workspaceManager.initWorkspace(local.getName(), remote.getSkillContent());
+                            }
+                        }
                     }
-                    updated++;
-                    log.debug("Synced updated skill from platform: {}", remote.getName());
-                }
-                // 密钥映射必须每次同步都执行（脱离 needsUpdate），
-                // 确保即使 skillContent 未变更，env var 映射逻辑也能覆盖历史遗漏。
-                // （例如 storePlatformSecretUnderEnvVars 功能上线前同步的技能，
-                //  其 BAIDU_API_KEY 等 env var 映射从未被写入过）
-                storePlatformSecret(local.getId(), remote.getSecret());
-                if (remote.getSecret() != null && !remote.getSecret().isEmpty()) {
-                    storePlatformSecretUnderEnvVars(local.getId(),
-                            remote.getSkillContent() != null ? remote.getSkillContent() : local.getSkillContent(),
-                            remote.getSecret());
+
+                    // === 更新：比对内容是否变化（不覆盖 enabled/installed，尊重用户本地决策） ===
+                    if (!wasRemoved && needsUpdate(local, remote)) {
+                        local.setDescription(remote.getDescription());
+                        local.setSkillContent(remote.getSkillContent());
+                        local.setVersion(remote.getVersion());
+                        local.setConfigJson(remote.getConfigJson());
+                        local.setIcon(remote.getIcon());
+                        local.setTags(remote.getTags());
+                        local.setAuthor(remote.getAuthor());
+                        local.setDescriptionZh(remote.getDescriptionZh());
+                        local.setCategoryId(remote.getCategoryId());
+                        local.setCategoryName(remote.getCategoryName());
+                        local.setSecret(encryptedSecret);
+                        // 注意：不设置 enabled/installed，保留客户端本地状态
+                        skillMapper.updateById(local);
+                        updated++;
+                        log.debug("Synced updated skill '{}' in workspace {}", remote.getName(), wsId);
+
+                        if (onetimeDone.add(remote.getName())) {
+                            try {
+                                skillFileSyncer.syncOne(local);
+                            } catch (Exception e) {
+                                log.warn("Skill file sync failed for updated skill '{}': {}",
+                                        local.getName(), e.getMessage());
+                            }
+                        }
+                    }
+
+                    // 密钥映射必须每次同步都执行（脱离 needsUpdate），
+                    // 确保即使 skillContent 未变更，env var 映射逻辑也能覆盖历史遗漏。
+                    storePlatformSecret(local.getId(), plaintextSecret);
+                    if (plaintextSecret != null && !plaintextSecret.isEmpty()) {
+                        storePlatformSecretUnderEnvVars(local.getId(),
+                                remote.getSkillContent() != null
+                                        ? remote.getSkillContent() : local.getSkillContent(),
+                                plaintextSecret);
+                    }
                 }
             }
         }
 
-        // 移除：本地有但平台端已不再分配 → 标记 REMOVED + 强制禁用
+        // 移除：本地有但平台端已不再分配 → 标记 REMOVED + 强制禁用（所有 workspace 副本）
         for (SkillEntity local : localSkills) {
             if (!remoteNames.contains(local.getName())) {
-                // 不再物理删除，标记为平台已移除并强制禁用
-                // 保留数据行以便用户看到状态（灰色/禁用），平台恢复后可重新安装
                 local.setEnabled(false);
                 local.setPlatformStatus("REMOVED");
                 skillMapper.updateById(local);
                 // 清理对应密钥（平台已不再授权，密钥也应失效）
                 skillSecretService.remove(local.getId(), PLATFORM_SECRET_KEY);
-                // 归档工作区
-                workspaceManager.archiveWorkspace(local.getName());
+                // 归档工作区（每个技能名只需归档一次）
+                if (onetimeDone.add("ARCHIVE_" + local.getName())) {
+                    workspaceManager.archiveWorkspace(local.getName());
+                }
                 // 注销运行时包装器（knowledge/acp tools），避免已禁用的技能仍暴露工具
                 runtimeService.deregisterSkillWrappers(local.getId());
                 disabled++;
-                log.info("Marked skill as platform-removed: {}", local.getName());
+                log.info("Marked skill as platform-removed in workspace {}: {}",
+                        local.getWorkspaceId(), local.getName());
             }
         }
 
@@ -296,8 +343,8 @@ public class SkillSyncService {
 
         lastSyncTime = LocalDateTime.now();
         lastSyncStatus = "SUCCESS";
-        log.info("Skill sync completed: {} inserted, {} updated, {} disabled",
-                inserted, updated, disabled);
+        log.info("Skill sync completed: {} inserted, {} updated, {} disabled across {} workspace(s)",
+                inserted, updated, disabled, workspaceIds.size());
 
         return new SyncResult(true, "Sync completed", inserted, updated, disabled);
     }

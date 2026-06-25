@@ -55,7 +55,7 @@ public class DiscordVerifier implements ChannelVerifier {
                 .uri(URI.create(API_URL))
                 .timeout(TIMEOUT)
                 .header("Authorization", "Bot " + botToken)
-                .header("User-Agent", "MateClaw-Verifier/1.0 (+https://claw.mate.vip)")
+                .header("User-Agent", "GLClaw-Verifier/1.0 (+https://claw.mate.vip)")
                 .GET()
                 .build();
 

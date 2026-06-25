@@ -1,14 +1,14 @@
 ---
-name: mateclaw_source_index
+name: glclaw_source_index
 version: "1.0.0"
-description: "将用户问题映射到 MateClaw 文档路径与源码入口，减少盲目搜索。回答'XX 功能在哪里实现'、'怎么修改 YY 逻辑'等源码定位问题。"
+description: "将用户问题映射到 GLClaw 文档路径与源码入口，减少盲目搜索。回答'XX 功能在哪里实现'、'怎么修改 YY 逻辑'等源码定位问题。"
 dependencies:
   tools:
-    - readMateClawDoc
+    - readGLClawDoc
     - read_file
 ---
 
-# MateClaw 源码导航
+# GLClaw 源码导航
 
 当用户询问"XX 功能在哪里实现"、"Agent 流程入口在哪"、"如何修改 YY 逻辑"等源码定位问题时使用本技能。
 
@@ -17,7 +17,7 @@ dependencies:
 ### 第一步：查文档索引
 
 ```
-readMateClawDoc(action="list")
+readGLClawDoc(action="list")
 ```
 
 根据用户问题关键词在文件列表中找到最相关文档。
@@ -25,7 +25,7 @@ readMateClawDoc(action="list")
 ### 第二步：读取架构文档
 
 ```
-readMateClawDoc(action="read", path="zh/architecture.md")
+readGLClawDoc(action="read", path="zh/architecture.md")
 ```
 
 或直接读 CLAUDE.md（项目根目录，包含最完整的包结构说明）：
@@ -104,5 +104,5 @@ read_file(filePath="CLAUDE.md")
 
 ## 注意
 
-- 路径均相对于 `mateclaw-server/src/main/java/vip/mate/`（Java 文件）或 `mateclaw-server/src/main/resources/`（资源文件）
-- 如找不到精确文件，先用 `readMateClawDoc` 搜索，再用 `read_file` 读取 CLAUDE.md 获取最新架构描述
+- 路径均相对于 `glclaw-server/src/main/java/vip/mate/`（Java 文件）或 `glclaw-server/src/main/resources/`（资源文件）
+- 如找不到精确文件，先用 `readGLClawDoc` 搜索，再用 `read_file` 读取 CLAUDE.md 获取最新架构描述

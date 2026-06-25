@@ -138,15 +138,29 @@ public class BrowserLauncher {
             trace.add(Attempt.fail(strategy, "executablePath=" + path, 0, "file not found"));
             return null;
         }
+        // Issue #40: isolated user-data-dir to avoid conflict with user's existing Chrome session
+        Path userDataDir;
+        try {
+            userDataDir = Files.createTempDirectory("mateclaw-profile-");
+        } catch (Exception e) {
+            trace.add(Attempt.fail(strategy, "executablePath=" + path, 0,
+                    "failed to create temp user-data-dir: " + e.getMessage()));
+            return null;
+        }
         long t0 = System.currentTimeMillis();
         try {
-            BrowserType.LaunchOptions opts = baseLaunchOptions(headed)
-                    .setExecutablePath(Path.of(path));
+            List<String> args = new ArrayList<>(chromiumLaunchArgs());
+            args.add("--user-data-dir=" + userDataDir.toAbsolutePath());
+            BrowserType.LaunchOptions opts = new BrowserType.LaunchOptions()
+                    .setHeadless(!headed)
+                    .setExecutablePath(Path.of(path))
+                    .setArgs(args);
             Browser browser = pw.chromium().launch(opts);
             Result r = wrapLocalBrowser(browser, strategy, "executablePath=" + path,
-                    System.currentTimeMillis() - t0, trace);
+                    System.currentTimeMillis() - t0, trace, userDataDir);
             return r;
         } catch (PlaywrightException e) {
+            deleteQuietly(userDataDir);
             trace.add(Attempt.fail(strategy, "executablePath=" + path,
                     System.currentTimeMillis() - t0, e.getMessage()));
             return null;
@@ -155,13 +169,28 @@ public class BrowserLauncher {
 
     private Result tryChannel(Playwright pw, String channel, boolean headed,
                               List<Attempt> trace, Strategy strategy) {
+        // Issue #40: isolated user-data-dir to avoid conflict with user's existing Chrome session
+        Path userDataDir;
+        try {
+            userDataDir = Files.createTempDirectory("mateclaw-profile-");
+        } catch (Exception e) {
+            trace.add(Attempt.fail(strategy, "channel=" + channel, 0,
+                    "failed to create temp user-data-dir: " + e.getMessage()));
+            return null;
+        }
         long t0 = System.currentTimeMillis();
         try {
-            BrowserType.LaunchOptions opts = baseLaunchOptions(headed).setChannel(channel);
+            List<String> args = new ArrayList<>(chromiumLaunchArgs());
+            args.add("--user-data-dir=" + userDataDir.toAbsolutePath());
+            BrowserType.LaunchOptions opts = new BrowserType.LaunchOptions()
+                    .setHeadless(!headed)
+                    .setChannel(channel)
+                    .setArgs(args);
             Browser browser = pw.chromium().launch(opts);
             return wrapLocalBrowser(browser, strategy, "channel=" + channel,
-                    System.currentTimeMillis() - t0, trace);
+                    System.currentTimeMillis() - t0, trace, userDataDir);
         } catch (PlaywrightException e) {
+            deleteQuietly(userDataDir);
             trace.add(Attempt.fail(strategy, "channel=" + channel,
                     System.currentTimeMillis() - t0, e.getMessage()));
             return null;
@@ -326,13 +355,13 @@ public class BrowserLauncher {
     }
 
     private Result wrapLocalBrowser(Browser browser, Strategy strategy, String desc,
-                                    long elapsedMs, List<Attempt> trace) {
+                                    long elapsedMs, List<Attempt> trace, Path userDataDir) {
         BrowserContext context = browser.newContext(new Browser.NewContextOptions()
                 .setViewportSize(props.getViewportWidth(), props.getViewportHeight())
                 .setLocale("zh-CN"));
         Page page = context.newPage();
         trace.add(Attempt.ok(strategy, desc, elapsedMs));
-        return Result.success(browser, context, page, false, null, strategy, trace);
+        return Result.successLocal(browser, context, page, strategy, trace, userDataDir);
     }
 
     public static List<String> chromiumLaunchArgs() {
@@ -584,6 +613,12 @@ public class BrowserLauncher {
         static Result success(Browser browser, BrowserContext context, Page page,
                               boolean cdp, String cdpUrl, Strategy strategy, List<Attempt> attempts) {
             return new Result(browser, context, page, cdp, cdpUrl, strategy, attempts, true, null, null, null);
+        }
+
+        /** Local launch (non-CDP) with an isolated user-data-dir (Issue #40). */
+        static Result successLocal(Browser browser, BrowserContext context, Page page,
+                                   Strategy strategy, List<Attempt> attempts, Path userDataDir) {
+            return new Result(browser, context, page, false, null, strategy, attempts, true, null, userDataDir, null);
         }
 
         static Result successOwned(Browser browser, BrowserContext context, Page page,

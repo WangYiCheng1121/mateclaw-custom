@@ -35,14 +35,14 @@ dependencies:
 **macOS / Linux：**
 ```
 execute_shell_command(
-  command="mateclaw chats list --agent-id <agentId> --channel <channel>"
+  command="glclaw chats list --agent-id <agentId> --channel <channel>"
 )
 ```
 
 **Windows：**
 ```
 execute_shell_command(
-  command="mateclaw.exe chats list --agent-id <agentId> --channel <channel>"
+  command="glclaw.exe chats list --agent-id <agentId> --channel <channel>"
 )
 ```
 
@@ -53,14 +53,14 @@ execute_shell_command(
 **macOS / Linux：**
 ```
 execute_shell_command(
-  command="mateclaw channels send --agent-id <agentId> --channel <channel> --target-user <userId> --target-session <sessionId> --text \"消息内容\""
+  command="glclaw channels send --agent-id <agentId> --channel <channel> --target-user <userId> --target-session <sessionId> --text \"消息内容\""
 )
 ```
 
 **Windows（PowerShell）：**
 ```
 execute_shell_command(
-  command="mateclaw.exe channels send --agent-id <agentId> --channel <channel> --target-user <userId> --target-session <sessionId> --text '消息内容'"
+  command="glclaw.exe channels send --agent-id <agentId> --channel <channel> --target-user <userId> --target-session <sessionId> --text '消息内容'"
 )
 ```
 
@@ -80,11 +80,11 @@ execute_shell_command(
 
 ```
 execute_shell_command(
-  command="mateclaw chats list --agent-id task-bot --channel dingtalk"
+  command="glclaw chats list --agent-id task-bot --channel dingtalk"
 )
 # 从结果中取 user_id / session_id，然后：
 execute_shell_command(
-  command="mateclaw channels send --agent-id task-bot --channel dingtalk --target-user alice --target-session alice_dt_001 --text \"✅ 数据分析已完成，结果已保存到 report.xlsx\""
+  command="glclaw channels send --agent-id task-bot --channel dingtalk --target-user alice --target-session alice_dt_001 --text \"✅ 数据分析已完成，结果已保存到 report.xlsx\""
 )
 ```
 
@@ -92,21 +92,21 @@ execute_shell_command(
 
 ```
 execute_shell_command(
-  command="mateclaw chats list --agent-id notify-bot --user-id alice"
+  command="glclaw chats list --agent-id notify-bot --user-id alice"
 )
 ```
 
-## mateclaw CLI 未安装时的降级处理
+## glclaw CLI 未安装时的降级处理
 
-若 `mateclaw` 命令不可用：
+若 `glclaw` 命令不可用：
 
 1. 检测：
 ```
-execute_shell_command(command="which mateclaw || where mateclaw")
+execute_shell_command(command="which glclaw || where glclaw")
 ```
 
 2. 如果未安装，告知用户：
-> mateclaw CLI 未找到，无法主动推送消息。请确认 MateClaw 已正确安装并将 CLI 加入 PATH。安装后重试。
+> glclaw CLI 未找到，无法主动推送消息。请确认 GLClaw 已正确安装并将 CLI 加入 PATH。安装后重试。
 
 ## 常见错误
 

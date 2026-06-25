@@ -25,12 +25,12 @@ Two tools, pick one:
 
 **Prefer `node inspect` first.** It's always available and the REPL is fast.
 
-In this repo the Node.js surfaces are the front-end packages — `mateclaw-ui`, `mateclaw-webchat`, and the Electron desktop app `mateclaw-desktop`. The Spring Boot backend is a JVM process and is not a target for this skill.
+In this repo the Node.js surfaces are the front-end packages — `glclaw-ui`, `glclaw-webchat`, and the Electron desktop app `glclaw-desktop`. The Spring Boot backend is a JVM process and is not a target for this skill.
 
 ## When to Use
 
 - A Node-based build or packaging step (a Vite build, an `electron-builder` hook, a `scripts/` helper) fails and you need to see intermediate state
-- The Electron desktop **main process** (`mateclaw-desktop`) crashes, hangs on startup, or mishandles the bundled Java backend child process
+- The Electron desktop **main process** (`glclaw-desktop`) crashes, hangs on startup, or mishandles the bundled Java backend child process
 - A Vite dev server or a build plugin behaves wrong and `console.log` can't reach the value
 - You need to inspect a value in a closure that `console.log` can't reach without patching
 - Perf: attach to a running process to capture a CPU profile or heap snapshot
@@ -179,14 +179,14 @@ NODE_PATH=/tmp/cdp-tools/node_modules node /tmp/cdp-debug.js
 
 ## Debugging the Electron Desktop App
 
-`mateclaw-desktop` is an Electron app. The **main process** is a Node process — `electron/main/index.ts`, compiled by Vite to `dist-electron/main/index.js` (the `main` field in `package.json`). It spawns the Java backend as a child process. The **renderer** is a Chromium `BrowserWindow` — debug that with the window's DevTools, not this skill.
+`glclaw-desktop` is an Electron app. The **main process** is a Node process — `electron/main/index.ts`, compiled by Vite to `dist-electron/main/index.js` (the `main` field in `package.json`). It spawns the Java backend as a child process. The **renderer** is a Chromium `BrowserWindow` — debug that with the window's DevTools, not this skill.
 
 ### Launch the main process paused
 
 Electron forwards `--inspect` / `--inspect-brk` to its main process. Build the Electron output first so there is a `dist-electron/` to run:
 
 ```bash
-cd mateclaw-desktop
+cd glclaw-desktop
 npm run build                          # produces dist/ and dist-electron/
 npx electron --inspect-brk=9229 .      # Electron starts, paused on the main process first line
 # In another terminal:
@@ -208,7 +208,7 @@ The Electron main process is the one launched without a `--type=` flag (renderer
 
 ```bash
 # Find the main process PID (the entry without --type=)
-ps aux | grep -i 'mateclaw-desktop' | grep -v -- '--type='
+ps aux | grep -i 'glclaw-desktop' | grep -v -- '--type='
 
 # Enable the inspector on it
 kill -SIGUSR1 <main-pid>
@@ -222,10 +222,10 @@ The Java backend that the main process spawns is a JVM, not a Node target — it
 
 ## Debugging a Vite Dev Server
 
-`mateclaw-ui`, `mateclaw-webchat`, and `mateclaw-desktop` all run `vite` for `dev`. To step through Vite config or a build plugin, run Vite's binary under the inspector instead of the `pnpm dev` wrapper:
+`glclaw-ui`, `glclaw-webchat`, and `glclaw-desktop` all run `vite` for `dev`. To step through Vite config or a build plugin, run Vite's binary under the inspector instead of the `pnpm dev` wrapper:
 
 ```bash
-cd mateclaw-ui
+cd glclaw-ui
 node --inspect-brk ./node_modules/vite/bin/vite.js
 # In another terminal: node inspect -p <pid>, then sb('vite.config.ts', N), cont
 ```

@@ -17,12 +17,12 @@ import java.util.List;
 import java.util.regex.Pattern;
 
 /**
- * MateClaw 项目文档读取工具
+ * GLClaw 项目文档读取工具
  * 允许 Agent 在运行时读取内置项目文档（classpath:docs/ 下的 Markdown 文件）
  */
 @Slf4j
 @Component
-public class MateClawDocTool {
+public class GLClawDocTool {
 
     private static final Pattern VALID_PATH = Pattern.compile("^(zh|en)/[a-z0-9_-]+\\.md$");
     private static final String DOCS_BASE = "docs/";
@@ -38,7 +38,7 @@ public class MateClawDocTool {
         Returns: For "list", a list of available doc files grouped by language.
                  For "read", the full markdown content of the specified doc.
         """)
-    public String readMateClawDoc(
+    public String readGLClawDoc(
         @JsonProperty(required = true)
         @JsonPropertyDescription("Action to perform: 'list' or 'read'")
         String action,
@@ -111,7 +111,7 @@ public class MateClawDocTool {
                 }
             }
 
-            sb.append("\nUse readMateClawDoc(action=\"read\", path=\"zh/config.md\") to read a specific doc.");
+            sb.append("\nUse readGLClawDoc(action=\"read\", path=\"zh/config.md\") to read a specific doc.");
             return sb.toString();
 
         } catch (Exception e) {
