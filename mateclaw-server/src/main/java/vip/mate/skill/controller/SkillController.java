@@ -739,6 +739,19 @@ public class SkillController {
         return R.ok(skillSyncService.getSyncStatus());
     }
 
+    @Operation(summary = "清理本地已移除的技能（平台不再拥有的技能物理删除）")
+    @DeleteMapping("/cleanup-removed")
+    @RequireWorkspaceRole("admin")
+    public R<Map<String, Object>> cleanupRemoved(
+            @RequestHeader(value = "X-Workspace-Id", required = false) Long workspaceId,
+            @RequestParam(required = false) Long skillId) {
+        List<String> deletedNames = skillService.cleanupRemovedSkills(workspaceId, skillId);
+        return R.ok(Map.of(
+                "deleted", deletedNames.size(),
+                "names", deletedNames
+        ));
+    }
+
     // ==================== Skill Install API ====================
 
     @Operation(summary = "安装技能（将平台同步过来的技能标记为已安装并启用）")

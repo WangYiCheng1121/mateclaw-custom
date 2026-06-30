@@ -15,6 +15,7 @@ import vip.mate.skill.repository.SkillMapper;
 import vip.mate.skill.runtime.SkillFrontmatterParser;
 import vip.mate.skill.runtime.SkillRuntimeService;
 import vip.mate.skill.secret.SkillSecretService;
+import vip.mate.skill.service.SkillService;
 import vip.mate.skill.workspace.SkillFileSyncer;
 import vip.mate.skill.workspace.SkillWorkspaceManager;
 import vip.mate.workspace.core.model.WorkspaceEntity;
@@ -31,8 +32,9 @@ import java.util.*;
  * 同步策略：
  * <ul>
  *   <li>新增：平台端有、本地无 → 插入（默认 installed=false, enabled=false，需用户手动安装）</li>
- *   <li>更新：平台端有、本地有但内容不同 → 更新内容（不覆盖客户端本地 enabled 状态）</li>
- *   <li>移除：平台端无、本地有且非内置 → 标记 platformStatus="REMOVED" 并强制禁用（保留数据行，重新分配时恢复）</li>
+ *   <li>更新：平台端有、本地有但内容不同 → 更新内容（不覆盖客户端本地 enabled/installed 状态）</li>
+ *   <li>移除-已安装：平台端无、本地有且已安装 → 标记 platformStatus="REMOVED" + installed=false + enabled=false（仅首次；已 REMOVED 的跳过等待用户手动删除）</li>
+ *   <li>移除-未安装：平台端无、本地有且未安装 → 物理删除（不留僵尸数据）</li>
  * </ul>
  *
  * @author MateClaw Team
@@ -54,6 +56,7 @@ public class SkillSyncService {
     private final SkillFileSyncer skillFileSyncer;
     private final SkillFrontmatterParser frontmatterParser;
     private final WorkspaceMapper workspaceMapper;
+    private final SkillService skillService;
 
     /**
      * AES 加密密钥，与 {@link SkillSecretService} 共用同一把 key，
@@ -136,10 +139,16 @@ public class SkillSyncService {
         log.info("Starting skill sync from platform...");
         List<SkillEntity> remoteSkills = platformSkillClient.fetchAssignedSkills();
 
-        if (remoteSkills.isEmpty() && !platformSkillClient.isReachable()) {
-            lastSyncStatus = "FAILED";
-            log.warn("Platform unreachable, skip sync");
-            return new SyncResult(false, "Platform unreachable", 0, 0, 0);
+        if (remoteSkills.isEmpty()) {
+            if (!platformSkillClient.isReachable()) {
+                lastSyncStatus = "FAILED";
+                log.warn("Platform unreachable, skip sync");
+                return new SyncResult(false, "Platform unreachable", 0, 0, 0);
+            }
+            // 平台可达但返回空列表：可能是认证/权限/临时故障，不执行移除逻辑避免误伤
+            lastSyncStatus = "SKIPPED";
+            log.warn("Platform reachable but returned empty skill list, skip sync to avoid mass-removal");
+            return new SyncResult(false, "Platform returned empty list, sync skipped", 0, 0, 0);
         }
 
         // 获取所有未删除的工作区 ID
@@ -175,6 +184,8 @@ public class SkillSyncService {
         Set<String> remoteNames = new HashSet<>();
         // 跟踪已完成一次性操作（工作区初始化、文件物化）的技能名，避免每个 workspace 重复执行
         Set<String> onetimeDone = new HashSet<>();
+        // 防平台返回重复数据：追踪本轮已插入的 (name, workspaceId) 组合
+        Set<String> insertedInThisRun = new HashSet<>();
 
         for (SkillEntity remote : remoteSkills) {
             // 跳过 builtin 技能：内置技能由种子数据管理，不参与平台同步
@@ -196,6 +207,13 @@ public class SkillSyncService {
                 SkillEntity local = wsMap.get(wsId);
 
                 if (local == null) {
+                    // 防平台返回重复：若本轮已插入过 (name, workspaceId)，跳过
+                    String dedupKey = remote.getName() + "|" + wsId;
+                    if (!insertedInThisRun.add(dedupKey)) {
+                        log.debug("Skipping duplicate remote skill '{}' for workspace {} in this sync run",
+                                remote.getName(), wsId);
+                        continue;
+                    }
                     // === 新增：该工作区尚无此技能 → 插入独立副本 ===
                     SkillEntity copy = new SkillEntity();
                     copy.setName(remote.getName());
@@ -318,23 +336,42 @@ public class SkillSyncService {
             }
         }
 
-        // 移除：本地有但平台端已不再分配 → 标记 REMOVED + 强制禁用（所有 workspace 副本）
+        // 移除：本地有但平台端已不再分配
+        // - 已标记 REMOVED → 跳过（用户需通过 cleanup-removed 手动删除，避免二次同步误删）
+        // - 已安装（installed=true）→ 标记 REMOVED + 强制退出安装状态，保留数据行待用户确认删除
+        // - 未安装（installed=false）→ 物理删除，不留僵尸数据
         for (SkillEntity local : localSkills) {
             if (!remoteNames.contains(local.getName())) {
-                local.setEnabled(false);
-                local.setPlatformStatus("REMOVED");
-                skillMapper.updateById(local);
-                // 清理对应密钥（平台已不再授权，密钥也应失效）
-                skillSecretService.remove(local.getId(), PLATFORM_SECRET_KEY);
-                // 归档工作区（每个技能名只需归档一次）
-                if (onetimeDone.add("ARCHIVE_" + local.getName())) {
-                    workspaceManager.archiveWorkspace(local.getName());
+                if ("REMOVED".equals(local.getPlatformStatus())) {
+                    // 已经是 REMOVED 状态，跳过 —— 等待用户通过 cleanup-removed 手动删除。
+                    // 不能在此物理删除，否则第一次同步标记 REMOVED 后，
+                    // 第二次同步会因 installed=false 落入物理删除分支，用户看不到确认入口。
+                    log.debug("Skill already marked REMOVED in workspace {}, skipping: {}",
+                            local.getWorkspaceId(), local.getName());
+                } else if (Boolean.TRUE.equals(local.getInstalled())) {
+                    // 场景 A/B：用户曾安装过 → 退出安装，标记 REMOVED，保留数据行
+                    local.setEnabled(false);
+                    local.setInstalled(false);
+                    local.setPlatformStatus("REMOVED");
+                    skillMapper.updateById(local);
+                    // 清理对应密钥（平台已不再授权，密钥也应失效）
+                    skillSecretService.remove(local.getId(), PLATFORM_SECRET_KEY);
+                    // 归档工作区（每个技能名只需归档一次）
+                    if (onetimeDone.add("ARCHIVE_" + local.getName())) {
+                        workspaceManager.archiveWorkspace(local.getName());
+                    }
+                    // 注销运行时包装器（knowledge/acp tools），避免已禁用的技能仍暴露工具
+                    runtimeService.deregisterSkillWrappers(local.getId());
+                    disabled++;
+                    log.info("Marked skill as platform-removed (was installed) in workspace {}: {}",
+                            local.getWorkspaceId(), local.getName());
+                } else {
+                    // 场景 C：从未安装 → 物理删除，不留痕迹
+                    skillService.hardDeleteSkill(local.getId());
+                    disabled++;
+                    log.info("Hard-deleted uninstalled platform-removed skill in workspace {}: {}",
+                            local.getWorkspaceId(), local.getName());
                 }
-                // 注销运行时包装器（knowledge/acp tools），避免已禁用的技能仍暴露工具
-                runtimeService.deregisterSkillWrappers(local.getId());
-                disabled++;
-                log.info("Marked skill as platform-removed in workspace {}: {}",
-                        local.getWorkspaceId(), local.getName());
             }
         }
 

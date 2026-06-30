@@ -22,6 +22,7 @@ import vip.mate.skill.workspace.SkillWorkspaceProperties;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.Set;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -613,6 +614,49 @@ public class SkillService {
     @Deprecated
     public void deleteSkill(Long id) {
         uninstallSkill(id);
+    }
+
+    /**
+     * 批量物理删除当前工作区中所有平台已移除（REMOVED）的技能。
+     * <p>
+     * 仅删除 platformStatus="REMOVED" 且非内置的技能。内置技能和平台端仍存在的技能不受影响。
+     * 每个技能都会执行完整清理链路：物理删行 → 清理密钥 → 清理文件行 → 清理工作区 → 注销运行时包装器。
+     * <p>
+     * 若指定 skillId，则直接删除该技能（跳过 platformStatus 校验，用于临时清数据）。
+     *
+     * @param workspaceId 工作区 ID（null 时使用默认工作区）
+     * @param skillId     可选：指定要删除的技能 ID，传了就直接删该技能
+     * @return 实际删除的技能名称列表
+     */
+    public List<String> cleanupRemovedSkills(Long workspaceId, Long skillId) {
+        long wsId = normalizeWorkspaceId(workspaceId);
+        LambdaQueryWrapper<SkillEntity> wrapper = new LambdaQueryWrapper<SkillEntity>()
+                .eq(SkillEntity::getBuiltin, false)
+                .eq(SkillEntity::getWorkspaceId, wsId);
+        // 指定 skillId 时跳过 platformStatus 限制，直接定点删除
+        if (skillId != null) {
+            wrapper.eq(SkillEntity::getId, skillId);
+        } else {
+            wrapper.eq(SkillEntity::getPlatformStatus, "REMOVED");
+        }
+        List<SkillEntity> removedSkills = skillMapper.selectList(wrapper);
+
+        List<String> deletedNames = new ArrayList<>();
+        for (SkillEntity skill : removedSkills) {
+            try {
+                hardDeleteSkill(skill.getId());
+                deletedNames.add(skill.getName());
+            } catch (Exception e) {
+                log.warn("Failed to hard-delete removed skill '{}' (id={}): {}",
+                        skill.getName(), skill.getId(), e.getMessage());
+            }
+        }
+
+        if (!deletedNames.isEmpty()) {
+            log.info("Cleanup removed skills in workspace {}: deleted {} skill(s) — {}",
+                    wsId, deletedNames.size(), deletedNames);
+        }
+        return deletedNames;
     }
 
     /**

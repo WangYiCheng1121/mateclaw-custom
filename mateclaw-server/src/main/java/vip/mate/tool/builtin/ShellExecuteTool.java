@@ -141,6 +141,12 @@ public class ShellExecuteTool {
         ProcessBuilder pb;
         if (IS_WINDOWS) {
             String winCommand = sanitizeWindowsCommand(command);
+            // Switch console code page to UTF-8 (65001) before executing the user
+            // command. Without this, cmd.exe defaults to the system ANSI code page
+            // (e.g. GBK / CP936 on Chinese Windows) and writes output bytes in that
+            // encoding, while readFileTruncated() on the Java side always decodes as
+            // UTF-8 — resulting in garbled Chinese characters.
+            winCommand = "chcp 65001 > nul && " + winCommand;
             pb = new ProcessBuilder("cmd.exe", "/D", "/S", "/C", winCommand);
         } else {
             String shell = selectPosixShell(System.getenv("SHELL"));

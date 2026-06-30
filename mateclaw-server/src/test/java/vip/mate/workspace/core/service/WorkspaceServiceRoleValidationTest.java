@@ -9,6 +9,7 @@ import vip.mate.workspace.core.model.WorkspaceMemberEntity;
 import vip.mate.workspace.core.repository.WorkspaceMapper;
 import vip.mate.workspace.core.repository.WorkspaceMemberMapper;
 import vip.mate.wiki.service.WikiKnowledgeBaseService;
+import vip.mate.workspace.document.WorkspaceFileService;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -22,8 +23,9 @@ class WorkspaceServiceRoleValidationTest {
     private final ConversationMapper conversationMapper = mock(ConversationMapper.class);
     private final AgentMapper agentMapper = mock(AgentMapper.class);
     private final WikiKnowledgeBaseService wikiKnowledgeBaseService = mock(WikiKnowledgeBaseService.class);
+    private final WorkspaceFileService workspaceFileService = mock(WorkspaceFileService.class);
     private final WorkspaceService service = new WorkspaceService(
-            workspaceMapper, memberMapper, conversationMapper, agentMapper, wikiKnowledgeBaseService, null);
+            workspaceMapper, memberMapper, conversationMapper, agentMapper, wikiKnowledgeBaseService, null, workspaceFileService);
 
     @Test
     void addMemberRejectsOwnerRole() {

@@ -459,6 +459,7 @@ public class ChatStreamTracker {
         if (state != null && state.done) {
             stopHeartbeat(conversationId);
             RunState nextState = new RunState(conversationId);
+            nextState.nextEventId = state.nextEventId;
             int carried = 0;
             QueuedInput queued;
             while ((queued = state.messageQueue.poll()) != null) {

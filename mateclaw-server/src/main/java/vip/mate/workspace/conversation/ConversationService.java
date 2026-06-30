@@ -905,6 +905,16 @@ public class ConversationService {
     }
 
     /**
+     * Look up a single message by its primary key.
+     *
+     * @param messageId message id
+     * @return the message entity, or {@code null} if not found
+     */
+    public MessageEntity getMessage(Long messageId) {
+        return messageMapper.selectById(messageId);
+    }
+
+    /**
      * Delete a single message by its ID and adjust the conversation's
      * messageCount accordingly. Used by the regenerate flow to remove the
      * old assistant reply before creating a new one.
@@ -934,6 +944,64 @@ public class ConversationService {
         log.info("[Conversation] Deleted message id={}, role={}, conversationId={}",
                 messageId, msg.getRole(), msg.getConversationId());
         return msg;
+    }
+
+    /**
+     * Delete the last user message and all messages after it in a
+     * conversation, and adjust {@code messageCount} accordingly.
+     * <p>
+     * A user "turn" is bounded by the most recent user message — everything
+     * from that message onward (the user message itself, plus any assistant
+     * gate messages, approval replays, and other artifacts) belongs to the
+     * same logical exchange. This method removes the entire tail in a single
+     * transaction so the regenerate flow starts from a clean slate (the
+     * frontend will re-send the user message afterwards).
+     * <p>
+     * 删除会话中最后一条 user 消息及其之后的所有消息。一轮对话的边界由
+     * 最近一条用户消息界定——该条 user 消息及之后的全部 assistant 消息
+     * （含审批门控消息、replay 结果等）均属同一逻辑轮次。此方法在单个
+     * 事务中清除整段尾部，前端随后重新发送用户消息即可从干净状态开始。
+     *
+     * @param conversationId the target conversation
+     * @return the number of messages deleted, or -1 when there is no user
+     *         message (nothing to regenerate from)
+     */
+    @Transactional
+    public int deleteMessagesAfterLastUser(String conversationId) {
+        // Locate the most recent user message for this conversation.
+        MessageEntity lastUser = messageMapper.selectOne(
+                new LambdaQueryWrapper<MessageEntity>()
+                        .eq(MessageEntity::getConversationId, conversationId)
+                        .eq(MessageEntity::getRole, "user")
+                        .orderByDesc(MessageEntity::getCreateTime)
+                        .last("LIMIT 1"));
+
+        if (lastUser == null) {
+            log.warn("[Conversation] deleteMessagesAfterLastUser: no user message found in {}",
+                    conversationId);
+            return -1;
+        }
+
+        // Delete the last user message and everything after it.
+        int deleted = messageMapper.delete(
+                new LambdaQueryWrapper<MessageEntity>()
+                        .eq(MessageEntity::getConversationId, conversationId)
+                        .ge(MessageEntity::getCreateTime, lastUser.getCreateTime()));
+
+        // Adjust the conversation's aggregate counter.
+        ConversationEntity conv = conversationMapper.selectOne(
+                new LambdaQueryWrapper<ConversationEntity>()
+                        .eq(ConversationEntity::getConversationId, conversationId));
+        if (conv != null) {
+            int newCount = Math.max(0,
+                    (conv.getMessageCount() != null ? conv.getMessageCount() : 0) - deleted);
+            conv.setMessageCount(newCount);
+            conversationMapper.updateById(conv);
+        }
+
+        log.info("[Conversation] Deleted {} messages (last user + tail) in {} (userMsgId={}, userMsgTime={})",
+                deleted, conversationId, lastUser.getId(), lastUser.getCreateTime());
+        return deleted;
     }
 
     public List<MessageContentPart> parseMessageParts(MessageEntity message) {

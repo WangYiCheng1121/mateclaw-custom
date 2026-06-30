@@ -91,6 +91,7 @@ public class SkillScriptExecutionService {
 
             // 根据文件扩展名选择解释器（跨平台适配）
             String fileName = scriptPath.getFileName().toString();
+            boolean alreadyAddedScript = false;
             if (fileName.endsWith(".py")) {
                 // Windows 通常只有 python，没有 python3
                 command.add(IS_WINDOWS ? "python" : "python3");
@@ -106,9 +107,14 @@ public class SkillScriptExecutionService {
                     return ScriptResult.error(-1,
                             "Batch scripts (.bat/.cmd) are only supported on Windows.");
                 }
+                alreadyAddedScript = true;
                 command.add("cmd.exe");
                 command.add("/D");
                 command.add("/C");
+                // Switch console code page to UTF-8 before running the batch script,
+                // so that any Chinese output (echo, etc.) is written as UTF-8 bytes
+                // matching readFileTruncated() on the Java side.
+                command.add("chcp 65001 > nul && \"" + scriptPath.toString() + "\"");
             } else if (fileName.endsWith(".ps1")) {
                 command.add("powershell");
                 command.add("-ExecutionPolicy");
@@ -122,7 +128,9 @@ public class SkillScriptExecutionService {
                 }
             }
 
-            command.add(scriptPath.toString());
+            if (!alreadyAddedScript) {
+                command.add(scriptPath.toString());
+            }
             if (args != null) {
                 for (String arg : args) {
                     command.add(escapeWindowsArg(arg));

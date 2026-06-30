@@ -21,6 +21,7 @@ import vip.mate.workspace.core.model.WorkspaceWithRoleVO;
 import vip.mate.workspace.core.repository.WorkspaceMapper;
 import vip.mate.workspace.core.repository.WorkspaceMemberMapper;
 import vip.mate.workspace.core.security.RoleCapabilities;
+import vip.mate.workspace.document.WorkspaceFileService;
 
 import java.time.Duration;
 import java.util.ArrayList;
@@ -45,6 +46,7 @@ public class WorkspaceService {
     private final AgentMapper agentMapper;
     private final WikiKnowledgeBaseService wikiKnowledgeBaseService;
     private final I18nService i18n;
+    private final WorkspaceFileService workspaceFileService;
 
     /** 默认工作区 slug */
     public static final String DEFAULT_SLUG = "default";
@@ -253,9 +255,197 @@ public class WorkspaceService {
             agentMapper.insert(agent);
             log.info("[WorkspaceService] Seeded default agent '{}' (id={}) for workspace {}",
                     agent.getName(), agent.getId(), workspaceId);
+
+            // 为新Agent种子初始化的记忆文件（PROFILE.md、MEMORY.md、AGENTS.md）
+            seedDefaultMemoryFiles(agent.getId());
         } catch (Exception e) {
             log.warn("[WorkspaceService] Failed to seed default agent for workspace {}: {}",
                     workspaceId, e.getMessage());
+        }
+    }
+
+    /**
+     * 为新创建的Agent种子初始化的记忆文件。
+     * <p>
+     * 创建 PROFILE.md、MEMORY.md、AGENTS.md 三个核心记忆文件，
+     * 并设置 PROFILE.md 和 MEMORY.md 为 enabled=true，使其自动纳入系统提示词。
+     *
+     * @param agentId Agent ID
+     */
+    private void seedDefaultMemoryFiles(Long agentId) {
+        if (agentId == null) return;
+        try {
+            // 创建 AGENTS.md（工具与行为配置）- 默认启用，作为系统提示词的一部分
+            workspaceFileService.saveFile(agentId, "AGENTS.md", """
+                    ## 记忆
+
+                    持久记忆基于数据库工作区文件，而不是本地磁盘文件系统。当前 Agent 的长期上下文由以下文档组成：
+
+                    - `PROFILE.md`：用户画像、偏好、协作方式、稳定身份信息
+                    - `MEMORY.md`：长期记忆、稳定事实、经验教训、工作流、反复出现的规律
+                    - `memory/YYYY-MM-DD.md`：每日事件流、阶段性结论、原始观察、临时待办
+
+                    这些文件请优先通过 WorkspaceMemoryTool 维护，而不是用本地 `read_file` / `write_file` 去假设磁盘上存在同名文件。
+
+                    ### 记到哪里
+
+                    - 用户怎么称呼、偏好什么、不喜欢什么、如何协作 → `PROFILE.md`
+                    - 稳定项目事实、关键决策、工具配置、路径、经验教训、长期约束 → `MEMORY.md`
+                    - 今天发生了什么、刚做出的决定、阶段性上下文、待跟进事项 → `memory/YYYY-MM-DD.md`
+
+                    ### 写下来
+
+                    - 记忆有限，想保留就写入工作区记忆文件
+                    - 当用户说"记住这个"或表达明确偏好时，优先更新 `PROFILE.md` 或 `MEMORY.md`
+                    - 当你完成任务、学到教训、发现稳定工作流时，及时更新 `MEMORY.md`
+                    - 当出现一次性事件或当天上下文时，记录到 `memory/YYYY-MM-DD.md`
+                    - 为避免覆盖信息，修改已有记忆前先读取原内容，再做增量编辑
+
+                    ### 主动记录
+
+                    不要总等用户明确下命令。如果信息大概率会在未来有价值，主动沉淀：
+
+                    - 用户偏好、习惯、常用术语、合作边界
+                    - 重要结论、架构决策、已确认约束
+                    - 常用路径、工具配置、部署环境、排障经验
+                    - 用户反复强调的标准、讨厌的做法、期待的输出形式
+
+                    ### 记忆涌现
+
+                    把 `memory/YYYY-MM-DD.md` 看作原始经历，把 `MEMORY.md` 看作提炼后的心智模型。
+
+                    - 如果同类偏好、约束、流程、问题或教训重复出现，就把它们从每日笔记上提为 `MEMORY.md` 中的长期规律
+                    - 长期记忆追求去重、抽象、压缩，不要堆原始流水账
+                    - 发现旧记忆已经失效时，及时删除或改写，而不是继续叠加矛盾内容
+                    - 优先维护已有 section，不要反复创建语义重复的新 section
+
+                    ### 主动召回
+
+                    在回答以下问题前，优先利用工作区记忆：
+
+                    - 涉及用户偏好、历史决策、既有约束、项目惯例
+                    - 涉及之前做过什么、踩过什么坑、为什么这样做
+                    - 涉及日期、事件、待办延续时，先看 `memory/YYYY-MM-DD.md`
+
+                    能从长期记忆回答的问题，就不要假装第一次见。能从每日笔记恢复上下文的问题，就不要只靠猜。
+
+                    ## 安全
+
+                    - 绝不泄露私密数据。绝不。
+                    - 运行破坏性命令（写文件、执行 Shell）前，等待用户审批确认。
+                    - `trash` > `rm`（能恢复总比永久删除好）
+                    - 拿不准的事情，先和用户确认。
+
+                    ## 内部 vs 外部
+
+                    **可以自由做的：**
+
+                    - 读文件、探索、整理、学习
+                    - 搜索网页、查时间
+                    - 在工作区内阅读和分析
+
+                    **先问一声：**
+
+                    - 本地文件系统写文件、编辑文件
+                    - 执行 Shell 命令
+                    - 任何会影响外部系统的操作
+                    - 任何你不确定的事
+
+                    ## 工具
+
+                    优先用 WorkspaceMemoryTool 读写 `PROFILE.md`、`MEMORY.md` 和 `memory/*.md`。
+                    通过 SkillFileTool 查看可用技能（Skills）的 SKILL.md 了解具体用法。
+                    本地配置（SSH 信息、常用路径等）记在 `MEMORY.md` 的工具设置 section。
+                    身份和用户资料记在 `PROFILE.md`。
+
+                    ## 让它成为你的
+
+                    这只是起点。摸索出什么管用后，加上你自己的习惯、风格和规则，更新 AGENTS.md。
+                    """);
+
+            // 创建 PROFILE.md（用户档案）- 默认启用
+            workspaceFileService.saveFile(agentId, "PROFILE.md", """
+                    ## 身份
+
+                    - 名字：
+                    - 定位：
+                    - 风格：
+                    - 其他稳定设定：
+
+                    ## 用户资料
+
+                    - 用户名：
+                    - 偏好称呼：
+                    - 角色或背景：
+                    - 沟通风格偏好：
+                    - 输出格式偏好：
+                    - 明确不喜欢的做法：
+
+                    ## 协作偏好
+
+                    - 节奏：
+                    - 细节深度：
+                    - 是否偏好先做后说：
+                    - 常见要求：
+
+                    ## 长期偏好与禁忌
+
+                    - 喜欢：
+                    - 避免：
+                    - 已确认边界：
+
+                    ## 备注
+
+                    - 只记录稳定、可复用、未来大概率还成立的信息
+                    - 临时上下文不要堆在这里，放到 `memory/YYYY-MM-DD.md`
+                    - 敏感信息默认不记录
+                    """);
+
+            // 创建 MEMORY.md（长期记忆）- 默认启用
+            workspaceFileService.saveFile(agentId, "MEMORY.md", """
+                    ## 长期记忆原则
+
+                    - 这里放提炼后的稳定知识，不放冗长流水账
+                    - 相同信息尽量合并，避免重复
+                    - 过期信息及时删改
+                    - 每条记忆都应该帮助未来更快决策或减少重复沟通
+
+                    ## 稳定事实
+
+                    - 项目：
+                    - 环境：
+                    - 长期约束：
+
+                    ## 决策与原因
+
+                    - 决策：
+                      原因：
+
+                    ## 工作流与偏好
+
+                    - 工作流程：
+                    - 工具配置：
+                    - 已验证有效的做法：
+
+                    ## 经验教训
+
+                    - 踩过的坑：
+                    - 更好的做法：
+                    - 用户反馈：
+
+                    ## 备注
+
+                    - 这里是压缩后的心智模型，不是每日流水账
+                    - 每日事件请记录到 `memory/YYYY-MM-DD.md`
+                    """);
+
+            // 设置启用的系统提示词文件列表（按顺序）
+            workspaceFileService.setPromptFiles(agentId, List.of("AGENTS.md", "PROFILE.md", "MEMORY.md"));
+
+            log.info("[WorkspaceService] Seeded default memory files for agent {}", agentId);
+        } catch (Exception e) {
+            log.warn("[WorkspaceService] Failed to seed default memory files for agent {}: {}",
+                    agentId, e.getMessage());
         }
     }
 

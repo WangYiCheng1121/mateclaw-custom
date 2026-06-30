@@ -560,6 +560,9 @@ public class FeishuChannelAdapter extends AbstractChannelAdapter implements Stre
         cancelSilentDisconnectWatchdog();
         silentDisconnectWatchdog = ensureWatchdogExecutor().scheduleAtFixedRate(() -> {
             if (!running.get() || wsClient == null) return;
+            // 每次巡检都刷新活跃时间戳，防止 SDK ping/pong 不触发 touchActivity()
+            // 导致 ChannelHealthMonitor 误判闲置连接为僵死而反复重启
+            touchActivity();
             if (!hasReceivedFirstEvent) return; // 没收到首个事件前不算静默
 
             long silentMs = System.currentTimeMillis() - lastEventTimeMs.get();

@@ -954,6 +954,20 @@ public class ChatController {
      * 前端随后通过 SSE 流重新发送用户消息。
      */
     @Operation(summary = "重新生成回复（删除旧消息后由前端重新发送）")
+    /**
+     * Regenerate the last assistant turn.
+     * <p>
+     * Deletes <em>all</em> messages after the most recent {@code role='user'}
+     * message in the conversation — not just the single message whose id was
+     * passed in. A user turn may produce multiple assistant rows (gate message
+     * while awaiting approval + replay message after approval), and they must
+     * be deleted together so the regenerate starts from a clean slate.
+     * <p>
+     * 重新生成最后一轮 assistant 回复。删除会话中最后一条 user 消息之后的
+     * 全部消息——而非仅传入 messageId 对应的那一条。一轮用户对话可能产生
+     * 多条 assistant 行（等待审批时的门控消息 + 审批通过后的 replay 消息），
+     * 必须一并删除才能从干净状态开始重新生成。
+     */
     @PostMapping("/{conversationId}/regenerate")
     public R<Map<String, Object>> regenerateMessage(
             @PathVariable String conversationId,
@@ -969,23 +983,31 @@ public class ChatController {
             return R.fail("messageId 不能为空");
         }
 
-        // Find and validate the assistant message to be regenerated.
-        MessageEntity deletedMsg = conversationService.deleteMessage(messageId);
-        if (deletedMsg == null) {
+        // Validate that the referenced message exists and belongs to this
+        // conversation, but do NOT delete only that single row — the actual
+        // deletion scope is "everything after the last user message".
+        MessageEntity msg = conversationService.getMessage(messageId);
+        if (msg == null) {
             return R.fail("消息不存在");
         }
-//        if (!"assistant".equals(deletedMsg.getRole())) {
-//            return R.fail("只能重新生成 assistant 类型的消息");
-//        }
-        if (!conversationId.equals(deletedMsg.getConversationId())) {
+        if (!"assistant".equals(msg.getRole())) {
+            return R.fail("只能重新生成 assistant 类型的消息");
+        }
+        if (!conversationId.equals(msg.getConversationId())) {
             return R.fail("消息不属于当前会话");
         }
 
-        log.info("Regenerate: conversationId={}, deletedMessageId={}, user={}",
-                conversationId, messageId, username);
+        int deleted = conversationService.deleteMessagesAfterLastUser(conversationId);
+        if (deleted < 0) {
+            return R.fail("会话中没有用户消息，无法重新生成");
+        }
+
+        log.info("Regenerate: conversationId={}, deletedMessageId={}, tailDeleted={}, user={}",
+                conversationId, messageId, deleted, username);
 
         return R.ok(Map.of(
                 "deletedMessageId", messageId,
+                "tailDeleted", deleted,
                 "conversationId", conversationId
         ));
     }
