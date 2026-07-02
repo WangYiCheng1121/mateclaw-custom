@@ -7,6 +7,8 @@ import org.springframework.ai.anthropic.AnthropicChatOptions;
 import org.springframework.ai.anthropic.api.AnthropicApi;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.retry.support.RetryTemplate;
 import org.springframework.stereotype.Component;
@@ -18,6 +20,7 @@ import vip.mate.llm.cache.AnthropicCacheOptionsFactory;
 import vip.mate.llm.model.ModelConfigEntity;
 import vip.mate.llm.model.ModelProtocol;
 import vip.mate.llm.model.ModelProviderEntity;
+import vip.mate.llm.platform.LlmProxyHelper;
 import vip.mate.llm.service.ModelProviderService;
 
 import java.net.http.HttpClient;
@@ -25,6 +28,11 @@ import java.time.Duration;
 
 /**
  * Strategy implementation for {@link ModelProtocol#ANTHROPIC_MESSAGES}.
+ *
+ * <p>All traffic is routed through the platform LLM proxy
+ * ({@code gatewayUrl/ai-manage/api/proxy/anthropic}).
+ * Direct provider connections are no longer supported;
+ * API keys and base URLs are managed exclusively by the platform.
  *
  * <p>Owns the full Anthropic construction logic — API client + chat options
  * including the extended-thinking budget mapping (low/medium/high/max →
@@ -39,6 +47,10 @@ public class AnthropicChatModelBuilder implements ChatModelBuilder {
     private final ObjectProvider<WebClient.Builder> webClientBuilderProvider;
     private final ObjectProvider<ObservationRegistry> observationRegistryProvider;
     private final AnthropicCacheOptionsFactory anthropicCacheOptionsFactory;
+
+    /** 共享的 LLM 代理基础设施（可选；未配置时退化为直连模式） */
+    @Autowired(required = false)
+    private LlmProxyHelper llmProxyHelper;
 
     public AnthropicChatModelBuilder(
             ModelProviderService modelProviderService,
@@ -61,7 +73,7 @@ public class AnthropicChatModelBuilder implements ChatModelBuilder {
     @Override
     public ChatModel build(ModelConfigEntity model, ModelProviderEntity provider, RetryTemplate retry) {
         AnthropicApi api = buildAnthropicApi(provider, model.getRequestTimeoutSeconds());
-        AnthropicChatOptions options = buildAnthropicOptions(model);
+        AnthropicChatOptions options = buildAnthropicOptions(model, provider);
         return AnthropicChatModel.builder()
                 .anthropicApi(api)
                 .defaultOptions(options)
@@ -79,29 +91,60 @@ public class AnthropicChatModelBuilder implements ChatModelBuilder {
      * (seconds). Null falls back to the default 180s.
      */
     AnthropicApi buildAnthropicApi(ModelProviderEntity provider, Integer readTimeoutOverride) {
-        if (provider == null || !modelProviderService.isProviderConfigured(provider.getProviderId())) {
-            throw new MateClawException("err.agent.anthropic_not_configured",
-                    "Anthropic Provider 未完成配置，请在模型设置中填写有效的 API Key 和 Base URL");
+        if (llmProxyHelper == null || !llmProxyHelper.isEnabled()) {
+            throw new MateClawException("err.agent.proxy_not_available",
+                    "平台 LLM 代理未就绪，请检查平台连接配置");
         }
-        String apiKey = provider.getApiKey();
-        if (!modelProviderService.hasUsableApiKey(apiKey)) {
-            throw new MateClawException("err.agent.anthropic_key_invalid",
-                    "Anthropic API Key 未配置或无效: " + provider.getProviderId());
-        }
-        String baseUrl = provider.getBaseUrl();
+        return buildProxyApi(readTimeoutOverride);
+    }
+
+    /**
+     * Build an {@link AnthropicApi} that routes through the platform LLM proxy.
+     * <p>
+     * Sets the base URL to {@code gatewayUrl/ai-manage/api/proxy/anthropic},
+     * so Spring AI appends {@code /v1/messages} yielding the proxy endpoint
+     * {@code gatewayUrl/ai-manage/api/proxy/anthropic/v1/messages}.
+     * Auth token and user context are injected via request interceptor.
+     */
+    private AnthropicApi buildProxyApi(Integer readTimeoutOverride) {
+        String proxyBaseUrl = llmProxyHelper.getProxyBaseUrl() + "/api/proxy/anthropic";
+
         RestClient.Builder restClientBuilder = applyHttpTimeouts(
                 restClientBuilderProvider.getIfAvailable(RestClient::builder), readTimeoutOverride);
         WebClient.Builder webClientBuilder = applyHttpTimeoutsToWebClient(
                 webClientBuilderProvider.getIfAvailable(WebClient::builder), readTimeoutOverride);
 
-        AnthropicApi.Builder builder = AnthropicApi.builder()
-                .apiKey(apiKey.trim())
+        // Inject auth token + user context per-request
+        restClientBuilder = restClientBuilder.requestInterceptor((request, body, execution) -> {
+            HttpHeaders reqHeaders = request.getHeaders();
+            String token = llmProxyHelper.resolveToken();
+            if (token != null) {
+                reqHeaders.set(HttpHeaders.AUTHORIZATION, "Bearer " + token);
+            }
+            llmProxyHelper.injectUserContext(reqHeaders);
+            return execution.execute(request, body);
+        });
+        webClientBuilder = webClientBuilder.filter((request, next) -> {
+            String token = llmProxyHelper.resolveToken();
+            var modified = org.springframework.web.reactive.function.client.ClientRequest.from(request)
+                    .headers(h -> {
+                        if (token != null) {
+                            h.set(HttpHeaders.AUTHORIZATION, "Bearer " + token);
+                        }
+                        llmProxyHelper.injectUserContext(h);
+                    })
+                    .build();
+            return next.exchange(modified);
+        });
+
+        log.info("[LlmProxy] Routing Anthropic through platform proxy: baseUrl={}", proxyBaseUrl);
+
+        return AnthropicApi.builder()
+                .apiKey("proxy")  // placeholder; real auth via interceptor
+                .baseUrl(proxyBaseUrl)
                 .restClientBuilder(restClientBuilder)
-                .webClientBuilder(webClientBuilder);
-        if (StringUtils.hasText(baseUrl)) {
-            builder.baseUrl(baseUrl.trim());
-        }
-        return builder.build();
+                .webClientBuilder(webClientBuilder)
+                .build();
     }
 
     /**
@@ -121,11 +164,12 @@ public class AnthropicChatModelBuilder implements ChatModelBuilder {
         return lower.contains("4-7") || lower.contains("4.7");
     }
 
-    AnthropicChatOptions buildAnthropicOptions(ModelConfigEntity runtimeModel) {
+    AnthropicChatOptions buildAnthropicOptions(ModelConfigEntity runtimeModel, ModelProviderEntity provider) {
         AnthropicChatOptions.Builder builder = AnthropicChatOptions.builder();
         String modelName = runtimeModel.getModelName();
         if (StringUtils.hasText(modelName)) {
-            builder.model(modelName);
+            String prefixedModel = provider.getProviderId() + "::" + modelName;
+            builder.model(prefixedModel);
         }
         boolean isClaude47 = isClaude47(modelName);
 
@@ -193,9 +237,7 @@ public class AnthropicChatModelBuilder implements ChatModelBuilder {
      * where nginx caps the gateway at 60s but a real long thinking response
      * needs more — the upper retry layer takes over once we time out.
      *
-     * <p>Package-private + static so {@code ClaudeCodeChatModelBuilder} can
-     * apply the same timeouts to its OAuth RestClient without duplicating
-     * the snippet.</p>
+     * <p>Package-private + static for shared timeout application.
      */
     static RestClient.Builder applyHttpTimeouts(RestClient.Builder builder) {
         return applyHttpTimeouts(builder, null);

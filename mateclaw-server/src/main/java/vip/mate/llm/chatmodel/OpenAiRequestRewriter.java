@@ -451,7 +451,8 @@ final class OpenAiRequestRewriter {
             return request;
         }
         String model = request.model();
-        if (model == null || !model.trim().toLowerCase().startsWith("gpt-5")) {
+        String rawModel = vip.mate.llm.model.ModelFamily.stripProviderPrefix(model);
+        if (rawModel == null || !rawModel.trim().toLowerCase().startsWith("gpt-5")) {
             return request;
         }
 

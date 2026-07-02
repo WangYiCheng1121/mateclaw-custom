@@ -121,7 +121,12 @@ public class SkillEntity {
      * 平台端可见性状态（客户端本地跟踪字段，非平台下发）。
      * NULL 正常 / "REMOVED" 平台已移除（禁用/删除/取消分配）。
      * 非空时 toggle/install 被拦截，重新出现时重置为全新技能。
+     * <p>
+     * 使用 ALWAYS 策略确保 null 值能被正确写入数据库，
+     * 否则 MyBatis-Plus 默认 NOT_NULL 会跳过 null 列，
+     * 导致 REMOVED 状态无法清除。
      */
+    @TableField(value = "platform_status", updateStrategy = FieldStrategy.ALWAYS)
     private String platformStatus;
 
     /** 标签（逗号分隔） */

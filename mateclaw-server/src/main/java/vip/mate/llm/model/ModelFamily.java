@@ -143,7 +143,7 @@ public enum ModelFamily {
         if (modelName == null || modelName.isBlank()) {
             return STANDARD;
         }
-        String normalized = modelName.trim().toLowerCase();
+        String normalized = stripProviderPrefix(modelName).trim().toLowerCase();
 
         // OpenAI reasoning 族：gpt-5*, o1*, o3*, o4*
         if (normalized.startsWith("gpt-5")
@@ -180,5 +180,23 @@ public enum ModelFamily {
         }
 
         return STANDARD;
+    }
+
+    /**
+     * Strip the {@code providerId::} prefix from a model name if present.
+     * <p>
+     * Used by the proxy-gateway routing scheme where the model field carries
+     * both the provider id and the real model name, separated by {@code ::}.
+     *
+     * @param maybePrefixed  model name that may start with {@code providerId::}
+     * @return the raw model name (everything after {@code ::}), or the
+     *         original string if no prefix separator is found
+     */
+    public static String stripProviderPrefix(String maybePrefixed) {
+        if (maybePrefixed == null) {
+            return null;
+        }
+        int idx = maybePrefixed.indexOf("::");
+        return idx >= 0 ? maybePrefixed.substring(idx + 2) : maybePrefixed;
     }
 }

@@ -7,9 +7,11 @@ import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import vip.mate.auth.config.PlatformOAuth2Config;
+import vip.mate.skill.event.SkillRemovedEvent;
 import vip.mate.skill.model.SkillEntity;
 import vip.mate.skill.repository.SkillMapper;
 import vip.mate.skill.runtime.SkillFrontmatterParser;
@@ -33,7 +35,7 @@ import java.util.*;
  * <ul>
  *   <li>新增：平台端有、本地无 → 插入（默认 installed=false, enabled=false，需用户手动安装）</li>
  *   <li>更新：平台端有、本地有但内容不同 → 更新内容（不覆盖客户端本地 enabled/installed 状态）</li>
- *   <li>移除-已安装：平台端无、本地有且已安装 → 标记 platformStatus="REMOVED" + installed=false + enabled=false（仅首次；已 REMOVED 的跳过等待用户手动删除）</li>
+ *   <li>移除-已安装：平台端无、本地有且已安装 → 标记 platformStatus="REMOVED" + installed=false + enabled=false（仅首次；已 REMOVED 的跳过等待用户手动删除；平台恢复时自动还原 installed=true + enabled=true）</li>
  *   <li>移除-未安装：平台端无、本地有且未安装 → 物理删除（不留僵尸数据）</li>
  * </ul>
  *
@@ -57,6 +59,7 @@ public class SkillSyncService {
     private final SkillFrontmatterParser frontmatterParser;
     private final WorkspaceMapper workspaceMapper;
     private final SkillService skillService;
+    private final ApplicationEventPublisher eventPublisher;
 
     /**
      * AES 加密密钥，与 {@link SkillSecretService} 共用同一把 key，
@@ -257,12 +260,14 @@ public class SkillSyncService {
                     }
                 } else {
                     // === 平台恢复检测 ===
-                    // 如果该工作区副本之前被标记为 REMOVED，重新出现 → 当作全新安装
+                    // 如果该工作区副本之前被标记为 REMOVED，重新出现 → 恢复安装。
+                    // 能进入 REMOVED 状态的技能必然之前 installed=true（uninstalled 的会直接物理删除），
+                    // 因此恢复时保持 installed=true + enabled=true，与更新路径一致：尊重用户本地决策。
                     boolean wasRemoved = "REMOVED".equals(local.getPlatformStatus());
                     if (wasRemoved) {
                         local.setPlatformStatus(null);
-                        local.setInstalled(false);
-                        local.setEnabled(false);
+                        local.setInstalled(true);
+                        local.setEnabled(true);
                         local.setDescription(remote.getDescription());
                         local.setSkillContent(remote.getSkillContent());
                         local.setVersion(remote.getVersion());
@@ -278,7 +283,7 @@ public class SkillSyncService {
                         local.setSecret(encryptedSecret);
                         skillMapper.updateById(local);
                         updated++;
-                        log.info("Skill '{}' restored in workspace {}, treated as new install",
+                        log.info("Skill '{}' restored (was REMOVED) in workspace {}, keeping installed=true",
                                 local.getName(), wsId);
 
                         // 一次性操作
@@ -362,6 +367,10 @@ public class SkillSyncService {
                     }
                     // 注销运行时包装器（knowledge/acp tools），避免已禁用的技能仍暴露工具
                     runtimeService.deregisterSkillWrappers(local.getId());
+                    // 通知监听器（AgentBindingSkillRemovalListener 会清理绑定行
+                    // 并在零绑定时设置 hasSkillBinding=TRUE，防止回退到全局默认）
+                    eventPublisher.publishEvent(
+                            new SkillRemovedEvent(local.getId(), local.getName()));
                     disabled++;
                     log.info("Marked skill as platform-removed (was installed) in workspace {}: {}",
                             local.getWorkspaceId(), local.getName());

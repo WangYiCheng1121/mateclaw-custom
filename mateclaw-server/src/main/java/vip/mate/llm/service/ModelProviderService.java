@@ -9,7 +9,6 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 import vip.mate.exception.MateClawException;
-import vip.mate.llm.anthropic.oauth.ClaudeCodeOAuthService;
 import vip.mate.llm.event.ModelConfigChangedEvent;
 import vip.mate.llm.failover.AvailableProviderPool;
 import vip.mate.llm.failover.ProviderHealthTracker;
@@ -28,8 +27,9 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class ModelProviderService {
 
-    /** Provider id whose OAuth token lives on local disk (Keychain / ~/.claude/.credentials.json) instead of the database. */
-    private static final String CLAUDE_CODE_PROVIDER_ID = "anthropic-claude-code";
+    private final ModelProviderMapper modelProviderMapper;
+    private final ModelConfigService modelConfigService;
+    private final ApplicationEventPublisher eventPublisher;
 
     /**
      * Issue #39: provider id is used as a single path segment in
@@ -46,11 +46,6 @@ public class ModelProviderService {
     static final java.util.regex.Pattern PROVIDER_ID_PATTERN =
             java.util.regex.Pattern.compile("^[a-zA-Z0-9][a-zA-Z0-9._-]{0,63}$");
 
-    private final ModelProviderMapper modelProviderMapper;
-    private final ModelConfigService modelConfigService;
-    private final ApplicationEventPublisher eventPublisher;
-    /** Lazy provider — avoids forcing the bean to exist in test contexts that don't load the anthropic package. */
-    private final ObjectProvider<ClaudeCodeOAuthService> claudeCodeOAuthServiceProvider;
     /** RFC-073: pool / cooldown / probe-completion signals that drive {@link Liveness}. */
     private final AvailableProviderPool providerPool;
     private final ProviderHealthTracker providerHealthTracker;
@@ -408,24 +403,8 @@ public class ModelProviderService {
         dto.setBaseUrl(provider.getBaseUrl());
         dto.setGenerateKwargs(readJson(provider.getGenerateKwargs()));
         dto.setAuthType(provider.getAuthType() != null ? provider.getAuthType() : "api_key");
-        if (CLAUDE_CODE_PROVIDER_ID.equals(provider.getProviderId())) {
-            // Claude Code OAuth credentials live on disk (RFC-062), not in the
-            // mate_model_provider row. Bypass the column lookup and ask the
-            // service directly. Falls back to false if the bean isn't present
-            // (e.g. minimal test contexts).
-            ClaudeCodeOAuthService svc = claudeCodeOAuthServiceProvider.getIfAvailable();
-            if (svc != null) {
-                ClaudeCodeOAuthService.OAuthStatus status = svc.getStatus();
-                dto.setOauthConnected(status.connected() && !status.expired());
-                dto.setOauthExpiresAt(status.expiresAtMs() > 0L ? status.expiresAtMs() : null);
-            } else {
-                dto.setOauthConnected(false);
-                dto.setOauthExpiresAt(null);
-            }
-        } else {
-            dto.setOauthConnected(StringUtils.hasText(provider.getOauthAccessToken()));
-            dto.setOauthExpiresAt(provider.getOauthExpiresAt());
-        }
+        dto.setOauthConnected(StringUtils.hasText(provider.getOauthAccessToken()));
+        dto.setOauthExpiresAt(provider.getOauthExpiresAt());
         dto.setFallbackPriority(provider.getFallbackPriority() != null ? provider.getFallbackPriority() : 0);
         List<ModelInfoDTO> builtinModels = new ArrayList<>();
         List<ModelInfoDTO> extraModels = new ArrayList<>();
@@ -531,14 +510,8 @@ public class ModelProviderService {
             return false;
         }
 
-        // OAuth providers store credentials elsewhere (DB column or disk for
-        // Claude Code). Resolve them via the OAuth service rather than the
-        // base-URL / api-key columns.
+        // OAuth providers store credentials in the DB column.
         if ("oauth".equals(provider.getAuthType())) {
-            if (CLAUDE_CODE_PROVIDER_ID.equals(provider.getProviderId())) {
-                ClaudeCodeOAuthService svc = claudeCodeOAuthServiceProvider.getIfAvailable();
-                return svc != null && svc.isLoggedIn();
-            }
             return StringUtils.hasText(provider.getOauthAccessToken());
         }
 

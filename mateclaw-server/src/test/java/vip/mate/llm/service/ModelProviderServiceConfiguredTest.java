@@ -6,7 +6,6 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.ApplicationEventPublisher;
-import vip.mate.llm.anthropic.oauth.ClaudeCodeOAuthService;
 import vip.mate.llm.failover.AvailableProviderPool;
 import vip.mate.llm.failover.ProviderHealthProperties;
 import vip.mate.llm.failover.ProviderHealthTracker;
@@ -33,8 +32,6 @@ class ModelProviderServiceConfiguredTest {
     private ModelProviderMapper providerMapper;
     private ModelConfigService modelConfigService;
     private ApplicationEventPublisher eventPublisher;
-    private ObjectProvider<ClaudeCodeOAuthService> claudeCodeOAuthProvider;
-    private ClaudeCodeOAuthService claudeCodeOAuthService;
     private AvailableProviderPool pool;
     private ProviderHealthTracker healthTracker;
     private ProviderInitProbe initProbe;
@@ -48,9 +45,6 @@ class ModelProviderServiceConfiguredTest {
         providerMapper = mock(ModelProviderMapper.class);
         modelConfigService = mock(ModelConfigService.class);
         eventPublisher = mock(ApplicationEventPublisher.class);
-        claudeCodeOAuthProvider = mock(ObjectProvider.class);
-        claudeCodeOAuthService = mock(ClaudeCodeOAuthService.class);
-        when(claudeCodeOAuthProvider.getIfAvailable()).thenReturn(null);
         pool = new AvailableProviderPool();
         ProviderHealthProperties props = new ProviderHealthProperties();
         props.setFailureThreshold(1);
@@ -62,7 +56,7 @@ class ModelProviderServiceConfiguredTest {
         when(initProbe.hasBeenProbed(any())).thenReturn(true);
 
         service = new ModelProviderService(providerMapper, modelConfigService, eventPublisher,
-                claudeCodeOAuthProvider, pool, healthTracker, initProbeProvider);
+                pool, healthTracker, initProbeProvider);
     }
 
     @Test

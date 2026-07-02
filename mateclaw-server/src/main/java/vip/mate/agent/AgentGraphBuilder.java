@@ -104,7 +104,6 @@ public class AgentGraphBuilder {
     private final MemoryManager memoryManager;
     private final WorkspaceFileService workspaceFileService;
     private final vip.mate.agent.context.ConversationWindowManager conversationWindowManager;
-    private final vip.mate.llm.chatgpt.ChatGPTResponsesClient chatGPTResponsesClient;
     private final WikiContextService wikiContextService;
     private final vip.mate.workspace.core.service.WorkspaceService workspaceService;
     private final vip.mate.llm.cache.AnthropicCacheOptionsFactory anthropicCacheOptionsFactory;
@@ -886,12 +885,6 @@ public class AgentGraphBuilder {
         return protocol == ModelProtocol.DASHSCOPE_NATIVE
                 || protocol == ModelProtocol.OPENAI_COMPATIBLE
                 || protocol == ModelProtocol.ANTHROPIC_MESSAGES
-                // RFC-062: Claude Code OAuth tunnels through the same Messages API
-                // wrapped in AnthropicChatModel — same StateGraph capability surface.
-                || protocol == ModelProtocol.ANTHROPIC_CLAUDE_CODE
-                || protocol == ModelProtocol.OPENAI_CHATGPT
-                // Gemini native generateContent — GeminiChatModel exposes the same
-                // streaming + tool-calling surface the StateGraph nodes rely on.
                 || protocol == ModelProtocol.GEMINI_NATIVE;
     }
 

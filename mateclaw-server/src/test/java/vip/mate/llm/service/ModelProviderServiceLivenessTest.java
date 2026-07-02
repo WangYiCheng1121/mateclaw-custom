@@ -6,7 +6,6 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.ApplicationEventPublisher;
-import vip.mate.llm.anthropic.oauth.ClaudeCodeOAuthService;
 import vip.mate.llm.failover.AvailableProviderPool;
 import vip.mate.llm.failover.ProviderHealthProperties;
 import vip.mate.llm.failover.ProviderHealthTracker;
@@ -37,7 +36,6 @@ class ModelProviderServiceLivenessTest {
     private ModelProviderMapper providerMapper;
     private ModelConfigService modelConfigService;
     private ApplicationEventPublisher eventPublisher;
-    private ObjectProvider<ClaudeCodeOAuthService> claudeCodeOAuthProvider;
     private AvailableProviderPool pool;
     private ProviderHealthTracker healthTracker;
     private ProviderInitProbe initProbe;
@@ -51,8 +49,6 @@ class ModelProviderServiceLivenessTest {
         providerMapper = mock(ModelProviderMapper.class);
         modelConfigService = mock(ModelConfigService.class);
         eventPublisher = mock(ApplicationEventPublisher.class);
-        claudeCodeOAuthProvider = mock(ObjectProvider.class);
-        when(claudeCodeOAuthProvider.getIfAvailable()).thenReturn(null);
         pool = new AvailableProviderPool();
         // failure-threshold = 1 so a single recordFailure() trips cooldown deterministically.
         ProviderHealthProperties props = new ProviderHealthProperties();
@@ -63,7 +59,7 @@ class ModelProviderServiceLivenessTest {
         when(initProbeProvider.getIfAvailable()).thenReturn(initProbe);
 
         service = new ModelProviderService(providerMapper, modelConfigService, eventPublisher,
-                claudeCodeOAuthProvider, pool, healthTracker, initProbeProvider);
+                pool, healthTracker, initProbeProvider);
     }
 
     @Test

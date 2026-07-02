@@ -1,6 +1,7 @@
 package vip.mate.agent.binding.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -119,14 +120,27 @@ public class AgentBindingService implements AgentBindingResolver {
 
     /**
      * 获取 Agent 绑定的 enabled skill ID 集合。
-     * 返回 null 表示该 agent 没有自定义绑定（使用全局默认）。
+     *
+     * <p>三态语义：
+     * <ul>
+     *   <li><b>返回 {@code null}</b> — 从未绑定或用户主动清空，使用全局默认（全部已启用技能）。</li>
+     *   <li><b>返回空集合</b> — 曾有过显式绑定但全部被平台删除，该员工不能使用任何技能。</li>
+     *   <li><b>返回非空集合</b> — 仅限这些技能。</li>
+     * </ul>
+     *
+     * <p>判断依据是 {@code mate_agent.has_skill_binding} 列：
+     * {@code TRUE} 表示曾有过显式绑定（由 {@code setSkillBindings} 或
+     * {@code AgentBindingSkillRemovalListener} 设置），此时返回当前 enabled 集合；
+     * {@code NULL / FALSE} 表示从未绑定或用户主动清空，返回 {@code null} 回到全局默认。
      */
     @Override
     public Set<Long> getBoundSkillIds(Long agentId) {
-        List<AgentSkillBinding> bindings = listSkillBindings(agentId);
-        if (bindings.isEmpty()) {
-            return null; // 无绑定 → 全局默认
+        AgentEntity agent = agentMapper.selectById(agentId);
+        if (agent == null || !Boolean.TRUE.equals(agent.getHasSkillBinding())) {
+            return null; // 从未绑定或主动清空 → 全局默认
         }
+        // 曾有过绑定 → 返回当前 enabled 集合（可能为空）
+        List<AgentSkillBinding> bindings = listSkillBindings(agentId);
         return bindings.stream()
                 .filter(b -> Boolean.TRUE.equals(b.getEnabled()))
                 .map(AgentSkillBinding::getSkillId)
@@ -161,7 +175,14 @@ public class AgentBindingService implements AgentBindingResolver {
     }
 
     /**
-     * 批量设置 Agent 的 skill 绑定（替换模式）
+     * 批量设置 Agent 的 skill 绑定（替换模式）。
+     *
+     * <p>同时更新 {@code mate_agent.has_skill_binding} 标记：
+     * <ul>
+     *   <li>非空列表 → 设为 {@code TRUE}（用户做了显式选择）</li>
+     *   <li>空列表 {@code []} → 设为 {@code FALSE}（用户主动清空，回到全局默认）</li>
+     *   <li>{@code null} → 不修改标记（兼容外部调用）</li>
+     * </ul>
      */
     public void setSkillBindings(Long agentId, List<Long> skillIds) {
         // Validate every incoming skill BEFORE touching the binding rows;
@@ -173,7 +194,7 @@ public class AgentBindingService implements AgentBindingResolver {
                 requireSameWorkspace(agentId, skillId);
             }
         }
-        // 删除旧绑定
+        // 删除旧绑定（硬删除）
         skillBindingMapper.delete(
                 new LambdaQueryWrapper<AgentSkillBinding>()
                         .eq(AgentSkillBinding::getAgentId, agentId));
@@ -186,6 +207,13 @@ public class AgentBindingService implements AgentBindingResolver {
                 binding.setEnabled(true);
                 skillBindingMapper.insert(binding);
             }
+            // 用户做了显式选择 → 标记 hasSkillBinding
+            // 空列表 = 主动清空 → FALSE（回到全局默认）
+            // 非空列表 = 显式绑定 → TRUE
+            agentMapper.update(null,
+                    new LambdaUpdateWrapper<AgentEntity>()
+                            .set(AgentEntity::getHasSkillBinding, !skillIds.isEmpty())
+                            .eq(AgentEntity::getId, agentId));
         }
     }
 

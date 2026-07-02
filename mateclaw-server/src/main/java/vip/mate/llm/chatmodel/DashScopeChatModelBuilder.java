@@ -8,6 +8,7 @@ import com.alibaba.cloud.ai.dashscope.spec.DashScopeApiSpec;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.retry.support.RetryTemplate;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
@@ -15,6 +16,7 @@ import vip.mate.exception.MateClawException;
 import vip.mate.llm.model.ModelConfigEntity;
 import vip.mate.llm.model.ModelProtocol;
 import vip.mate.llm.model.ModelProviderEntity;
+import vip.mate.llm.platform.LlmProxyHelper;
 import vip.mate.llm.service.ModelProviderService;
 
 import java.lang.reflect.Field;
@@ -39,6 +41,10 @@ public class DashScopeChatModelBuilder implements ChatModelBuilder {
     private final ObjectProvider<DashScopeChatModel> dashScopeChatModelProvider;
     private final DashScopeConnectionProperties dashScopeConnectionProperties;
     private final ModelProviderService modelProviderService;
+
+    /** 共享的 LLM 代理基础设施（可选；未配置时退化为直连模式） */
+    @Autowired(required = false)
+    private LlmProxyHelper llmProxyHelper;
 
     public DashScopeChatModelBuilder(ObjectProvider<DashScopeChatModel> dashScopeChatModelProvider,
                                           DashScopeConnectionProperties dashScopeConnectionProperties,
@@ -130,7 +136,8 @@ public class DashScopeChatModelBuilder implements ChatModelBuilder {
         Map<String, Object> kwargs = modelProviderService.readProviderGenerateKwargs(provider);
 
         if (StringUtils.hasText(runtimeModel.getModelName())) {
-            builder.withModel(runtimeModel.getModelName());
+            String prefixedModel = provider.getProviderId() + "::" + runtimeModel.getModelName();
+            builder.withModel(prefixedModel);
         }
         if (runtimeModel.getTemperature() != null) {
             builder.withTemperature(runtimeModel.getTemperature());
@@ -159,35 +166,30 @@ public class DashScopeChatModelBuilder implements ChatModelBuilder {
     }
 
     DashScopeApi buildDashScopeApi(ModelProviderEntity provider) {
-        DashScopeApi.Builder builder = DashScopeApi.builder();
+        if (llmProxyHelper == null || !llmProxyHelper.isEnabled()) {
+            throw new MateClawException("err.agent.proxy_not_available",
+                    "平台 LLM 代理未就绪，请检查平台连接配置");
+        }
+        return buildProxyApi();
+    }
 
-        // API Key fallback chain: provider UI config → env / application.yml → default bean reflection
-        String apiKey = provider != null ? provider.getApiKey() : null;
-        if (!StringUtils.hasText(apiKey) || !modelProviderService.hasUsableApiKey(apiKey)) {
-            apiKey = dashScopeConnectionProperties.getApiKey();
+    /**
+     * Build a {@link DashScopeApi} that routes through the platform LLM proxy.
+     * Sets the base URL to {@code gatewayUrl/ai-manage/api/proxy/dashscope}
+     * and uses the platform token as the API key.
+     */
+    private DashScopeApi buildProxyApi() {
+        String proxyBaseUrl = llmProxyHelper.getProxyBaseUrl() + "/api/proxy/dashscope";
+        String token = llmProxyHelper.resolveToken();
+        if (token == null) {
+            throw new MateClawException("err.agent.proxy_token_unavailable",
+                    "平台代理 Token 不可用，请检查平台连接");
         }
-        if (!StringUtils.hasText(apiKey) || !modelProviderService.hasUsableApiKey(apiKey)) {
-            apiKey = readApiKeyFromDefaultChatModel();
-        }
-        if (!modelProviderService.hasUsableApiKey(apiKey)) {
-            throw new MateClawException("err.agent.dashscope_key_missing",
-                    "DashScope API Key 未配置，请在「设置 → 模型 → 添加供应商」中为 dashscope 填写 API Key");
-        }
-        builder.apiKey(apiKey.trim());
-
-        // Base URL fallback chain — same priority as API Key
-        String baseUrl = provider != null ? provider.getBaseUrl() : null;
-        if (!StringUtils.hasText(baseUrl)) {
-            baseUrl = dashScopeConnectionProperties.getBaseUrl();
-        }
-        if (!StringUtils.hasText(baseUrl)) {
-            baseUrl = readBaseUrlFromDefaultChatModel();
-        }
-        String normalizedBaseUrl = normalizeDashScopeBaseUrl(baseUrl);
-        if (StringUtils.hasText(normalizedBaseUrl)) {
-            builder.baseUrl(normalizedBaseUrl);
-        }
-        return builder.build();
+        log.info("[LlmProxy] Routing DashScope through platform proxy: baseUrl={}", proxyBaseUrl);
+        return DashScopeApi.builder()
+                .apiKey(token)
+                .baseUrl(proxyBaseUrl)
+                .build();
     }
 
     /**

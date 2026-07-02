@@ -6,7 +6,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.ApplicationEventPublisher;
 import vip.mate.exception.MateClawException;
-import vip.mate.llm.anthropic.oauth.ClaudeCodeOAuthService;
 import vip.mate.llm.failover.AvailableProviderPool;
 import vip.mate.llm.failover.ProviderHealthProperties;
 import vip.mate.llm.failover.ProviderHealthTracker;
@@ -44,7 +43,6 @@ class ModelProviderServiceCustomProviderTest {
     private ModelProviderMapper providerMapper;
     private ModelConfigService modelConfigService;
     private ApplicationEventPublisher eventPublisher;
-    private ObjectProvider<ClaudeCodeOAuthService> claudeCodeOAuthProvider;
     private AvailableProviderPool pool;
     private ProviderHealthTracker healthTracker;
     private ProviderInitProbe initProbe;
@@ -58,8 +56,6 @@ class ModelProviderServiceCustomProviderTest {
         providerMapper = mock(ModelProviderMapper.class);
         modelConfigService = mock(ModelConfigService.class);
         eventPublisher = mock(ApplicationEventPublisher.class);
-        claudeCodeOAuthProvider = mock(ObjectProvider.class);
-        when(claudeCodeOAuthProvider.getIfAvailable()).thenReturn(null);
         pool = new AvailableProviderPool();
         healthTracker = new ProviderHealthTracker(new ProviderHealthProperties());
         initProbe = mock(ProviderInitProbe.class);
@@ -67,7 +63,7 @@ class ModelProviderServiceCustomProviderTest {
         when(initProbeProvider.getIfAvailable()).thenReturn(initProbe);
 
         service = new ModelProviderService(providerMapper, modelConfigService, eventPublisher,
-                claudeCodeOAuthProvider, pool, healthTracker, initProbeProvider);
+                pool, healthTracker, initProbeProvider);
     }
 
     // ==================== create-side guard ====================

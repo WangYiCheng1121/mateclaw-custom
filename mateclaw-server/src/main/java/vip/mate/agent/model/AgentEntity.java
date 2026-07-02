@@ -78,6 +78,18 @@ public class AgentEntity {
     /** 默认思考深度：off / low / medium / high / max，null 表示跟随模型默认 */
     private String defaultThinkingLevel;
 
+    /**
+     * Tracks whether this agent has ever had explicit skill bindings.
+     *
+     * <p>{@code NULL}  = brand-new agent, never configured → all skills.
+     * {@code FALSE} = user explicitly cleared bindings → all skills.
+     * {@code TRUE}  = has/had explicit bindings → only currently bound skills (possibly empty).
+     *
+     * <p>Set by {@code setSkillBindings} (user action) and
+     * {@code AgentBindingSkillRemovalListener} (platform-side skill deletion).
+     */
+    private Boolean hasSkillBinding;
+
     @TableField(fill = FieldFill.INSERT)
     private LocalDateTime createTime;
 

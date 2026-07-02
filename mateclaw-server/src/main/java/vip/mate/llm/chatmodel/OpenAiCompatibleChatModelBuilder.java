@@ -4,9 +4,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import io.micrometer.observation.ObservationRegistry;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.model.ChatModel;
-import org.springframework.ai.model.ApiKey;
-import org.springframework.ai.model.NoopApiKey;
-import org.springframework.ai.model.SimpleApiKey;
 import org.springframework.ai.openai.OpenAiChatModel;
 import org.springframework.ai.openai.OpenAiChatOptions;
 import org.springframework.ai.openai.api.OpenAiApi;
@@ -24,37 +21,29 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
 import reactor.core.publisher.Flux;
-import vip.mate.auth.config.PlatformOAuth2Config;
-import vip.mate.auth.service.PlatformNacosService;
-import vip.mate.auth.service.PlatformTokenHolder;
 import vip.mate.exception.MateClawException;
 import vip.mate.llm.model.ModelConfigEntity;
 import vip.mate.llm.model.ModelFamily;
 import vip.mate.llm.model.ModelProtocol;
 import vip.mate.llm.model.ModelProviderEntity;
-import vip.mate.llm.platform.LlmUserContextHolder;
-import vip.mate.llm.platform.PlatformLlmProxyProperties;
-import vip.mate.llm.platform.PlatformMachineTokenProvider;
+import vip.mate.llm.platform.LlmProxyHelper;
 import vip.mate.llm.service.ModelProviderService;
 
 import java.net.http.HttpClient;
-import java.util.HashMap;
 import java.util.Map;
-import java.util.regex.Pattern;
 
 /**
  * Strategy implementation of {@link ChatModelBuilder} for
  * {@link ModelProtocol#OPENAI_COMPATIBLE}.
  *
- * <p>Owns the full OpenAI-compatible construction path: the {@link OpenAiApi}
- * client (HTTP timeouts, header overrides, completions-path resolution), the
- * {@link OpenAiChatOptions} (temperature / max tokens / reasoning effort / web
- * search), and the outbound request-rewrite pipeline delegated to
- * {@link OpenAiRequestRewriter}. DeepSeek V4 reasoning models are wrapped with
- * {@link DeepSeekV4ThinkingDecorator}.
+ * <p>All traffic is routed through the platform LLM proxy
+ * ({@code gatewayUrl/ai-manage/api/proxy/chat/completions}).
+ * Direct provider connections are no longer supported;
+ * API keys and base URLs are managed exclusively by the platform.
  *
- * <p>Depends only on infrastructure beans, so the {@code llm} package builds a
- * {@link ChatModel} without any dependency on the agent graph layer.
+ * <p>Builds {@link OpenAiChatOptions} (temperature / max tokens / reasoning effort /
+ * web search) and delegates request rewriting to {@link OpenAiRequestRewriter}.
+ * DeepSeek V4 reasoning models are wrapped with {@link DeepSeekV4ThinkingDecorator}.
  */
 @Slf4j
 @Component
@@ -66,25 +55,9 @@ public class OpenAiCompatibleChatModelBuilder implements ChatModelBuilder {
     private final ObjectProvider<WebClient.Builder> webClientBuilderProvider;
     private final ObjectProvider<ObservationRegistry> observationRegistryProvider;
 
-    /** LLM 代理配置（可选；未配置时退化为直连模式） */
+    /** 共享的 LLM 代理基础设施（可选；未配置时不可用） */
     @Autowired(required = false)
-    private PlatformLlmProxyProperties proxyProperties;
-
-    /** 平台 OAuth2 配置（可选；用于机器令牌申请） */
-    @Autowired(required = false)
-    private PlatformOAuth2Config platformConfig;
-
-    /** 平台服务地址解析（可选） */
-    @Autowired(required = false)
-    private PlatformNacosService nacosService;
-
-    /** 平台 token 持有者（用户登录后缓存，authorization_code 模式，与渠道同步一致） */
-    @Autowired(required = false)
-    private PlatformTokenHolder platformTokenHolder;
-
-    /** 机器令牌提供者（可选；client_credentials 模式，作为 fallback） */
-    @Autowired(required = false)
-    private PlatformMachineTokenProvider machineTokenProvider;
+    private LlmProxyHelper llmProxyHelper;
 
     public OpenAiCompatibleChatModelBuilder(
             ModelProviderService modelProviderService,
@@ -135,7 +108,8 @@ public class OpenAiCompatibleChatModelBuilder implements ChatModelBuilder {
         ModelFamily family = ModelFamily.detect(modelName);
 
         if (StringUtils.hasText(modelName)) {
-            builder.model(modelName);
+            String prefixedModel = provider.getProviderId() + "::" + modelName;
+            builder.model(prefixedModel);
         }
 
         // temperature: some model families force 1.0
@@ -237,47 +211,16 @@ public class OpenAiCompatibleChatModelBuilder implements ChatModelBuilder {
     // ==================== OpenAI API client ====================
 
     /**
-     * Resolve the platform access token for LLM proxy requests.
-     * &lt;p&gt;
-     * Priority: PlatformTokenHolder (authorization_code, same as channel sync)
-     * &gt; PlatformMachineTokenProvider (client_credentials fallback).
-     * Returns null if no token source is available.
-     */
-    private String resolveProxyToken() {
-        if (platformTokenHolder != null) {
-            String token = platformTokenHolder.getAccessToken();
-            if (token != null) {
-                return token;
-            }
-        }
-        if (machineTokenProvider != null) {
-            return machineTokenProvider.getAccessToken();
-        }
-        return null;
-    }
-
-    /**
-     * Whether the platform LLM proxy is ready to use.
-     */
-    private boolean isProxyEnabled() {
-        return proxyProperties != null && proxyProperties.isEnabled()
-                && platformConfig != null && platformConfig.isEnabled()
-                && nacosService != null
-                && (platformTokenHolder != null || machineTokenProvider != null);
-    }
-
-    /**
      * Build an {@link OpenAiApi} that routes through the platform LLM proxy
      * instead of calling the LLM provider directly.
      * <p>
      * The proxy URL is {@code gatewayUrl/ai-manage/api/proxy/chat/completions}.
-     * Authentication uses a machine token (client_credentials). Per-request user
-     * identity (userId, username) is read from {@link LlmUserContextHolder} and
-     * injected as HTTP headers.
+     * Token resolution and user context injection are delegated to
+     * {@link LlmProxyHelper}.
      */
     private OpenAiApi buildProxyApi(ModelProviderEntity provider, Integer readTimeoutOverride) {
-        String serviceBaseUrl = nacosService.resolveServiceUrl(proxyProperties.getServiceId());
-        String completionsPath = proxyProperties.getCompletionsPath();
+        String serviceBaseUrl = llmProxyHelper.getProxyBaseUrl();
+        String completionsPath = llmProxyHelper.getCompletionsPath();
 
         MultiValueMap<String, String> headers = new LinkedMultiValueMap<>();
         headers.add("User-Agent", "GLClaw/1.0");
@@ -287,28 +230,23 @@ public class OpenAiCompatibleChatModelBuilder implements ChatModelBuilder {
         WebClient.Builder webClientBuilder = applyHttpTimeoutsToWebClient(
                 webClientBuilderProvider.getIfAvailable(WebClient::builder), readTimeoutOverride);
 
-        // Inject platform token + user identity into every outbound request.
-        // Token priority: PlatformTokenHolder (authorization_code, same as channel sync)
-        //                 > PlatformMachineTokenProvider (client_credentials fallback).
-        // Token is fetched per-request so long-lived ChatModel instances
-        // always carry a fresh (non-expired) access token.
         restClientBuilder = restClientBuilder.requestInterceptor((request, body, execution) -> {
             HttpHeaders reqHeaders = request.getHeaders();
-            String token = resolveProxyToken();
+            String token = llmProxyHelper.resolveToken();
             if (token != null) {
                 reqHeaders.set(HttpHeaders.AUTHORIZATION, "Bearer " + token);
             }
-            injectUserContextHeaders(reqHeaders);
+            llmProxyHelper.injectUserContext(reqHeaders);
             return execution.execute(request, body);
         });
         webClientBuilder = webClientBuilder.filter((request, next) -> {
-            String token = resolveProxyToken();
+            String token = llmProxyHelper.resolveToken();
             var modified = org.springframework.web.reactive.function.client.ClientRequest.from(request)
                     .headers(h -> {
                         if (token != null) {
                             h.set(HttpHeaders.AUTHORIZATION, "Bearer " + token);
                         }
-                        injectUserContextHeaders(h);
+                        llmProxyHelper.injectUserContext(h);
                     })
                     .build();
             return next.exchange(modified);
@@ -317,18 +255,9 @@ public class OpenAiCompatibleChatModelBuilder implements ChatModelBuilder {
         log.info("[LlmProxy] Routing through platform proxy: baseUrl={}, completionsPath={}",
                 serviceBaseUrl, completionsPath);
 
-        // Delegating ApiKey: fetch fresh token on every getValue() call
-        // so long-lived OpenAiApi instances never hold a stale token.
-        ApiKey apiKeyImpl = new ApiKey() {
-            @Override
-            public String getValue() {
-                String token = resolveProxyToken();
-                return token != null ? token : "";
-            }
-        };
         return new OpenAiApi(
                 serviceBaseUrl,
-                apiKeyImpl,
+                llmProxyHelper.createDelegatingApiKey(),
                 headers,
                 completionsPath,
                 "/v1/embeddings",
@@ -343,7 +272,6 @@ public class OpenAiCompatibleChatModelBuilder implements ChatModelBuilder {
                 chatRequest = OpenAiRequestRewriter.patchReasoningContent(chatRequest, provider);
                 chatRequest = OpenAiRequestRewriter.stripReasoningEffortIfIncompatible(chatRequest);
                 chatRequest = OpenAiRequestRewriter.stripAutoToolChoice(chatRequest);
-                chatRequest = OpenAiRequestRewriter.injectProvider(chatRequest, provider.getProviderId());
                 chatRequest = OpenAiRequestRewriter.patchVideoMediaContent(chatRequest);
                 logOpenAiRequest(provider, chatRequest);
                 try {
@@ -362,7 +290,6 @@ public class OpenAiCompatibleChatModelBuilder implements ChatModelBuilder {
                 chatRequest = OpenAiRequestRewriter.patchReasoningContent(chatRequest, provider);
                 chatRequest = OpenAiRequestRewriter.stripReasoningEffortIfIncompatible(chatRequest);
                 chatRequest = OpenAiRequestRewriter.stripAutoToolChoice(chatRequest);
-                chatRequest = OpenAiRequestRewriter.injectProvider(chatRequest, provider.getProviderId());
                 chatRequest = OpenAiRequestRewriter.patchVideoMediaContent(chatRequest);
                 logOpenAiRequest(provider, chatRequest);
                 return super.chatCompletionStream(chatRequest, additionalHttpHeader)
@@ -376,215 +303,25 @@ public class OpenAiCompatibleChatModelBuilder implements ChatModelBuilder {
     }
 
     /**
-     * Build an {@link OpenAiApi} for the provider. Accepts a per-model
-     * read-timeout override (seconds), threaded into both the sync RestClient and
-     * the streaming WebClient. Null falls back to the default 180s.
+     * Build an {@link OpenAiApi} forced through the platform LLM proxy.
+     * Accepts a per-model read-timeout override (seconds).
      */
     OpenAiApi buildOpenAiApi(ModelProviderEntity provider, Integer readTimeoutOverride) {
-        // ---- 平台 LLM 代理模式 ----
-        if (isProxyEnabled()) {
-            return buildProxyApi(provider, readTimeoutOverride);
+        if (llmProxyHelper == null || !llmProxyHelper.isEnabled()) {
+            throw new MateClawException("err.agent.proxy_not_available",
+                    "平台 LLM 代理未就绪，请检查平台连接配置");
         }
-        // ---- 直连模式 ----
-        if (provider == null || !modelProviderService.isProviderConfigured(provider.getProviderId())) {
-            throw new MateClawException("err.agent.provider_not_configured",
-                    "Provider 未完成配置，请在模型设置中填写有效的 API Key 和 Base URL");
-        }
-        String apiKey = provider.getApiKey();
-        // Honor the provider's requireApiKey flag instead of hard-failing on every empty key.
-        // Local + key-free providers (Ollama, LM Studio, MLX, llama.cpp, OpenCode) declare
-        // requireApiKey=false; for them an empty / placeholder key means "no Authorization
-        // header" — Spring AI's NoopApiKey expresses that.
-        boolean keyRequired = !Boolean.FALSE.equals(provider.getRequireApiKey());
-        if (keyRequired && !modelProviderService.hasUsableApiKey(apiKey)) {
-            throw new MateClawException("err.agent.provider_apikey_invalid",
-                    "Provider API Key 未配置或无效: " + provider.getProviderId());
-        }
-        String baseUrl = normalizeOpenAiBaseUrl(provider.getBaseUrl());
-        if (!StringUtils.hasText(baseUrl)) {
-            throw new MateClawException("err.agent.provider_baseurl_missing",
-                    "Provider Base URL 未配置: " + provider.getProviderId());
-        }
-        Map<String, Object> kwargs = modelProviderService.readProviderGenerateKwargs(provider);
-        MultiValueMap<String, String> headers = buildOpenAiHeaders(kwargs);
-        String completionsPath = resolveOpenAiCompletionsPath(baseUrl, kwargs);
-        RestClient.Builder restClientBuilder = applyHttpTimeouts(
-                restClientBuilderProvider.getIfAvailable(RestClient::builder), readTimeoutOverride);
-        WebClient.Builder webClientBuilder = applyHttpTimeoutsToWebClient(
-                webClientBuilderProvider.getIfAvailable(WebClient::builder), readTimeoutOverride);
-
-        // Spring AI's OpenAiApi constructor sets User-Agent to "spring-ai" first, then addAll's
-        // our headers, so a custom User-Agent is appended rather than replaced. For providers
-        // that must masquerade as a specific client (e.g. kimi-code), force-override headers
-        // via a RestClient/WebClient interceptor before the request goes out.
-        Map<String, String> overrideHeaders = extractOverrideHeaders(kwargs);
-        if (!overrideHeaders.isEmpty()) {
-            restClientBuilder = restClientBuilder.requestInterceptor((request, body, execution) -> {
-                HttpHeaders reqHeaders = request.getHeaders();
-                overrideHeaders.forEach(reqHeaders::set);
-                return execution.execute(request, body);
-            });
-            webClientBuilder = webClientBuilder.filter((request, next) -> {
-                org.springframework.web.reactive.function.client.ClientRequest modified =
-                        org.springframework.web.reactive.function.client.ClientRequest.from(request)
-                                .headers(h -> overrideHeaders.forEach(h::set))
-                                .build();
-                return next.exchange(modified);
-            });
-        }
-
-        boolean kimiSearchEnabled = isKimiProvider(provider)
-                && Boolean.TRUE.equals(kwargs.get("enableSearch"));
-
-        ApiKey apiKeyImpl = (keyRequired && StringUtils.hasText(apiKey))
-                ? new SimpleApiKey(apiKey.trim())
-                : new NoopApiKey();
-        return new OpenAiApi(
-                baseUrl,
-                apiKeyImpl,
-                headers,
-                completionsPath,
-                "/v1/embeddings",
-                restClientBuilder,
-                webClientBuilder,
-                RetryUtils.DEFAULT_RESPONSE_ERROR_HANDLER) {
-            @Override
-            public org.springframework.http.ResponseEntity<OpenAiApi.ChatCompletion> chatCompletionEntity(
-                    OpenAiApi.ChatCompletionRequest chatRequest,
-                    MultiValueMap<String, String> additionalHttpHeader) {
-                chatRequest = OpenAiRequestRewriter.sanitizeReasoningEffortForProvider(chatRequest, provider);
-                chatRequest = OpenAiRequestRewriter.patchReasoningContent(chatRequest, provider);
-                chatRequest = OpenAiRequestRewriter.stripReasoningEffortIfIncompatible(chatRequest);
-                chatRequest = OpenAiRequestRewriter.stripAutoToolChoice(chatRequest);
-                chatRequest = OpenAiRequestRewriter.patchVideoMediaContent(chatRequest);
-                if (kimiSearchEnabled) {
-                    chatRequest = OpenAiRequestRewriter.injectKimiWebSearch(chatRequest);
-                }
-                logOpenAiRequest(provider, chatRequest);
-                try {
-                    return super.chatCompletionEntity(chatRequest, additionalHttpHeader);
-                } catch (WebClientResponseException e) {
-                    logOpenAiError(provider, e);
-                    throw e;
-                }
-            }
-
-            @Override
-            public Flux<OpenAiApi.ChatCompletionChunk> chatCompletionStream(
-                    OpenAiApi.ChatCompletionRequest chatRequest,
-                    MultiValueMap<String, String> additionalHttpHeader) {
-                chatRequest = OpenAiRequestRewriter.sanitizeReasoningEffortForProvider(chatRequest, provider);
-                chatRequest = OpenAiRequestRewriter.patchReasoningContent(chatRequest, provider);
-                chatRequest = OpenAiRequestRewriter.stripReasoningEffortIfIncompatible(chatRequest);
-                chatRequest = OpenAiRequestRewriter.stripAutoToolChoice(chatRequest);
-                chatRequest = OpenAiRequestRewriter.patchVideoMediaContent(chatRequest);
-                if (kimiSearchEnabled) {
-                    chatRequest = OpenAiRequestRewriter.injectKimiWebSearch(chatRequest);
-                }
-                logOpenAiRequest(provider, chatRequest);
-                return super.chatCompletionStream(chatRequest, additionalHttpHeader)
-                        .doOnError(error -> {
-                            if (error instanceof WebClientResponseException e) {
-                                logOpenAiError(provider, e);
-                            }
-                        });
-            }
-        };
+        return buildProxyApi(provider, readTimeoutOverride);
     }
 
     /**
      * Whether the provider is one of Kimi's first-party providers. Public so the
      * agent graph builder can surface a "built-in search active" log line.
      */
-    /** Inject user identity headers from {@link LlmUserContextHolder}. */
-    private static void injectUserContextHeaders(HttpHeaders headers) {
-        String userId = LlmUserContextHolder.getUserId();
-        String userName = LlmUserContextHolder.getUserName();
-        if (userId != null) {
-            headers.set("X-User-Id", userId);
-        }
-        if (userName != null) {
-            headers.set("X-User-Name", userName);
-        }
-    }
-
     public static boolean isKimiProvider(ModelProviderEntity provider) {
         if (provider == null) return false;
         String id = provider.getProviderId();
         return "kimi-cn".equals(id) || "kimi-intl".equals(id);
-    }
-
-    // ==================== URL / headers ====================
-
-    private String normalizeOpenAiBaseUrl(String baseUrl) {
-        if (!StringUtils.hasText(baseUrl)) {
-            return null;
-        }
-        String normalized = baseUrl.trim();
-        if (normalized.endsWith("/")) {
-            normalized = normalized.substring(0, normalized.length() - 1);
-        }
-        if (normalized.endsWith("/v1")) {
-            normalized = normalized.substring(0, normalized.length() - 3);
-        }
-        return normalized;
-    }
-
-    private MultiValueMap<String, String> buildOpenAiHeaders(Map<String, Object> kwargs) {
-        LinkedMultiValueMap<String, String> headers = new LinkedMultiValueMap<>();
-        headers.add("User-Agent", "GLClaw/1.0");
-        Object headerObject = kwargs.get("headers");
-        if (headerObject instanceof Map<?, ?> headerMap) {
-            headerMap.forEach((key, value) -> {
-                if (key != null && value != null) {
-                    headers.set(String.valueOf(key), String.valueOf(value));
-                }
-            });
-        }
-        return headers;
-    }
-
-    /**
-     * Extract headers that must be force-overridden, read from
-     * {@code generateKwargs.headers}. Used by a RestClient/WebClient interceptor
-     * to bypass Spring AI's default User-Agent.
-     */
-    private Map<String, String> extractOverrideHeaders(Map<String, Object> kwargs) {
-        Map<String, String> result = new HashMap<>();
-        Object headerObject = kwargs.get("headers");
-        if (headerObject instanceof Map<?, ?> headerMap) {
-            headerMap.forEach((key, value) -> {
-                if (key != null && value != null) {
-                    result.put(String.valueOf(key), String.valueOf(value));
-                }
-            });
-        }
-        return result;
-    }
-
-    // Trailing "/v{digits}" segment in a base URL — the OpenAI-compatible convention
-    // (/v1 OpenAI, /v3 Volcano Ark, /v4 Zhipu). When the baseUrl already carries this
-    // segment, the default /v1 prefix on the path must be stripped to avoid building
-    // a broken URL like /api/v3/v1/chat/completions.
-    private static final Pattern OPENAI_BASE_URL_VERSION_SUFFIX = Pattern.compile(".*/v\\d+$");
-
-    private String resolveOpenAiCompletionsPath(String baseUrl, Map<String, Object> kwargs) {
-        Object raw = kwargs.get("completionsPath");
-        boolean explicit = raw instanceof String value && StringUtils.hasText(value);
-        String path = explicit ? ((String) raw).trim() : "/v1/chat/completions";
-        if (!path.startsWith("/")) {
-            path = "/" + path;
-        }
-        // An explicit completionsPath is honored as-is. Otherwise, dedupe the /v1
-        // prefix when the baseUrl already ends with /v{N} (Volcano Engine Ark /v3,
-        // Zhipu /v4, etc.).
-        if (!explicit
-                && baseUrl != null
-                && OPENAI_BASE_URL_VERSION_SUFFIX.matcher(baseUrl).matches()
-                && path.startsWith("/v1/")) {
-            path = path.substring(3);
-        }
-        return path;
     }
 
     // ==================== HTTP timeouts ====================
