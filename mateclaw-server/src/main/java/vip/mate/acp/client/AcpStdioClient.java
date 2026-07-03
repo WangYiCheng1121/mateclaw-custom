@@ -40,7 +40,7 @@ import java.util.function.Function;
  * a future increment — that needs a proper async bus and ties into the
  * agent graph layer.
  *
- * <p>Why not the official {@code acp} Python SDK: MateClaw runs on the
+ * <p>Why not the official {@code acp} Python SDK: GLClaw runs on the
  * JVM. The protocol is JSON-RPC 2.0 line-delimited over stdio; the
  * surface we need for "test connection" is small enough to implement
  * directly.
@@ -156,7 +156,7 @@ public class AcpStdioClient implements AutoCloseable {
         // don't reject the request.
         params.set("clientCapabilities", mapper.createObjectNode());
         ObjectNode info = mapper.createObjectNode();
-        info.put("name", "mateclaw-acp-client");
+        info.put("name", "glclaw-acp-client");
         info.put("version", "1.0.0");
         params.set("clientInfo", info);
         return sendRequest("initialize", params, timeoutMillis);

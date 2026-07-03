@@ -1049,15 +1049,6 @@ public class AgentGraphBuilder {
                 log.debug("[LlmFailover] skipping primary provider {} in fallback chain", primaryProviderId);
                 continue;
             }
-            // RFC-009 Phase 4: skip providers known-bad at build time. The runtime walker in
-            // NodeStreamingChatHelper re-checks pool membership per request, so a provider
-            // that re-enters the pool later still gets used (the graph is rebuilt on
-            // ModelConfigChangedEvent).
-            if (providerPool != null && !providerPool.contains(p.getProviderId())) {
-                log.debug("[LlmFailover] skipping provider {} — not in available pool",
-                        p.getProviderId());
-                continue;
-            }
             ModelConfigEntity fallbackConfig = pickFallbackModel(p.getProviderId());
             if (fallbackConfig == null) {
                 log.debug("[LlmFailover] skipping provider {} — no enabled chat model",

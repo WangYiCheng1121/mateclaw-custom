@@ -123,10 +123,10 @@ springdoc:
   swagger-ui:
     path: /swagger-ui.html
 
-# MateClaw 自定义配置
+# GLClaw 自定义配置
 mateclaw:
   # 平台端 OAuth2 认证配置（对接 esp-auth 服务）
-  # 启用后登录必须先通过平台验证，关闭则退化为 MateClaw 单机模式
+  # 启用后登录必须先通过平台验证，关闭则退化为 GLClaw 单机模式
   platform:
     enabled: ${PLATFORM_AUTH_ENABLED:true}
     # 统一网关地址（通过路径前缀路由到具体服务）
@@ -151,7 +151,7 @@ mateclaw:
       connect-timeout: 5000
       read-timeout: 15000
   jwt:
-    secret: ${JWT_SECRET:MateClaw-JWT-Secret-Key-2024-Please-Change-In-Production}
+    secret: ${JWT_SECRET:GLClaw-JWT-Secret-Key-2024-Please-Change-In-Production}
     expiration: 86400000
   # 搜索配置已迁移至数据库（mate_system_setting 表），通过 UI 系统设置管理
   # MCP server 配置已迁移至数据库（mate_mcp_server 表），通过 UI 管理
@@ -262,7 +262,7 @@ mateclaw:
     # when the child must produce multi-section structured output.
     parallel-timeout-seconds: 300
 
-# MateClaw Agent 配置
+# GLClaw Agent 配置
 mate:
   agent:
     graph:

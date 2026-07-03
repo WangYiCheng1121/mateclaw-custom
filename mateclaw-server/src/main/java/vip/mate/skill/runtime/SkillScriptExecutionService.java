@@ -158,6 +158,7 @@ public class SkillScriptExecutionService {
                     processEnv.put(e.getKey(), e.getValue());
                 }
             }
+
             // Windows: force Python to use UTF-8 for stdin/stdout/stderr,
             // otherwise the default GBK codec garbles Chinese output while
             // readFileTruncated() on the Java side reads in UTF-8.

@@ -1,10 +1,10 @@
 <div align="center">
 
 <p align="center">
-  <img src="mateclaw-ui/public/logo/mateclaw_logo_s.png" alt="MateClaw Logo" width="120">
+  <img src="mateclaw-ui/public/logo/mateclaw_logo_s.png" alt="GLClaw Logo" width="120">
 </p>
 
-# 太一（MateClaw）
+# 太一（GLClaw）
 
 <p align="center"><b>你的超级大脑</b></p>
 
@@ -25,12 +25,12 @@
 </div>
 
 <p align="center">
-  <img src="assets/images/preview.png" alt="MateClaw 预览" width="800">
+  <img src="assets/images/preview.png" alt="GLClaw 预览" width="800">
 </p>
 
 ---
 
-> **别的 AI 助手是给一个人用的。MateClaw 是公司允许部署的那一个。**
+> **别的 AI 助手是给一个人用的。GLClaw 是公司允许部署的那一个。**
 >
 > 多用户工作空间。敏感操作走审批。完整审计日志。Spring Boot Actuator 健康监控。单个渠道挂掉不影响其他渠道的错误隔离。一个 JAR 包跑在自己机器上，数据不出门。
 >
@@ -38,7 +38,7 @@
 
 大多数 AI 工具一到厂商抽风那天就两手一摊。关一次标签页就忘了你是谁。给你一个聊天框，就敢叫产品。
 
-**MateClaw 是完整的一整套。** 一次部署——推理、知识、记忆、工具、多渠道入口，从第一天就一起设计，不是事后拼接。主模型挂了，下一家接着把这句话说完。
+**GLClaw 是完整的一整套。** 一次部署——推理、知识、记忆、工具、多渠道入口，从第一天就一起设计，不是事后拼接。主模型挂了，下一家接着把这句话说完。
 
 ---
 
@@ -48,7 +48,7 @@
 
 Key 过期。厂商返回 401。网络抖动。配额耗尽。
 
-别的工具丢你一张红色错误卡。MateClaw 自动切到下一家健康的供应商——DashScope、OpenAI、Anthropic、Gemini、DeepSeek、Kimi、Ollama、LM Studio、MLX，共 14+ 家——用户只会看到回答正常完成。内置的 **Provider Health Tracker** 会把连续失败的供应商放进冷却窗口，避免每一轮对话都白白撞壁。
+别的工具丢你一张红色错误卡。GLClaw 自动切到下一家健康的供应商——DashScope、OpenAI、Anthropic、Gemini、DeepSeek、Kimi、Ollama、LM Studio、MLX，共 14+ 家——用户只会看到回答正常完成。内置的 **Provider Health Tracker** 会把连续失败的供应商放进冷却窗口，避免每一轮对话都白白撞壁。
 
 你不用写重试脚本。在 **设置 → 模型** 里把供应商拖成你想要的优先顺序，健康面板实时亮起一排绿点——请求绕着故障流过去。
 
@@ -56,7 +56,7 @@ Key 过期。厂商返回 401。网络抖动。配额耗尽。
 
 上传 PDF、一批 markdown、抓下来的网页——原始材料进去。
 
-MateClaw 的 **LLM Wiki** 把它消化成结构化页面，页面之间自己长出 `[[链接]]`，每一句话都记得来自哪里。点开引用抽屉，就能看到原始 chunk。问一个问题，得到的页面是从对应片段拼出来的——带可核对的出处。
+GLClaw 的 **LLM Wiki** 把它消化成结构化页面，页面之间自己长出 `[[链接]]`，每一句话都记得来自哪里。点开引用抽屉，就能看到原始 chunk。问一个问题，得到的页面是从对应片段拼出来的——带可核对的出处。
 
 这是**仓库**和**图书馆**的区别。
 
@@ -114,13 +114,13 @@ RBAC + JWT。**Personal Access Token** 给无人值守脚本和 CI 用。**Webho
 
 这和 2010 年数据库走过的路、2018 年云走过的路**是同一个转弯**：赢的那一层，不再绑在一家供应商身上。**57% 的公司已经把 AI agent 推进生产**——没有一家希望某个厂商的坏日子变成自己的坏日子。
 
-**MateClaw 就是那一层——用 Spring Boot 方式盖的。**
+**GLClaw 就是那一层——用 Spring Boot 方式盖的。**
 
 ---
 
-## 为什么选 MateClaw
+## 为什么选 GLClaw
 
-| | MateClaw | [OpenClaw](https://github.com/openclaw/openclaw) | [Hermes Agent](https://github.com/NousResearch/hermes-agent) | [Claude Code](https://github.com/anthropics/claude-code) | [Cursor](https://cursor.com) |
+| | GLClaw | [OpenClaw](https://github.com/openclaw/openclaw) | [Hermes Agent](https://github.com/NousResearch/hermes-agent) | [Claude Code](https://github.com/anthropics/claude-code) | [Cursor](https://cursor.com) |
 |:---|:---:|:---:|:---:|:---:|:---:|
 | **多厂商失败转移** | **Chain + 健康追踪 + 冷却** | 切换供应商（改配置） | 内置编排重试 | 仅 Anthropic | 单模型 |
 | **知识消化式加工** | **Wiki + 页面级引用溯源** | Canvas + 记忆 | Skills Hub + 记忆 | — | 代码索引 |
@@ -130,9 +130,9 @@ RBAC + JWT。**Personal Access Token** 给无人值守脚本和 CI 用。**Webho
 | **技术栈** | **Java（Spring Boot）** | TypeScript | Python | TypeScript | Electron/TS |
 | **许可 / 定价** | **Apache 2.0 · 免费** | MIT · 免费 | MIT · 免费 | 闭源 · $20–200/月 | 闭源 · $0–200/月 |
 
-**OpenClaw 和 Hermes Agent 是优秀的个人 AI 平台**——如果你是一个人、一台笔记本、习惯从 CLI 搭自己的 agent、所有东西都靠手工配置文件调优，选它们没问题。两家的社区规模今天都大于 MateClaw。
+**OpenClaw 和 Hermes Agent 是优秀的个人 AI 平台**——如果你是一个人、一台笔记本、习惯从 CLI 搭自己的 agent、所有东西都靠手工配置文件调优，选它们没问题。两家的社区规模今天都大于 GLClaw。
 
-**MateClaw 是那个给团队用的版本。** 每位数字员工、每个模型、每个工具都有 RBAC。危险动作自动暂停等审批。完整审计事件流。Admin 运行时控制台让一个运维能实时看到 50 位员工跑在 14 家供应商上的状态——卡住了一键回收。底座是 Spring Boot——任何一家已经在生产跑 Java 服务的公司可以直接并入。
+**GLClaw 是那个给团队用的版本。** 每位数字员工、每个模型、每个工具都有 RBAC。危险动作自动暂停等审批。完整审计事件流。Admin 运行时控制台让一个运维能实时看到 50 位员工跑在 14 家供应商上的状态——卡住了一键回收。底座是 Spring Boot——任何一家已经在生产跑 Java 服务的公司可以直接并入。
 
 **同一套"完整一整套"哲学，不同的重心。**
 

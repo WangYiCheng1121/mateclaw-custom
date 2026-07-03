@@ -1,6 +1,6 @@
 # Docker Deployment
 
-The only recommended production deployment outside the desktop app. One `docker compose up -d` brings up three containers: MySQL, SearXNG, and mateclaw-server.
+The only recommended production deployment outside the desktop app. One `docker compose up -d` brings up three containers: MySQL, SearXNG, and GLClaw-server.
 
 This page covers **requirements, steps, verification, and common gotchas**. For the full environment variable reference, see [Configuration](./config).
 
@@ -15,9 +15,9 @@ This page covers **requirements, steps, verification, and common gotchas**. For 
 | Host RAM | 4 GB | 8 GB+ | Chromium consumes 1-2 GB when the browser tool is active |
 | Disk | 6 GB | 20 GB+ | ~2 GB image + MySQL data + workspace files |
 | /dev/shm | default | compose sets 2 GB automatically | Chromium uses shared memory for rendering; the 64 MB default causes SIGBUS |
-| Network | outbound | ‚Äî | for pulling images and calling LLM APIs |
+| Network | outbound | ‚Ä?| for pulling images and calling LLM APIs |
 
-**Not required on the host**: Java, Node, Maven, Chrome, or Python ‚Äî all live inside the image.
+**Not required on the host**: Java, Node, Maven, Chrome, or Python ‚Ä?all live inside the image.
 
 ---
 
@@ -27,7 +27,7 @@ This page covers **requirements, steps, verification, and common gotchas**. For 
 |---|---|---|---|
 | `mysql` | `mysql:8.0` | Business data | `3306` |
 | `searxng` | Built from `./docker/searxng/` | Keyless search fallback | `8088` |
-| `mateclaw-server` | Built from `mateclaw-server/Dockerfile` | Spring Boot backend + embedded browser | `18080` |
+| `GLClaw-server` | Built from `GLClaw-server/Dockerfile` | Spring Boot backend + embedded browser | `18080` |
 
 ---
 
@@ -35,18 +35,18 @@ This page covers **requirements, steps, verification, and common gotchas**. For 
 
 ### Why we build a custom image
 
-`docker/searxng/Dockerfile` derives from upstream `searxng/searxng:latest` and **bakes our own `settings.yml` into `/etc/searxng/settings.yml`**. This isn't polish ‚Äî it's mandatory:
+`docker/searxng/Dockerfile` derives from upstream `searxng/searxng:latest` and **bakes our own `settings.yml` into `/etc/searxng/settings.yml`**. This isn't polish ‚Ä?it's mandatory:
 
-- **Upstream ships with only `html` output enabled**, while mateclaw calls `GET /search?q=...&format=json`. The default image responds to JSON requests with an HTML error page, `SearXNGSearchProvider` fails to parse it, returns empty results, and the UI shows "search temporarily unavailable".
+- **Upstream ships with only `html` output enabled**, while GLClaw calls `GET /search?q=...&format=json`. The default image responds to JSON requests with an HTML error page, `SearXNGSearchProvider` fails to parse it, returns empty results, and the UI shows "search temporarily unavailable".
 - **Upstream enables the anti-bot Limiter plugin by default**, which rejects server-side calls (no JS, no cookies) with HTTP 429.
 
 Our `docker/searxng/settings.yml` changes three things:
 
-1. `search.formats: [html, json]` ‚Äî enable JSON output
-2. `server.limiter: false` ‚Äî disable anti-bot rate limiting
+1. `search.formats: [html, json]` ‚Ä?enable JSON output
+2. `server.limiter: false` ‚Ä?disable anti-bot rate limiting
 3. Trim the engine list to a reliable subset (DuckDuckGo / Bing / Brave / Wikipedia / Google / Startpage), dropping the dozens of niche engines the upstream enables
 
-**Do not** switch this to a host bind-mount. An earlier version did, and deploys where the host directory didn't exist got an auto-created empty directory that shadowed the file ‚Äî SearXNG started with no config at all. To tweak settings.yml, edit `docker/searxng/settings.yml` then:
+**Do not** switch this to a host bind-mount. An earlier version did, and deploys where the host directory didn't exist got an auto-created empty directory that shadowed the file ‚Ä?SearXNG started with no config at all. To tweak settings.yml, edit `docker/searxng/settings.yml` then:
 
 ```sh
 docker compose build searxng
@@ -57,9 +57,9 @@ docker compose up -d searxng
 
 The backend `SearchProviderRegistry` picks a provider in this order:
 
-1. Whatever the user explicitly set under `Settings ‚Üí Search` (the `searchProvider` setting)
+1. Whatever the user explicitly set under `Settings ‚Ü?Search` (the `searchProvider` setting)
 2. Walk `autoDetectOrder`, **preferring paid providers whose API key is configured** (Serper order=1, Tavily order=2)
-3. Fall back to keyless ‚Äî SearXNG (order=50) wins over DuckDuckGo (order=100)
+3. Fall back to keyless ‚Ä?SearXNG (order=50) wins over DuckDuckGo (order=100)
 
 On a fresh container with no API keys configured at all, **SearXNG handles every search call**.
 
@@ -71,24 +71,24 @@ curl -s 'http://localhost:8088/search?q=test&format=json' | head -5
 # Expect: {"query": ..., "results": [...]}
 # If you get HTML back, settings.yml didn't take effect.
 
-# 2. Hit it from inside the mateclaw-server container
-docker exec mateclaw-server wget -qO- 'http://searxng:8080/search?q=test&format=json' | head -5
+# 2. Hit it from inside the GLClaw-server container
+docker exec GLClaw-server wget -qO- 'http://searxng:8080/search?q=test&format=json' | head -5
 # If this fails, compose networking is the problem.
 
 # 3. Ask an agent to search and tail backend logs
-docker compose logs -f mateclaw-server | grep "ÊêúÁ¥¢ provider"
+docker compose logs -f GLClaw-server | grep "ÊêúÁ¥¢ provider"
 # Expect: ÊêúÁ¥¢ provider Ëß£Êûê: searxng (source=keyless-fallback)
 ```
 
 ### Using an external SearXNG instance
 
-If you're already running SearXNG elsewhere, point mateclaw at it via `.env`:
+If you're already running SearXNG elsewhere, point GLClaw at it via `.env`:
 
 ```properties
 SEARXNG_BASE_URL=https://your-searxng.example.com
 ```
 
-Then comment out the `searxng` service block in `docker-compose.yml`. Make sure **your external instance has the same JSON + Limiter settings** ‚Äî otherwise you'll hit the same silent failure mode.
+Then comment out the `searxng` service block in `docker-compose.yml`. Make sure **your external instance has the same JSON + Limiter settings** ‚Ä?otherwise you'll hit the same silent failure mode.
 
 ---
 
@@ -96,20 +96,20 @@ Then comment out the `searxng` service block in `docker-compose.yml`. Make sure 
 
 ### What the image actually contains
 
-The backend runtime stage (`mateclaw-server/Dockerfile` stage 3) is based on `mcr.microsoft.com/playwright:v1.52.0-noble` (Ubuntu Noble 24.04, glibc) and installs on top of it:
+The backend runtime stage (`GLClaw-server/Dockerfile` stage 3) is based on `mcr.microsoft.com/playwright:v1.52.0-noble` (Ubuntu Noble 24.04, glibc) and installs on top of it:
 
-- `openjdk-21-jre-headless` ‚Äî runs the Spring Boot JAR
-- `fonts-noto-cjk` ‚Äî Chinese/Japanese/Korean rendering in screenshots
-- `fonts-noto-color-emoji` ‚Äî emoji glyphs
-- `tzdata` ‚Äî `Asia/Shanghai` timezone
+- `openjdk-21-jre-headless` ‚Ä?runs the Spring Boot JAR
+- `fonts-noto-cjk` ‚Ä?Chinese/Japanese/Korean rendering in screenshots
+- `fonts-noto-color-emoji` ‚Ä?emoji glyphs
+- `tzdata` ‚Ä?`Asia/Shanghai` timezone
 
 Microsoft's base image already ships all three browsers in `/ms-playwright/`:
 
-- `chromium-XXXX/chrome-linux/chrome` ‚Äî the primary
+- `chromium-XXXX/chrome-linux/chrome` ‚Ä?the primary
 - `firefox-XXXX/firefox/firefox`
 - `webkit-XXXX/pw_run.sh`
 
-Plus every system library Chromium needs (`libnss3`, `libgbm1`, `libasound2`, `libx11-xcb1`, `libxkbcommon`, ‚Ä¶). **No `playwright install` is required, and the Alpine-vs-musl incompatibility that blocks most Playwright deployments is sidestepped entirely.**
+Plus every system library Chromium needs (`libnss3`, `libgbm1`, `libasound2`, `libx11-xcb1`, `libxkbcommon`, ‚Ä?. **No `playwright install` is required, and the Alpine-vs-musl incompatibility that blocks most Playwright deployments is sidestepped entirely.**
 
 The Dockerfile sets one environment variable explicitly:
 
@@ -123,19 +123,19 @@ This tells Playwright Java to use the pre-installed browsers and **not** try to 
 
 `vip.mate.tool.browser.BrowserLauncher` tries each strategy in order until one succeeds:
 
-1. `CONFIG_CDP` ‚Äî if `MATECLAW_BROWSER_CDP_URL` is set, attach to that running Chrome
-2. `CONFIG_PATH` ‚Äî if `MATECLAW_BROWSER_CHROME_PATH` or `CHROME_PATH` env is set, use that exe
-3. `CONFIG_CHANNEL` ‚Äî if `MATECLAW_BROWSER_CHANNEL=chrome|msedge`, use the Playwright channel
-4. `AUTO_CHANNEL` ‚Äî try `chrome` then `msedge` channel (this step always wins inside the Docker image)
-5. `AUTO_PATH` ‚Äî scan standard install paths (`/usr/bin/google-chrome`, `chromium-browser`, `/snap/bin/chromium`, `microsoft-edge`, `brave-browser`)
-6. `BUNDLED` ‚Äî Playwright bundled Chromium (also guaranteed to work inside the image)
-7. `EXTERNAL_CDP` ‚Äî last resort: fork a system Chrome with `--remote-debugging-port=0`, parse stderr for the DevTools URL, attach via `connectOverCDP` (the openfang pattern)
+1. `CONFIG_CDP` ‚Ä?if `GLClaw_BROWSER_CDP_URL` is set, attach to that running Chrome
+2. `CONFIG_PATH` ‚Ä?if `GLClaw_BROWSER_CHROME_PATH` or `CHROME_PATH` env is set, use that exe
+3. `CONFIG_CHANNEL` ‚Ä?if `GLClaw_BROWSER_CHANNEL=chrome|msedge`, use the Playwright channel
+4. `AUTO_CHANNEL` ‚Ä?try `chrome` then `msedge` channel (this step always wins inside the Docker image)
+5. `AUTO_PATH` ‚Ä?scan standard install paths (`/usr/bin/google-chrome`, `chromium-browser`, `/snap/bin/chromium`, `microsoft-edge`, `brave-browser`)
+6. `BUNDLED` ‚Ä?Playwright bundled Chromium (also guaranteed to work inside the image)
+7. `EXTERNAL_CDP` ‚Ä?last resort: fork a system Chrome with `--remote-debugging-port=0`, parse stderr for the DevTools URL, attach via `connectOverCDP` (the openfang pattern)
 
 Inside the Docker image, **strategy 4 or 6 always hits** and no configuration is needed. If you need to attach to an external Chrome, use strategy 1. If you want a specific host-installed Chrome, use strategy 2.
 
 ### `/dev/shm` must be 2 GB
 
-`docker-compose.yml` sets `shm_size: 2gb` for `mateclaw-server`. Docker defaults to 64 MB per container ‚Äî Chromium uses shared memory for GPU compositing and page rendering, and three tabs is enough to SIGBUS the browser. Playwright surfaces this as `TargetClosedError: Target page, context or browser has been closed`. **Do not shrink this value.**
+`docker-compose.yml` sets `shm_size: 2gb` for `GLClaw-server`. Docker defaults to 64 MB per container ‚Ä?Chromium uses shared memory for GPU compositing and page rendering, and three tabs is enough to SIGBUS the browser. Playwright surfaces this as `TargetClosedError: Target page, context or browser has been closed`. **Do not shrink this value.**
 
 ### SSRF protection
 
@@ -145,7 +145,7 @@ Before any `navigate` call, `BrowserUseTool` runs the URL through `UrlSafetyChec
 - `169.254.169.254` (AWS / GCP / Azure IMDS), `100.100.100.200` (Alibaba Cloud IMDS), `192.0.0.192` (Azure IMDS alternative)
 - All link-local / private / multicast IP ranges
 
-An LLM generating a malicious URL to dump cloud credentials is therefore a closed loop. If you genuinely need to scrape internal infrastructure from a specific host, either disable via `mateclaw.browser.ssrf-check-enabled` or edit the `UrlSafetyChecker` allowlist. **Think twice before doing this in production.**
+An LLM generating a malicious URL to dump cloud credentials is therefore a closed loop. If you genuinely need to scrape internal infrastructure from a specific host, either disable via `GLClaw.browser.ssrf-check-enabled` or edit the `UrlSafetyChecker` allowlist. **Think twice before doing this in production.**
 
 ### Verifying the browser path
 
@@ -166,8 +166,8 @@ curl -s http://localhost:18080/api/v1/system/browser-health | jq .
 ## First deployment
 
 ```sh
-git clone https://github.com/matevip/mateclaw.git
-cd mateclaw
+git clone https://github.com/matevip/GLClaw.git
+cd GLClaw
 
 # 1. Fill in required values
 cp .env.example .env
@@ -178,26 +178,26 @@ vi .env   # see table below
 
 | Variable | Notes |
 |---|---|
-| `DB_PASSWORD` | App DB password ‚Äî 16+ chars, mixed case, digits, symbols |
-| `DB_ROOT_PASSWORD` | MySQL root password ‚Äî **must differ from the above** |
+| `DB_PASSWORD` | App DB password ‚Ä?16+ chars, mixed case, digits, symbols |
+| `DB_ROOT_PASSWORD` | MySQL root password ‚Ä?**must differ from the above** |
 
 **Strongly recommended** (not enforced, but startup logs WARN if missing):
 
 | Variable | Notes |
 |---|---|
-| `JWT_SECRET` | JWT signing key ‚Äî generate with `openssl rand -base64 48` |
-| `MATECLAW_CORS_ALLOWED_ORIGINS` | Production allowlist, e.g. `https://mateclaw.example.com` |
+| `JWT_SECRET` | JWT signing key ‚Ä?generate with `openssl rand -base64 48` |
+| `GLClaw_CORS_ALLOWED_ORIGINS` | Production allowlist, e.g. `https://GLClaw.example.com` |
 
 Then bring the stack up:
 
 ```sh
 docker compose up -d --build   # first build takes 3-10 minutes
-docker compose logs -f mateclaw-server
+docker compose logs -f GLClaw-server
 ```
 
 First boot runs Flyway migrations (~5 s) and seeds default data (~3 s), then binds `0.0.0.0:18080`.
 
-Open `http://localhost:18080`, sign in as `admin / admin123`, and **change the password immediately** under `Settings ‚Üí Security`.
+Open `http://localhost:18080`, sign in as `admin / admin123`, and **change the password immediately** under `Settings ‚Ü?Security`.
 
 ---
 
@@ -205,11 +205,11 @@ Open `http://localhost:18080`, sign in as `admin / admin123`, and **change the p
 
 ### US / EU servers
 
-**Already optimal.** `mateclaw-server/pom.xml` lists repositories in the order `Maven Central ‚Üí Google CDN ‚Üí Aliyun`; Central direct is fastest over US/EU backbones.
+**Already optimal.** `GLClaw-server/pom.xml` lists repositories in the order `Maven Central ‚Ü?Google CDN ‚Ü?Aliyun`; Central direct is fastest over US/EU backbones.
 
 ### China servers
 
-Flip to Aliyun-first. Either edit the `mvn` lines in `mateclaw-server/Dockerfile` to add `-Paliyun-first`, or (easier) expose it as a build arg:
+Flip to Aliyun-first. Either edit the `mvn` lines in `GLClaw-server/Dockerfile` to add `-Paliyun-first`, or (easier) expose it as a build arg:
 
 ```dockerfile
 # from
@@ -225,7 +225,7 @@ RUN mvn package -DskipTests -q ${MAVEN_PROFILE:+-P${MAVEN_PROFILE}}
 Then:
 
 ```sh
-docker compose build --build-arg MAVEN_PROFILE=aliyun-first mateclaw-server
+docker compose build --build-arg MAVEN_PROFILE=aliyun-first GLClaw-server
 ```
 
 Aliyun's public + Spring mirrors are promoted to the top of the lookup chain, keeping traffic inside China.
@@ -238,14 +238,14 @@ All can be set in `.env` and are read as environment variables. **Leave them emp
 
 | Variable | Default | Purpose |
 |---|---|---|
-| `SERPER_API_KEY` | ‚Äî | Google Serper search API (paid, best quality) |
+| `SERPER_API_KEY` | ‚Ä?| Google Serper search API (paid, best quality) |
 | `SEARXNG_SECRET` | built-in dev secret | Only fill when exposing port 8088 to the public internet |
 | `SEARXNG_BASE_URL` | `http://searxng:8080` | Point at an external SearXNG instance |
-| `MATECLAW_BROWSER_CDP_URL` | ‚Äî | Attach to an external Chrome CDP sidecar |
-| `MATECLAW_BROWSER_CHROME_PATH` | ‚Äî | Override the bundled Chromium with a host-installed browser |
-| `MATECLAW_BROWSER_CHANNEL` | ‚Äî | Force a Playwright channel (`chrome`, `msedge`, ...) |
+| `GLClaw_BROWSER_CDP_URL` | ‚Ä?| Attach to an external Chrome CDP sidecar |
+| `GLClaw_BROWSER_CHROME_PATH` | ‚Ä?| Override the bundled Chromium with a host-installed browser |
+| `GLClaw_BROWSER_CHANNEL` | ‚Ä?| Force a Playwright channel (`chrome`, `msedge`, ...) |
 
-**LLM API keys (DashScope, OpenAI, Anthropic, DeepSeek, Kimi, etc.) are not read from `.env`** ‚Äî add them after startup in the UI under `Settings ‚Üí Models ‚Üí Add Provider`. Hot-reload supported. The container starts with **zero LLM keys configured**; just log in and add your first provider on the Models page.
+**LLM API keys (DashScope, OpenAI, Anthropic, DeepSeek, Kimi, etc.) are not read from `.env`** ‚Ä?add them after startup in the UI under `Settings ‚Ü?Models ‚Ü?Add Provider`. Hot-reload supported. The container starts with **zero LLM keys configured**; just log in and add your first provider on the Models page.
 
 ---
 
@@ -275,18 +275,18 @@ If any of these fail, jump to the next section.
 ## Common gotchas
 
 **Build stage `mvn dependency:go-offline` hangs**
-US servers pulling through Aliyun is slow. The default `pom.xml` puts Maven Central first, so it should be fast. If it's still slow, the container has no outbound access ‚Äî check your egress firewall.
+US servers pulling through Aliyun is slow. The default `pom.xml` puts Maven Central first, so it should be fast. If it's still slow, the container has no outbound access ‚Ä?check your egress firewall.
 
-**`mateclaw-server` stays unhealthy at startup**
-`docker compose logs mateclaw-server` and look for Flyway migration errors. Nine times out of ten, a special character in `DB_PASSWORD` got eaten by the shell ‚Äî wrap the value in double quotes in `.env`.
+**`GLClaw-server` stays unhealthy at startup**
+`docker compose logs GLClaw-server` and look for Flyway migration errors. Nine times out of ten, a special character in `DB_PASSWORD` got eaten by the shell ‚Ä?wrap the value in double quotes in `.env`.
 
 **Browser tool reports "Target page closed" or SIGBUS**
-`shm_size: 2gb` didn't take effect. Check the actual value with `docker inspect mateclaw-server | grep ShmSize`. Upgrade Docker Engine to 24.0+ if it's still showing 64 MB.
+`shm_size: 2gb` didn't take effect. Check the actual value with `docker inspect GLClaw-server | grep ShmSize`. Upgrade Docker Engine to 24.0+ if it's still showing 64 MB.
 
 **Search returns "Search temporarily unavailable"**
 SearXNG either isn't up or the image default settings disabled JSON output. Our own `./docker/searxng/` build patches this; if you're reusing an old named volume, reset it: `docker compose down -v searxng && docker compose up -d searxng`.
 
-**LLM responses show tofu boxes (‚ñ°) for Chinese**
+**LLM responses show tofu boxes (‚ñ? for Chinese**
 The image already installs `fonts-noto-cjk` and `fonts-noto-color-emoji`, so this isn't a server-side font issue. Check your frontend browser's locale / font settings.
 
 ---
@@ -295,16 +295,16 @@ The image already installs `fonts-noto-cjk` and `fonts-noto-color-emoji`, so thi
 
 ```sh
 git pull
-docker compose build mateclaw-server   # only rebuild the backend
-docker compose up -d mateclaw-server
+docker compose build GLClaw-server   # only rebuild the backend
+docker compose up -d GLClaw-server
 ```
 
-The `mysql_data` volume persists across rebuilds. Flyway runs incremental migrations automatically and self-heals checksum changes on restart. **Version is pinned in `mateclaw-server/pom.xml` and the git tag** ‚Äî prefer pinning to a tag in production, not tracking `dev`.
+The `mysql_data` volume persists across rebuilds. Flyway runs incremental migrations automatically and self-heals checksum changes on restart. **Version is pinned in `GLClaw-server/pom.xml` and the git tag** ‚Ä?prefer pinning to a tag in production, not tracking `dev`.
 
 ---
 
 ## Next steps
 
-- [Configuration](./config) ‚Äî every environment variable and runtime toggle
-- [Doctor Health Check](./doctor) ‚Äî the in-app diagnostics page
-- [Security & Approval](./security) ‚Äî pre-production hardening checklist
+- [Configuration](./config) ‚Ä?every environment variable and runtime toggle
+- [Doctor Health Check](./doctor) ‚Ä?the in-app diagnostics page
+- [Security & Approval](./security) ‚Ä?pre-production hardening checklist

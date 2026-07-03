@@ -1250,6 +1250,10 @@ public class DingTalkChannelAdapter extends AbstractChannelAdapter implements St
                 log.warn("[dingtalk] Watchdog: no activity for {}s (threshold {}s), triggering disconnect",
                         silentMs / 1000, WATCHDOG_SILENT_THRESHOLD_SECONDS);
                 onDisconnected("watchdog: silent connection, no events for " + (silentMs / 1000) + "s");
+            } else {
+                // 连接正常：刷新活跃时间戳，防止 ChannelHealthMonitor 误判 stale 并重复重启
+                // （钉钉 Stream SDK 的 ping/pong 不会触发应用层 touchActivity()）
+                touchActivity();
             }
         }, WATCHDOG_INTERVAL_SECONDS, WATCHDOG_INTERVAL_SECONDS, TimeUnit.SECONDS);
         log.info("[dingtalk] Watchdog started (check every {}s, threshold {}s)",

@@ -2,7 +2,7 @@
 
 **A skill is a tool that thinks in sentences.**
 
-Tools are atomic â€” read a file, send an HTTP request, run a command. Skills are compositions â€” "research this topic and write a brief", "review this code and comment on it", "turn my git log into a standup update". A skill is a `SKILL.md` file that combines instructions, parameters, prompt templates, optional scripts, and a list of tools the skill needs. The runtime loads it, renders it with your inputs, and hands the result to the agent.
+Tools are atomic â€?read a file, send an HTTP request, run a command. Skills are compositions â€?"research this topic and write a brief", "review this code and comment on it", "turn my git log into a standup update". A skill is a `SKILL.md` file that combines instructions, parameters, prompt templates, optional scripts, and a list of tools the skill needs. The runtime loads it, renders it with your inputs, and hands the result to the agent.
 
 If tools are hands, skills are recipes.
 
@@ -12,7 +12,7 @@ If tools are hands, skills are recipes.
 
 | Type | Where it comes from | Who maintains it |
 |------|--------------------|------------------|
-| **`builtin`** | Ships with MateClaw under `skills/` in the classpath | The core team |
+| **`builtin`** | Ships with GLClaw under `skills/` in the classpath | The core team |
 | **`custom`** | Created by you through the UI, API, or dropping a file into the workspace | You |
 | **`dynamic`** | Auto-synthesized by agents during work | The agent + your approval |
 | **`mcp`** | Backed by a tool exposed from an MCP server (a same-name `custom` skill shadows it) | The MCP server author |
@@ -69,31 +69,31 @@ Present your findings as:
 - **Sources**: Numbered list of URLs
 ```
 
-Two things to notice. First, the body is a prompt â€” not a description of one. It's what the skill will say to the agent at runtime, with `{{topic}}` and `{{depth}}` filled in. Second, the `tools:` list is a contract: the runtime guarantees those tools are available when the skill runs. If the agent doesn't have them, the skill call fails early with a clear error.
+Two things to notice. First, the body is a prompt â€?not a description of one. It's what the skill will say to the agent at runtime, with `{{topic}}` and `{{depth}}` filled in. Second, the `tools:` list is a contract: the runtime guarantees those tools are available when the skill runs. If the agent doesn't have them, the skill call fails early with a clear error.
 
 ### Frontmatter fields
 
 | Field | Required | Purpose |
 |-------|----------|---------|
-| `name` | âœ… | Unique identifier (kebab-case) |
-| `title` | âœ… | Human-readable display name |
-| `description` | âœ… | One-line summary |
-| `version` | âœ… | Semantic version |
-| `type` | âœ… | `builtin`, `custom`, `mcp` |
-| `author` | â€” | Skill author |
-| `tools` | â€” | List of tool names the skill requires |
-| `tags` | â€” | Categorization |
-| `parameters` | â€” | Typed input parameters |
+| `name` | âœ?| Unique identifier (kebab-case) |
+| `title` | âœ?| Human-readable display name |
+| `description` | âœ?| One-line summary |
+| `version` | âœ?| Semantic version |
+| `type` | âœ?| `builtin`, `custom`, `mcp` |
+| `author` | â€?| Skill author |
+| `tools` | â€?| List of tool names the skill requires |
+| `tags` | â€?| Categorization |
+| `parameters` | â€?| Typed input parameters |
 
 ### Parameter schema
 
 | Field | Required | Purpose |
 |-------|----------|---------|
-| `name` | âœ… | Parameter name (used in `{{name}}` interpolation) |
-| `type` | âœ… | `string`, `number`, `boolean`, `array` |
-| `required` | â€” | Whether it must be provided (default: false) |
-| `default` | â€” | Fallback value if caller omits |
-| `description` | âœ… | What the parameter controls |
+| `name` | âœ?| Parameter name (used in `{{name}}` interpolation) |
+| `type` | âœ?| `string`, `number`, `boolean`, `array` |
+| `required` | â€?| Whether it must be provided (default: false) |
+| `default` | â€?| Fallback value if caller omits |
+| `description` | âœ?| What the parameter controls |
 
 ### Typed wrapper tools for scripts (new in v1.4)
 
@@ -117,9 +117,9 @@ scripts:
         required: true
 ```
 
-- **One typed tool per entrypoint** â€” the model gets typed params, not a free-form arg string.
-- **`fixedArgs` lets one dispatcher script back several entrypoints** â€” both entries above call `dispatch.py`, distinguished by the fixed leading arg, so you don't need a separate file per command.
-- **Wrappers register/deregister with the skill lifecycle** â€” they appear when the skill goes live and disappear when it's disabled or archived. Path traversal is blocked: only scripts under the skill's own `scripts/` directory are reachable. A database-only skill (no directory) exposes no wrappers.
+- **One typed tool per entrypoint** â€?the model gets typed params, not a free-form arg string.
+- **`fixedArgs` lets one dispatcher script back several entrypoints** â€?both entries above call `dispatch.py`, distinguished by the fixed leading arg, so you don't need a separate file per command.
+- **Wrappers register/deregister with the skill lifecycle** â€?they appear when the skill goes live and disappear when it's disabled or archived. Path traversal is blocked: only scripts under the skill's own `scripts/` directory are reachable. A database-only skill (no directory) exposes no wrappers.
 
 ---
 
@@ -127,24 +127,24 @@ scripts:
 
 ```
 1. RESOLVE     Look up the skill by name in mate_skill
-       â”‚
-       â–¼
+       â”?
+       â–?
 2. VALIDATE    Check that required parameters are provided
-       â”‚
-       â–¼
+       â”?
+       â–?
 3. RENDER      Replace {{parameter}} placeholders in the SKILL.md body
-       â”‚
-       â–¼
+       â”?
+       â–?
 4. INJECT      Append the rendered instructions to the agent's system prompt
-       â”‚
-       â–¼
+       â”?
+       â–?
 5. BIND TOOLS  Verify required tools are available; fail fast if missing
-       â”‚
-       â–¼
+       â”?
+       â–?
 6. EXECUTE     The agent processes the enriched prompt with bound tools
 ```
 
-Skills don't run scripts by default â€” they **shape the agent's behavior** for the duration of the call. The agent's next reasoning step sees the skill's rendered instructions as part of its system prompt. The exception is skills that ship with a script â€” `SkillScriptTool` can execute a skill's bundled script file, gated by Tool Guard.
+Skills don't run scripts by default â€?they **shape the agent's behavior** for the duration of the call. The agent's next reasoning step sees the skill's rendered instructions as part of its system prompt. The exception is skills that ship with a script â€?`SkillScriptTool` can execute a skill's bundled script file, gated by Tool Guard.
 
 ### Template rendering
 
@@ -170,7 +170,7 @@ The database is the source of truth, the filesystem is a materialized cache. Tha
 
 ### Database: `mate_skill` + `mate_skill_file`
 
-`mate_skill` â€” skill identity and body:
+`mate_skill` â€?skill identity and body:
 
 | Column | Purpose |
 |--------|---------|
@@ -185,39 +185,39 @@ The database is the source of truth, the filesystem is a materialized cache. Tha
 | `tags` | JSON array |
 | `create_time` / `update_time` | Timestamps |
 
-`mate_skill_file` (new in v1.3, migration `V112`) â€” the **canonical copy** of every bundle file:
+`mate_skill_file` (new in v1.3, migration `V112`) â€?the **canonical copy** of every bundle file:
 
 | Column | Purpose |
 |--------|---------|
 | `id` | Primary key |
 | `skill_id` | FK to `mate_skill` |
 | `file_path` | Relative path like `scripts/run.py` or `references/cfg.md` |
-| `content` | UTF-8 text (â‰¤1 MB per file, â‰¤50 MB per bundle) |
+| `content` | UTF-8 text (â‰? MB per file, â‰?0 MB per bundle) |
 | `content_size` | Byte count (so listings don't have to load the blob) |
 | `sha256` | Content fingerprint, drives the syncer's idempotent diff |
 
 ### Filesystem: skill workspace
 
 ```
-~/.mateclaw/skills/
+~/.GLClaw/skills/
 â”œâ”€â”€ translate/
-â”‚   â”œâ”€â”€ SKILL.md               # Skill definition
-â”‚   â”œâ”€â”€ references/            # Reference materials
-â”‚   â””â”€â”€ scripts/               # Optional executable scripts
+â”?  â”œâ”€â”€ SKILL.md               # Skill definition
+â”?  â”œâ”€â”€ references/            # Reference materials
+â”?  â””â”€â”€ scripts/               # Optional executable scripts
 â”œâ”€â”€ code-review/
-â”‚   â”œâ”€â”€ SKILL.md
-â”‚   â””â”€â”€ ...
+â”?  â”œâ”€â”€ SKILL.md
+â”?  â””â”€â”€ ...
 â””â”€â”€ .archived/                 # Archived old versions
     â””â”€â”€ translate-20260401-143000/
 ```
 
-Think of it as "Maven Local Repository, but for skills" â€” except the local repo can now hydrate itself from the database.
+Think of it as "Maven Local Repository, but for skills" â€?except the local repo can now hydrate itself from the database.
 
 ### Auto-sync on startup
 
 Two sync passes run at boot, so every node has the latest bundle:
 
-1. `SkillWorkspaceBootstrapRunner` â†’ `BundledSkillSyncer` scans the classpath `skills/` directory and syncs **bundled skills** into the workspace root. **Only syncs when the target directory doesn't exist**, so it never clobbers local modifications.
+1. `SkillWorkspaceBootstrapRunner` â†?`BundledSkillSyncer` scans the classpath `skills/` directory and syncs **bundled skills** into the workspace root. **Only syncs when the target directory doesn't exist**, so it never clobbers local modifications.
 2. `SkillFileSyncer` diffs `mate_skill_file` (DB) against the local workspace (FS) by `sha256` and materializes anything missing or stale.
 
 **Why this matters for multi-instance deployments**: one node accepts the upload, the DB row + file rows are written, every other node either restarts or hits `POST /api/v1/skills/{id}/sync-files` to receive the full bundle. No NFS, no scp loop, even desktop clients can hand a skill off across machines.
@@ -226,21 +226,21 @@ Two sync passes run at boot, so every node has the latest bundle:
 
 ### Robust zip install
 
-Third-party packagers package weirdly â€” some put `setup.sh` at the zip root, some emit `scripts/` entries before `SKILL.md`. As of v1.3, `ZipSkillFetcher`:
+Third-party packagers package weirdly â€?some put `setup.sh` at the zip root, some emit `scripts/` entries before `SKILL.md`. As of v1.3, `ZipSkillFetcher`:
 
-- **Two-pass extraction** â€” the entire archive is buffered in memory first (cap-protected at 50 MB), `SKILL.md` is located and the wrapper-dir prefix computed, then entries are classified. **Zip entry order no longer affects the result.**
-- **Root-level extension fallback** â€” files sitting next to `SKILL.md` that aren't already under a known bucket get classified by extension: `.sh / .py / .js / .rb / ...` â†’ `scripts/`, `.md / .json / .yaml / .csv / ...` â†’ `references/`. Unknown extensions are dropped with a `WARN` line so packaging mistakes surface instead of vanishing.
-- **Write-then-prune + empty-bundle guard** â€” reinstalls **write new files first, then prune anything in the bucket that's not in the new bundle**. If the new bundle has zero entries for a bucket (`scripts/` or `references/`), the disk copies for that bucket are **left alone** â€” a malformed re-extract can no longer wipe your scripts. Pass `forcePrune=true` if you really want to clear a bucket via an intentionally empty bundle.
+- **Two-pass extraction** â€?the entire archive is buffered in memory first (cap-protected at 50 MB), `SKILL.md` is located and the wrapper-dir prefix computed, then entries are classified. **Zip entry order no longer affects the result.**
+- **Root-level extension fallback** â€?files sitting next to `SKILL.md` that aren't already under a known bucket get classified by extension: `.sh / .py / .js / .rb / ...` â†?`scripts/`, `.md / .json / .yaml / .csv / ...` â†?`references/`. Unknown extensions are dropped with a `WARN` line so packaging mistakes surface instead of vanishing.
+- **Write-then-prune + empty-bundle guard** â€?reinstalls **write new files first, then prune anything in the bucket that's not in the new bundle**. If the new bundle has zero entries for a bucket (`scripts/` or `references/`), the disk copies for that bucket are **left alone** â€?a malformed re-extract can no longer wipe your scripts. Pass `forcePrune=true` if you really want to clear a bucket via an intentionally empty bundle.
 
 > Real failure this catches: the official tencent-meeting-mcp zip puts `setup.sh` at the package root (not under `scripts/`). The old extractor silently dropped it; the new one auto-classifies it as `scripts/setup.sh` and the skill installs ready to run.
 
 ### Configuration
 
 ```yaml
-mateclaw:
+GLClaw:
   skill:
     workspace:
-      root: ${user.home}/.mateclaw/skills
+      root: ${user.home}/.GLClaw/skills
       auto-init: true
       delete-policy: archive                 # `archive` or `ignore`
       bundled-skills-path: skills
@@ -252,11 +252,11 @@ mateclaw:
 
 The **Skill Market** page (`/skills`) is where you browse, install, edit, and manage skills. Three sources:
 
-- **Built-in** â€” skills that ship with GLClaw
-- **Your custom skills** â€” the ones you created
-- **ClawHub** â€” a community skill repository. Browse thousands of community skills, preview them, install with one click. Installed skills land as `custom` type.
+- **Built-in** â€?skills that ship with GLClaw
+- **Your custom skills** â€?the ones you created
+- **ClawHub** â€?a community skill repository. Browse thousands of community skills, preview them, install with one click. Installed skills land as `custom` type.
 
-ClawHub is optional â€” if you're offline or don't want external skills, just don't touch that tab.
+ClawHub is optional â€?if you're offline or don't want external skills, just don't touch that tab.
 
 ---
 
@@ -291,11 +291,11 @@ curl -X DELETE http://localhost:18088/api/v1/skills/1 \
   -H "Authorization: Bearer YOUR_JWT_TOKEN"
 ```
 
-Delete policy is configurable â€” by default, deletion moves the skill workspace to `.archived/` rather than erasing it.
+Delete policy is configurable â€?by default, deletion moves the skill workspace to `.archived/` rather than erasing it.
 
 ---
 
-## Writing a custom skill â€” step by step
+## Writing a custom skill â€?step by step
 
 1. **Decide what the skill does.** One sentence.
 2. **List the tools it needs.** Three or fewer is a good target.
@@ -305,7 +305,7 @@ Delete policy is configurable â€” by default, deletion moves the skill workspace
 6. **Bind** the skill to one or more agents.
 7. **Test** by sending a message that should trigger the skill.
 
-Example â€” "Daily Standup" skill:
+Example â€?"Daily Standup" skill:
 
 ```markdown
 ---
@@ -349,16 +349,16 @@ Each workspace gets its own copy of skills. When you enable a skill for a worksp
 
 ## Auto Skill Synthesis
 
-Agents that work with you long enough start noticing patterns â€” a recurring database query, a particular report layout, the exact commands to SSH into your box. Agents can **turn those patterns into skills on their own**.
+Agents that work with you long enough start noticing patterns â€?a recurring database query, a particular report layout, the exact commands to SSH into your box. Agents can **turn those patterns into skills on their own**.
 
 The flow:
 
 1. The agent recognizes a reusable workflow during task execution
 2. The agent proposes a new skill (create / edit / patch / delete)
-3. You review in ChatConsole â€” check the content, rename if you want, approve or reject
+3. You review in ChatConsole â€?check the content, rename if you want, approve or reject
 4. On approval, the skill saves as `dynamic` type, ready for reuse
 
-**Security scan runs automatically before save** â€” dangerous patterns (prompt injection, script injection) are blocked. Skills can migrate between agents and export as ZIP.
+**Security scan runs automatically before save** â€?dangerous patterns (prompt injection, script injection) are blocked. Skills can migrate between agents and export as ZIP.
 
 The agent's memory grows with you. No more repeating "remember I like tables sorted this way."
 
@@ -368,37 +368,37 @@ The agent's memory grows with you. No more repeating "remember I like tables sor
 
 Don't know how to write a SKILL.md? Open the wizard.
 
-`Skills â†’ Create Wizard`:
+`Skills â†?Create Wizard`:
 
 1. Pick a **starter template** (8 of them: researcher, code reviewer, writing assistant, customer-support script, data analysis, Claude Code helper, Codex helper, blank)
-2. Fill in the variables â€” name, parameters, a few sentences of description
+2. Fill in the variables â€?name, parameters, a few sentences of description
 3. Upload any supporting files (scripts, references, prompt fragments)
-4. Set secrets (API keys, etc.) â€” **secrets go to a vault, not into SKILL.md**
+4. Set secrets (API keys, etc.) â€?**secrets go to a vault, not into SKILL.md**
 5. Save
 
-You don't get just a SKILL.md. You get a **multi-file bundle** â€” SKILL.md, references/, scripts/, secret references â€” packaged together.
+You don't get just a SKILL.md. You get a **multi-file bundle** â€?SKILL.md, references/, scripts/, secret references â€?packaged together.
 
 ### The `skill-authoring` meta-skill (new in v1.4)
 
 There's now a built-in `skill-authoring` skill, auto-seeded on startup, that teaches an agent (or you) how to author a SKILL.md correctly. It covers:
 
 - **Required frontmatter** and what each field means
-- **Validator limits** â€” name must match `^[a-z0-9][a-z0-9._-]{0,63}$`, content â‰¤ 100k characters
+- **Validator limits** â€?name must match `^[a-z0-9][a-z0-9._-]{0,63}$`, content â‰?100k characters
 - **Built-in vs custom** authoring workflows
 - **Directory placement** for scripts/ and references/
 - **Common pitfalls** that fail validation or silently misbehave
 
-Bind it to an agent and "write me a skill thatâ€¦" produces a valid bundle on the first try, not after three validation round-trips.
+Bind it to an agent and "write me a skill thatâ€? produces a valid bundle on the first try, not after three validation round-trips.
 
 ---
 
 ## Pre-flight check before installation
 
-A skill that's installed isn't necessarily a skill that runs â€” it might need an API key, a CLI tool, a MateClaw feature flag toggled on.
+A skill that's installed isn't necessarily a skill that runs â€?it might need an API key, a CLI tool, a GLClaw feature flag toggled on.
 
 Used to be: install, run, fail, debug. Now:
 
-**Pre-flight install dialog** â€” runs the prerequisite check automatically before the skill goes live:
+**Pre-flight install dialog** â€?runs the prerequisite check automatically before the skill goes live:
 
 - Are the required tools present?
 - Are the required API keys configured?
@@ -411,7 +411,7 @@ Whatever's missing is reported up front, with a one-click **`[Set Up]`** button 
 
 ## LESSONS.md: skills that learn from experience
 
-Each skill can carry a `LESSONS.md` â€” what the skill learned during runs.
+Each skill can carry a `LESSONS.md` â€?what the skill learned during runs.
 
 - After a run, the skill can **proactively write a lesson**: "Last time the user didn't like that format, don't do it again"
 - Next time the same skill is invoked, LESSONS get auto-injected into the prompt context
@@ -425,13 +425,13 @@ LESSONS are viewable and editable in the skill detail drawer's **Memory tab**.
 
 ## Secrets: put the token in the right place
 
-Lots of skills need API credentials to function â€” tencent-meeting needs `TENCENT_MEETING_TOKEN`, Slack needs a bot token, Linear needs a personal API key. Those values **don't belong in SKILL.md** (it goes into the prompt and leaks to the LLM), don't belong in scripts (one git push and you're sorry), and editing `~/.zshrc` requires restarting the server and won't follow the skill across machines.
+Lots of skills need API credentials to function â€?tencent-meeting needs `TENCENT_MEETING_TOKEN`, Slack needs a bot token, Linear needs a personal API key. Those values **don't belong in SKILL.md** (it goes into the prompt and leaks to the LLM), don't belong in scripts (one git push and you're sorry), and editing `~/.zshrc` requires restarting the server and won't follow the skill across machines.
 
 As of v1.3, every skill has its own **per-skill secret store**.
 
 ### Manage it in the UI
 
-Skill detail drawer â†’ **Secrets** tab. One table plus a form:
+Skill detail drawer â†?**Secrets** tab. One table plus a form:
 
 ```
 Key                        Value         Last updated     Actions
@@ -440,17 +440,17 @@ TENCENT_MEETING_TOKEN     skâ€¢â€¢â€¢â€¢ef      2026-05-12       [Edit] [Delete]
 [+ Add secret]
 ```
 
-- **Plaintext never leaves the server** â€” listing returns only `preview` (`skâ€¢â€¢â€¢â€¢ef`-style mask); the add/edit dialog's value field starts blank, saving overwrites whatever was there.
-- **Client-side validation** â€” keys must match `^[A-Za-z_][A-Za-z0-9_]{0,127}$`; bad keys are rejected in the browser before submission.
-- **Value field is `<input type="password" autocomplete="off">`** â€” shoulder-surfers, screenshots, and password managers all stay out.
+- **Plaintext never leaves the server** â€?listing returns only `preview` (`skâ€¢â€¢â€¢â€¢ef`-style mask); the add/edit dialog's value field starts blank, saving overwrites whatever was there.
+- **Client-side validation** â€?keys must match `^[A-Za-z_][A-Za-z0-9_]{0,127}$`; bad keys are rejected in the browser before submission.
+- **Value field is `<input type="password" autocomplete="off">`** â€?shoulder-surfers, screenshots, and password managers all stay out.
 
 ### How it's stored / how it's injected
 
 | Stage | What happens |
 |---|---|
-| Write | `POST /api/v1/skills/{id}/secrets` `{key, value}` â†’ AES-encrypted â†’ `mate_skill_secret` |
+| Write | `POST /api/v1/skills/{id}/secrets` `{key, value}` â†?AES-encrypted â†?`mate_skill_secret` |
 | Read | Before subprocess launch, `SkillSecretService.getDecrypted(skillId)` AES-decrypts |
-| Inject | `ProcessBuilder.environment().putAll(...)` â€” **overrides parent-process env vars of the same name** |
+| Inject | `ProcessBuilder.environment().putAll(...)` â€?**overrides parent-process env vars of the same name** |
 
 The injection rule is **secret-store wins, `.zshrc` is the fallback**. For multi-user / multi-machine deployments, desktop clients, and corporate accounts that don't share databases, the secret store is the more reliable source of truth.
 
@@ -468,16 +468,16 @@ DELETE /api/v1/skills/{id}/secrets/{key}
 ### A full example: tencent-meeting
 
 ```
-SkillMarket â†’ tencent-meeting-mcp card â†’ detail drawer â†’ Secrets tab
-  â†’ + Add secret â†’ key=TENCENT_MEETING_TOKEN, value=<paste your token>
-  â†’ Save
+SkillMarket â†?tencent-meeting-mcp card â†?detail drawer â†?Secrets tab
+  â†?+ Add secret â†?key=TENCENT_MEETING_TOKEN, value=<paste your token>
+  â†?Save
 
 Then when the agent runs setup.sh or scripts/tencent_meeting.py:
   ProcessBuilder env carries $TENCENT_MEETING_TOKEN
-  â†’ mcporter / Python script calls the Tencent API â†’ meeting ID returned
+  â†?mcporter / Python script calls the Tencent API â†?meeting ID returned
 ```
 
-No `~/.zshrc` edit, no mateclaw restart needed.
+No `~/.zshrc` edit, no GLClaw restart needed.
 
 ---
 
@@ -487,22 +487,22 @@ Installing a new skill used to mean the agent often couldn't find it. Three caus
 
 ### 1) New skills are **boosted** in the prompt catalog
 
-The agent's system prompt carries a compact Skills table. Each model gets a row cap based on its max input tokens â€” qwen-turbo with 8192 tokens gets only **8 entries**. A brand-new skill has zero usage history, so the existing recent / frequent / RECOMMENDED sort buries it behind ~40 older skills, well below the cutoff.
+The agent's system prompt carries a compact Skills table. Each model gets a row cap based on its max input tokens â€?qwen-turbo with 8192 tokens gets only **8 entries**. A brand-new skill has zero usage history, so the existing recent / frequent / RECOMMENDED sort buries it behind ~40 older skills, well below the cutoff.
 
-v1.3 inserts a "**installed in the last 7 days**" sort key at the front of the ranker. Install on Friday, the skill is still in the first frame on Monday â€” long enough to span a weekend, short enough not to occupy a slot indefinitely. Builtins and virtual MCP/ACP rows are excluded (you didn't "just install" them).
+v1.3 inserts a "**installed in the last 7 days**" sort key at the front of the ranker. Install on Friday, the skill is still in the first frame on Monday â€?long enough to span a weekend, short enough not to occupy a slot indefinitely. Builtins and virtual MCP/ACP rows are excluded (you didn't "just install" them).
 
 ### 2) `listAvailableSkills()` teaches the LLM how to search wider
 
 The tool description now explicitly says:
 
 - The default page is 20 entries; if you see `Showing: 20 of 47`, **retry with `keyword=<part of name>` or `limit=50`**
-- If the user mentions a specific skill name, **skip the catalog** â€” go straight to `readSkillFile(skillName="<exact-name>", filePath="SKILL.md")` to verify
+- If the user mentions a specific skill name, **skip the catalog** â€?go straight to `readSkillFile(skillName="<exact-name>", filePath="SKILL.md")` to verify
 
 Truncated results carry a one-line hint at the end so even small models can see how to follow up.
 
 ### 3) Calling a skill name as a tool **auto-redirects**
 
-LLMs occasionally call a skill name as if it were a tool (`tencent-meeting-mcp({...})`). The previous behavior was a textual hint telling them to call `readSkillFile` instead â€” which qwen-turbo-class models often can't act on. They reply "let me get that for you" and end the turn without any further tool call, producing a dead loop.
+LLMs occasionally call a skill name as if it were a tool (`tencent-meeting-mcp({...})`). The previous behavior was a textual hint telling them to call `readSkillFile` instead â€?which qwen-turbo-class models often can't act on. They reply "let me get that for you" and end the turn without any further tool call, producing a dead loop.
 
 As of v1.3, when `ToolExecutionExecutor` sees this case AND `readSkillFile` is bound to the agent, it **transparently invokes readSkillFile on the LLM's behalf** and returns the SKILL.md content (prefixed with `[auto-redirect]` and the original args echoed back) as the tool result. The model has runnable instructions in front of it on its very first attempt and goes straight to `runSkillScript`, no loop.
 
@@ -512,16 +512,16 @@ As of v1.3, when `ToolExecutionExecutor` sees this case AND `readSkillFile` is b
 
 ## Progressive skill disclosure (new in v1.4)
 
-Dumping every skill's full SKILL.md into the system prompt doesn't scale â€” it blows the token budget and churns the prompt cache on every turn. v1.4 flips the model: the prompt carries only a compact catalog, and the agent **pulls a skill's instructions on demand**.
+Dumping every skill's full SKILL.md into the system prompt doesn't scale â€?it blows the token budget and churns the prompt cache on every turn. v1.4 flips the model: the prompt carries only a compact catalog, and the agent **pulls a skill's instructions on demand**.
 
 **`load_skill(skillName, filePath?)`** loads a skill's SKILL.md (or any bundle file via the optional `filePath`) right when the agent decides to use it:
 
-- **Injected via message history, not the system prompt** â€” the loaded content arrives as a conversation turn, so the system prompt (and its cache) stays byte-stable across the session.
+- **Injected via message history, not the system prompt** â€?the loaded content arrives as a conversation turn, so the system prompt (and its cache) stays byte-stable across the session.
 - **Loaded skills get pinned** to the top of the runtime catalog on later turns, so the agent keeps seeing what it just pulled in.
 - The catalog guidance tells the model to `load_skill(skillName=<name>)` before using a skill, and to call it directly when the user names a specific skill.
 
 ```yaml
-mateclaw:
+GLClaw:
   skill:
     disclosure:
       load-skill-tool:
@@ -534,21 +534,21 @@ When disabled, the catalog guidance points at `readSkillFile` instead and `load_
 
 ## Skill lifecycle curator (new in v1.4)
 
-Agents that synthesize skills accumulate cruft â€” a one-off skill from three weeks ago is still in the catalog, eating a slot. The **curator** is a daily sweep that ages idle, **agent-created** skills through `active â†’ stale â†’ archived` and gets them out of the way without deleting anything.
+Agents that synthesize skills accumulate cruft â€?a one-off skill from three weeks ago is still in the catalog, eating a slot. The **curator** is a daily sweep that ages idle, **agent-created** skills through `active â†?stale â†?archived` and gets them out of the way without deleting anything.
 
-- Idle past `staleAfterDays` (default 30) â†’ **stale**; idle past `archiveAfterDays` (default 90) â†’ **archived** (workspace moved to a `.archived/` subdir). `restore` brings an archived skill back.
+- Idle past `staleAfterDays` (default 30) â†?**stale**; idle past `archiveAfterDays` (default 90) â†?**archived** (workspace moved to a `.archived/` subdir). `restore` brings an archived skill back.
 - **Never touched**: built-ins, pinned skills, MCP/ACP/virtual skills, and any name starting with a protected prefix (default `sys-`, `ops-`).
 
-### Settings â†’ Skill Curator panel
+### Settings â†?Skill Curator panel
 
-- **Preview (dry-run)** â€” see exactly which skills the next sweep would move, before it runs.
+- **Preview (dry-run)** â€?see exactly which skills the next sweep would move, before it runs.
 - **Pause / resume** the whole sweep; **activate / deactivate** an individual skill.
 - **Last run / next run** timestamps and **per-state counts** (active / stale / archived).
 
 ### Configuration
 
 ```yaml
-mateclaw:
+GLClaw:
   skill:
     curator:
       enabled: true
@@ -565,32 +565,32 @@ mateclaw:
 
 The Skills page picks up the lifecycle:
 
-- **Lifecycle tabs** â€” Enabled / Stale / Archived.
+- **Lifecycle tabs** â€?Enabled / Stale / Archived.
 - Cards show a **"last used"** badge.
 - The detail drawer adds **manual archive / restore / pin**.
-- Manually archiving a still-bound skill triggers a **confirm handshake** â€” you don't silently pull a skill out from under a digital employee that's still using it.
+- Manually archiving a still-bound skill triggers a **confirm handshake** â€?you don't silently pull a skill out from under a digital employee that's still using it.
 
 ---
 
 ## ACP bridge: plug in external coding agents
 
-ACP (Agent Client Protocol) is a protocol that lets external agent clients (Claude Code, Codex, other compatible clients) plug into MateClaw as skills.
+ACP (Agent Client Protocol) is a protocol that lets external agent clients (Claude Code, Codex, other compatible clients) plug into GLClaw as skills.
 
 Once installed:
 
-- ACP endpoints **auto-bridge into skill cards** â€” they show up on the Skills page with a wrapper toolset
-- **Visual env editor** â€” every endpoint's required key, URL, CWD, configurable in the UI
-- **Per-session cwd** â€” every ACP session has its own working directory
-- **Errors translated** â€” upstream messages like "Request not allowed" get translated into something actionable
-- **OAuth keychain hijack detection** â€” if your OAuth token has been hijacked by another app, you're prompted to re-authenticate
+- ACP endpoints **auto-bridge into skill cards** â€?they show up on the Skills page with a wrapper toolset
+- **Visual env editor** â€?every endpoint's required key, URL, CWD, configurable in the UI
+- **Per-session cwd** â€?every ACP session has its own working directory
+- **Errors translated** â€?upstream messages like "Request not allowed" get translated into something actionable
+- **OAuth keychain hijack detection** â€?if your OAuth token has been hijacked by another app, you're prompted to re-authenticate
 
-Templates: `claude-code-helper`, `codex-helper` â€” install and go.
+Templates: `claude-code-helper`, `codex-helper` â€?install and go.
 
 A digital employee calls an ACP skill the same way it calls a built-in tool.
 
 ### Virtual SKILL.md for MCP/ACP skills (new in v1.4)
 
-MCP- and ACP-derived skills used to be opaque tool bundles with no readable instructions. v1.4 **synthesizes a read-only virtual SKILL.md** from each MCP/ACP server's metadata (transport, command, args, env, exposed tools), so those integrations show up as **navigable skill catalogs** in the Skills page. Because they're synthesized, virtual SKILL.md rebuilds on every list call â€” no stale persisted copy to maintain â€” and `load_skill` can read it just like a real skill, giving the agent a description of what the integration can do before it calls a single tool.
+MCP- and ACP-derived skills used to be opaque tool bundles with no readable instructions. v1.4 **synthesizes a read-only virtual SKILL.md** from each MCP/ACP server's metadata (transport, command, args, env, exposed tools), so those integrations show up as **navigable skill catalogs** in the Skills page. Because they're synthesized, virtual SKILL.md rebuilds on every list call â€?no stale persisted copy to maintain â€?and `load_skill` can read it just like a real skill, giving the agent a description of what the integration can do before it calls a single tool.
 
 ---
 
@@ -598,16 +598,16 @@ MCP- and ACP-derived skills used to be opaque tool bundles with no readable inst
 
 Every skill card opens a drawer with eight tabs:
 
-- **Overview** â€” identity fields, manifest projection, source, version
-- **Body** â€” `SKILL.md` editor (takes over the full drawer width)
-- **Tools** â€” which tools this skill uses (with effective tool expansion)
-- **Features** â€” capability matrix
-- **Security** â€” content scan results, related Tool Guard rules
-- **Lessons** â€” `LESSONS.md` content
-- **Secrets** â€” env-var-style credentials (new in v1.3; see the "Secrets" section below)
-- **Memory** â€” digital employees bound to this skill
+- **Overview** â€?identity fields, manifest projection, source, version
+- **Body** â€?`SKILL.md` editor (takes over the full drawer width)
+- **Tools** â€?which tools this skill uses (with effective tool expansion)
+- **Features** â€?capability matrix
+- **Security** â€?content scan results, related Tool Guard rules
+- **Lessons** â€?`LESSONS.md` content
+- **Secrets** â€?env-var-style credentials (new in v1.3; see the "Secrets" section below)
+- **Memory** â€?digital employees bound to this skill
 
-The card itself is slim â€” six fields and one status pill. **Clear beats comprehensive.**
+The card itself is slim â€?six fields and one status pill. **Clear beats comprehensive.**
 
 ---
 
@@ -615,10 +615,10 @@ The card itself is slim â€” six fields and one status pill. **Clear beats compre
 
 Custom skills go through several checks before they become live:
 
-- **Content scanning** â€” `SKILL.md` scanned for prompt injection and script injection on upload
-- **Tool requirement check** â€” `tools:` list must only reference tools that exist
-- **Tool Guard compliance** â€” skills with dangerous tools inherit Tool Guard rules
-- **MCP skill constraints** â€” MCP-backed skills inherit the security constraints of their MCP server
+- **Content scanning** â€?`SKILL.md` scanned for prompt injection and script injection on upload
+- **Tool requirement check** â€?`tools:` list must only reference tools that exist
+- **Tool Guard compliance** â€?skills with dangerous tools inherit Tool Guard rules
+- **MCP skill constraints** â€?MCP-backed skills inherit the security constraints of their MCP server
 
 Full review in [Security & Approval](./security).
 
@@ -626,7 +626,7 @@ Full review in [Security & Approval](./security).
 
 ## Next
 
-- [Tools](./tools) â€” tools that skills can use
-- [Agents](./agents) â€” how agents invoke skills during a turn
-- [MCP](./mcp) â€” MCP-backed skills
-- [Security & Approval](./security) â€” skill scanning details
+- [Tools](./tools) â€?tools that skills can use
+- [Agents](./agents) â€?how agents invoke skills during a turn
+- [MCP](./mcp) â€?MCP-backed skills
+- [Security & Approval](./security) â€?skill scanning details

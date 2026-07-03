@@ -241,7 +241,7 @@ public class BrowserLauncher {
         command.add("--no-default-browser-check");
         command.add("--disable-extensions");
         command.add("--disable-background-networking");
-        if (props.isHeadless() && !headed) {
+        if (!headed) {
             command.add("--headless=new");
         }
         if (isRunningAsRoot() || IS_WINDOWS) {

@@ -10,15 +10,15 @@
 
 Everyone deserves an AI assistant that actually understands them.
 
-Not a chat toy. Not a tech demo. A **digital counterpart** â€” one that knows how you work, connects to all your tools, thinks for you, executes for you, and remembers for you.
+Not a chat toy. Not a tech demo. A **digital counterpart** â€?one that knows how you work, connects to all your tools, thinks for you, executes for you, and remembers for you.
 
-**MateClaw is that thing.**
+**GLClaw is that thing.**
 
 ---
 
 ## What we've shipped
 
-### v1.0 â€” It thinks and acts âœ… Released
+### v1.0 â€?It thinks and acts âœ?Released
 
 Make an AI assistant a coworker who uses tools, not a chat box.
 
@@ -30,7 +30,7 @@ Make an AI assistant a coworker who uses tools, not a chat box.
 - Tool Guard + File Guard + Audit Log: every tool call has approval, control, and a record
 - SKILL.md skill system: install new capabilities into your AI like apps
 
-### v1.1 â€” It's everywhere âœ… Released
+### v1.1 â€?It's everywhere âœ?Released
 
 Move AI out of the chat box on a webpage and into every IM your team actually uses.
 
@@ -42,15 +42,15 @@ Move AI out of the chat box on a webpage and into every IM your team actually us
 - ChatGPT OAuth + Anthropic Claude Code OAuth: log in with your subscription, no API key
 - LLM Wiki + RAG: raw files become structured pages with bidirectional links and summaries
 
-### v1.2 â€” It's your coworker âœ… Released (2026-05-05)
+### v1.2 â€?It's your coworker âœ?Released (2026-05-05)
 
-Renamed "agents" to **digital employees** â€” not vocabulary purism, a worldview shift.
+Renamed "agents" to **digital employees** â€?not vocabulary purism, a worldview shift.
 
-- **Digital employees** with Role / Goal / Backstory â€” not a cold system prompt
-- **5 career templates**: product researcher / customer support / knowledge curator / data analyst / executive assistant â€” open one, it works
-- **Skills are no longer aliases for tools** â€” each skill is a backbone with its own SKILL.md + LESSONS.md + workspace filesystem
+- **Digital employees** with Role / Goal / Backstory â€?not a cold system prompt
+- **5 career templates**: product researcher / customer support / knowledge curator / data analyst / executive assistant â€?open one, it works
+- **Skills are no longer aliases for tools** â€?each skill is a backbone with its own SKILL.md + LESSONS.md + workspace filesystem
 - **ACP bridge**: Claude Code, Codex, Gemini CLI plug in as employees
-- **Backstage runtime console**: for the first time you can **see what each employee is doing right now** â€” who's running, on which step, how many tokens, kill them in one click
+- **Backstage runtime console**: for the first time you can **see what each employee is doing right now** â€?who's running, on which step, how many tokens, kill them in one click
 - **Onboarding wizard**: first-login four-step flow from zero to first message
 - **Dashboard**: daily usage trend + top agents/tools
 - **Doctor**: system health checks + one-click fix
@@ -59,13 +59,13 @@ Full story: [v1.2.0 release notes](./releases/1.2.0.md).
 
 ---
 
-## v1.3 â€” The workflow year âœ… Shipped (2026-05-13)
+## v1.3 â€?The workflow year âœ?Shipped (2026-05-13)
 
 > "Focus is about saying no to the hundred other good ideas that there are."
 
 Each digital employee being able to do work is just the beginning. **Real collaboration needs orchestration.**
 
-The v1.3 line is **graduating MateClaw from a chatbot framework to a business-process OS** â€” a flow is no longer the sum of several employees chatting separately, but a publishable, triggerable, replayable **linear-step DSL**.
+The v1.3 line is **graduating GLClaw from a chatbot framework to a business-process OS** â€?a flow is no longer the sum of several employees chatting separately, but a publishable, triggerable, replayable **linear-step DSL**.
 
 Full story: [v1.3.0 release notes](./releases/1.3.0.md).
 
@@ -74,10 +74,10 @@ Full story: [v1.3.0 release notes](./releases/1.3.0.md).
 - [x] **7 step modes**: sequential / fan_out / collect / conditional / await_approval / dispatch_channel / write_memory
 - [x] **Pebble expression subset** for conditionals + variable references (no side effects, no code execution)
 - [x] **JSON-first authoring**: Monaco + JSON-schema validation + static Pebble checking + template dropdown
-- [x] **Natural language â†’ workflow draft** (`POST /workflows/draft/generate`): a user describes the flow, an agent emits `graph_json` + compile diagnostics; never publishes directly â€” a human still reviews
+- [x] **Natural language â†?workflow draft** (`POST /workflows/draft/generate`): a user describes the flow, an agent emits `graph_json` + compile diagnostics; never publishes directly â€?a human still reviews
 - [x] **Integer revisions**: publish writes a new immutable row; draft is split from published version
 - [x] **Run history**: every step's input / output / duration / token / failure chain is recorded
-- [x] **Internal payload storage**: large I/O goes through `payload://` URIs â€” doesn't blow out the DB
+- [x] **Internal payload storage**: large I/O goes through `payload://` URIs â€?doesn't blow out the DB
 - [x] **Cross-workspace ACL**: publish-time validation rejects agent / channel / employeeId references outside the workspace
 - [x] **Persistent `await_approval` pause**: survives service restarts
 
@@ -87,14 +87,14 @@ Full story: [v1.3.0 release notes](./releases/1.3.0.md).
 - [x] **Event governance on by default**: dedup (60s window), per-trigger rate limit, bot-self-msg filter, Aâ†’Bâ†’A recursion guard
 - [x] **CronDelegationPort**: shares ShedLock + Spring TaskScheduler with the legacy cron module without writing into mate_cron_job
 - [x] **Cross-instance consistency**: `pattern_version` self-cancellation + periodic syncFromDatabase
-- [x] **Structured forms**: each of the 6 pattern types has its own field UI â€” no need to hand-write patternJson
+- [x] **Structured forms**: each of the 6 pattern types has its own field UI â€?no need to hand-write patternJson
 
 ### Existing experience upgrades
 
 - [x] **Image editing** (issue #75): `image_generate` gains `image` / `images` parameters with 5 reference forms (including `msg:<id>:<idx>` for in-conversation attachments)
 - [x] **DashScope OpenAI-compatible variant**: same sk- key, reaches the dot-versioned families (qwen3.5-plus / qwen3.6-plus / qwen3-vl-plus etc.)
 - [x] **New Wanxiang / Qwen-Image families**: 14 new image models, 3 new video models (including happyhorse-1.0-t2v)
-- [x] **4 document-generation tools**: DocxRenderTool / XlsxRenderTool / PptxRenderTool / PdfRenderTool â€” Markdown rendered directly into Office files, no subprocess fork, no npm dependency
+- [x] **4 document-generation tools**: DocxRenderTool / XlsxRenderTool / PptxRenderTool / PdfRenderTool â€?Markdown rendered directly into Office files, no subprocess fork, no npm dependency
 - [x] **MCP per-agent tool binding**: every employee binds MCP tools individually + status badges (connected / stale / unavailable / orphan) + namespace collisions auto-prefixed + server renames auto-followed
 - [x] **Xiaomi MiMo provider**: MiMo V2.5 Pro / V2.5 / V2 Pro / V2 Omni / V2 Flash
 - [x] **Multimodal sidecar routing** (issue #87): when a text-only primary model meets an image attachment, the configured vision model captions it first so the primary chat stays cheap; the old "do not call any tools" hard ban is gone, so user-built tools are no longer suppressed; routing badge on the bubble and a hint above the input box make every decision visible
@@ -110,24 +110,24 @@ Full story: [v1.3.0 release notes](./releases/1.3.0.md).
 
 ---
 
-## Next: v1.4 â€” The scenario-application year
+## Next: v1.4 â€?The scenario-application year
 
 > "When the tools are good enough, hide the tools and put the scenarios in front."
 
-v1.0 â†’ v1.3 builds out the infrastructure: employees, memory, knowledge bases, tools, skills, workflows, triggers, multimodal, channels. **The next move isn't another bolt** â€” it's assembling these parts into **scenarios users can drop in and use**.
+v1.0 â†?v1.3 builds out the infrastructure: employees, memory, knowledge bases, tools, skills, workflows, triggers, multimodal, channels. **The next move isn't another bolt** â€?it's assembling these parts into **scenarios users can drop in and use**.
 
-The v1.4 keyword is **scenario applications**. Not "more features" â€” **letting normal users get value without learning 7 step modes and 6 trigger pattern types**.
+The v1.4 keyword is **scenario applications**. Not "more features" â€?**letting normal users get value without learning 7 step modes and 6 trigger pattern types**.
 
 ### Industry scenario templates (workflow + trigger combos)
 
 Each one is **a one-click-importable workflow template + trigger config + recommended employee bindings + recommended KB structure**:
 
-- [ ] **Customer ticket triage**: WeCom / Feishu entry â†’ digital-employee classification â†’ route / escalate / auto-reply â†’ write to customer record
-- [ ] **Morning / weekly report automation**: cron trigger â†’ multi-employee parallel data collection â†’ data analyst summarizes â†’ generate PDF/PPTX â†’ multi-channel dispatch
-- [ ] **Contract approval flow**: contract upload â†’ legal-employee first review â†’ approval wait â†’ legal-employee revision suggestions â†’ write to archived memory
-- [ ] **Market intel monitoring**: webhook trigger (site change) â†’ content_match filtering â†’ business analyst summary â†’ Feishu bot push
-- [ ] **New employee onboarding**: webhook (HRIS hire event) â†’ executive assistant pulls doc checklist â†’ training-KB onboarding â†’ multi-day follow-up triggers
-- [ ] **Code PR review**: GitHub webhook â†’ code-reviewer employee runs review â†’ comments back to PR â†’ flag critical changes through await_approval
+- [ ] **Customer ticket triage**: WeCom / Feishu entry â†?digital-employee classification â†?route / escalate / auto-reply â†?write to customer record
+- [ ] **Morning / weekly report automation**: cron trigger â†?multi-employee parallel data collection â†?data analyst summarizes â†?generate PDF/PPTX â†?multi-channel dispatch
+- [ ] **Contract approval flow**: contract upload â†?legal-employee first review â†?approval wait â†?legal-employee revision suggestions â†?write to archived memory
+- [ ] **Market intel monitoring**: webhook trigger (site change) â†?content_match filtering â†?business analyst summary â†?Feishu bot push
+- [ ] **New employee onboarding**: webhook (HRIS hire event) â†?executive assistant pulls doc checklist â†?training-KB onboarding â†?multi-day follow-up triggers
+- [ ] **Code PR review**: GitHub webhook â†?code-reviewer employee runs review â†?comments back to PR â†?flag critical changes through await_approval
 
 ### Scenario marketplace
 
@@ -138,12 +138,12 @@ Each one is **a one-click-importable workflow template + trigger config + recomm
 ### Cross-scenario employee collaboration
 
 - [ ] **Employee directory profile**: each employee auto-gains "good at / weak at" tags (based on history + skills + tool set)
-- [ ] **Scenario suggestions**: user describes "I want a flow that does X" â†’ recommend the closest scenario template + existing employees
+- [ ] **Scenario suggestions**: user describes "I want a flow that does X" â†?recommend the closest scenario template + existing employees
 - [ ] **Cross-scenario memory sharing**: customer ticket triage and contract approval see the same customer record
 
 ### Hide the infrastructure further
 
-- [ ] **Natural language â†’ full scenario package**: v1.3 already does "NL â†’ workflow draft"; v1.4 extends it to **the whole scenario** â€” one sentence yields a draft of workflow + triggers + recommended employees + recommended KB structure
+- [ ] **Natural language â†?full scenario package**: v1.3 already does "NL â†?workflow draft"; v1.4 extends it to **the whole scenario** â€?one sentence yields a draft of workflow + triggers + recommended employees + recommended KB structure
 - [ ] **Self-diagnosis wizards**: typical issues like "my workflow stuck waiting on approval" become self-serve diagnostics
 - [ ] **Scenario-level dashboards**: not "tokens spent today" but "average customer-ticket handling time today"
 
@@ -161,12 +161,12 @@ Each one is **a one-click-importable workflow template + trigger config + recomm
 
 | Cut | Why | When it might return |
 |-----|-----|---------------------|
-| **Full RBAC permission model** | MateClaw is a digital-employee system, not an enterprise management platform. A single team doesn't need 100 permission combinations | When real multi-team SaaS customers need fine-grained permissions |
+| **Full RBAC permission model** | GLClaw is a digital-employee system, not an enterprise management platform. A single team doesn't need 100 permission combinations | When real multi-team SaaS customers need fine-grained permissions |
 | **Multi-tenancy** | Same as above. Premature multi-tenancy is architectural cancer | When there's a clear SaaS commercialization path |
 | **SSO / LDAP / SAML** | Enterprise integration is a bottomless pit | When paying enterprise customers explicitly ask |
 | **30+ node visual workflow editor** | Most users won't reach for it. **v1.3's 7 step modes already cover 90% of real-world scenarios**; the rest is pushed to LLM natural-language generation | When a user case actually needs 30+ nodes (rare) |
-| **Native mobile app** | 8 IM channels + desktop + Web already cover it. On your phone, you use MateClaw via DingTalk / Feishu / Telegram | When Web / IM channels can't deliver an irreplaceable mobile-only feature |
-| **Replacing ReAct / Plan-Execute** | Workflow and those two engines **collaborate**, not replace â€” single-agent multi-turn reasoning still lives there | Never replaces |
+| **Native mobile app** | 8 IM channels + desktop + Web already cover it. On your phone, you use GLClaw via DingTalk / Feishu / Telegram | When Web / IM channels can't deliver an irreplaceable mobile-only feature |
+| **Replacing ReAct / Plan-Execute** | Workflow and those two engines **collaborate**, not replace â€?single-agent multi-turn reasoning still lives there | Never replaces |
 
 ---
 
@@ -174,17 +174,17 @@ Each one is **a one-click-importable workflow template + trigger config + recomm
 
 | Version | One line | User experience goal | Status |
 |---------|----------|----------------------|--------|
-| **v1.0** | It thinks and acts | An AI assistant that uses tools to solve problems | âœ… Released |
-| **v1.1** | It's everywhere | 8 channels + 4-layer memory + workspaces + LLM Wiki | âœ… Released |
-| **v1.2** | It's your coworker | Digital employees + 5 career templates + backbone-style skills + ACP bridge + Backstage runtime | âœ… Released |
-| **v1.3** | It orchestrates business flows | Workflow + triggers + image editing + document generation + per-agent tool binding | âœ… Released |
-| **v1.4** | **It lands real scenarios** | **Industry scenario templates + scenario marketplace + NL â†’ workflow + cross-scenario employee profiling** | ðŸ“‹ Planned |
+| **v1.0** | It thinks and acts | An AI assistant that uses tools to solve problems | âœ?Released |
+| **v1.1** | It's everywhere | 8 channels + 4-layer memory + workspaces + LLM Wiki | âœ?Released |
+| **v1.2** | It's your coworker | Digital employees + 5 career templates + backbone-style skills + ACP bridge + Backstage runtime | âœ?Released |
+| **v1.3** | It orchestrates business flows | Workflow + triggers + image editing + document generation + per-agent tool binding | âœ?Released |
+| **v1.4** | **It lands real scenarios** | **Industry scenario templates + scenario marketplace + NL â†?workflow + cross-scenario employee profiling** | ðŸ“‹ Planned |
 
 ---
 
 ## One More Thing
 
-We're not building MateClaw to chase ChatGPT, not to be the next Dify, not to add another buzzword to a funding deck.
+We're not building GLClaw to chase ChatGPT, not to be the next Dify, not to add another buzzword to a funding deck.
 
 We're building it because we believe one thing:
 

@@ -1,4 +1,4 @@
-# Upgrading MateClaw
+# Upgrading GLClaw
 
 ## 1.0.x → 1.1.0
 
@@ -89,7 +89,7 @@ docker compose logs -f mateclaw-server   # watch for "Flyway Successfully applie
 ```
 
 Expected log lines during boot:
-- `Flyway Successfully applied N migrations to schema mateclaw`
+- `Flyway Successfully applied N migrations to schema glclaw`
 - `Ollama: auto-activated default model '<actual-tag>'` (if you use Ollama — should NOT say `:latest` any more)
 - `[Security] Using default JWT secret!` → means you forgot to set `JWT_SECRET` — fix and restart
 

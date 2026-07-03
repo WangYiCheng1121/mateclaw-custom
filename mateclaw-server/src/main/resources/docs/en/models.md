@@ -2,7 +2,7 @@
 
 **Pick a model. Just one. Add more later.**
 
-MateClaw doesn't care which LLM you use. It talks to every mainstream provider through five protocol adapters, supports 15+ cloud providers and 4 local runtimes, and lets you swap models at runtime without touching agent configuration. The only opinion MateClaw has is that you should **start with one and add more when you need them** ‚Äî not configure everything on day one.
+GLClaw doesn't care which LLM you use. It talks to every mainstream provider through five protocol adapters, supports 15+ cloud providers and 4 local runtimes, and lets you swap models at runtime without touching agent configuration. The only opinion GLClaw has is that you should **start with one and add more when you need them** ‚Ä?not configure everything on day one.
 
 ---
 
@@ -16,10 +16,10 @@ MateClaw doesn't care which LLM you use. It talks to every mainstream provider t
 | **DashScope (OpenAI-compatible)** | Qwen3.5-Plus, Qwen3.6-Plus, Qwen3 VL Plus, etc. (dot-versioned families) | openai | See "Two DashScope variants" below |
 | **Bailian Token Plan** | Bailian token-bundle plan | dashscope | 7 seeded models; long tokens supported |
 | **OpenAI** | GPT-4o, GPT-4o-mini, GPT-5.5, o1, o3, o4-mini | openai | Standard OpenAI API |
-| **OpenAI OAuth (ChatGPT Plus/Pro)** | GPT-4o, o3, o4-mini via subscription | openai | Browser-based OAuth ‚Äî no API key |
+| **OpenAI OAuth (ChatGPT Plus/Pro)** | GPT-4o, o3, o4-mini via subscription | openai | Browser-based OAuth ‚Ä?no API key |
 | **Anthropic** | Claude 4.7, Claude 4.6 Sonnet, Claude 4.5 Haiku | anthropic | Native Messages API |
-| **Anthropic Claude Code OAuth** | Claude 4.7 / 4.6 via Claude Pro/Max/Team subscription | anthropic | Browser OAuth + manual-paste flow ‚Äî no API key |
-| **Google Gemini** _(native)_ | gemini-2.5-flash, gemini-3-pro-image-preview, gemini-2.5-flash-image | gemini | Native `generateContent` API (not OpenAI-compatible) ‚Äî see "Native Gemini" below |
+| **Anthropic Claude Code OAuth** | Claude 4.7 / 4.6 via Claude Pro/Max/Team subscription | anthropic | Browser OAuth + manual-paste flow ‚Ä?no API key |
+| **Google Gemini** _(native)_ | gemini-2.5-flash, gemini-3-pro-image-preview, gemini-2.5-flash-image | gemini | Native `generateContent` API (not OpenAI-compatible) ‚Ä?see "Native Gemini" below |
 | **xAI / Grok** | Grok 3, Grok 4 | openai | OpenAI-compatible (base URL + API key); xAI brand icon in the UI |
 | **DeepSeek** | deepseek-chat, deepseek-coder, **DeepSeek V4 flash + pro** (thinking-mode) | openai | OpenAI-compatible |
 | **Kimi (Moonshot)** | moonshot-v1-8k/32k/128k | openai | OpenAI-compatible |
@@ -51,7 +51,7 @@ Five protocols cover everything:
 | **Gemini** | Google Gemini family |
 | **Ollama** | Locally hosted models via Ollama |
 
-Any OpenAI-compatible service works ‚Äî just point `base-url` at it.
+Any OpenAI-compatible service works ‚Ä?just point `base-url` at it.
 
 ---
 
@@ -63,50 +63,50 @@ Same `sk-` API key, **two endpoints** that ship different model families:
 |---|---|---|
 | Endpoint | `dashscope.aliyuncs.com/api/v1` (native) | `dashscope.aliyuncs.com/compatible-mode/v1` (OpenAI-compatible) |
 | Protocol | DashScope native | OpenAI standard (same shape as GPT-4 / DeepSeek / Kimi) |
-| Built-in web search (`enable_search`) | ‚úÖ Supported | ‚ùå Not supported |
+| Built-in web search (`enable_search`) | ‚ú?Supported | ‚ù?Not supported |
 | Models | Qwen-Max / Plus / Turbo / Long, Qwen-VL, Qwen3-Max, DeepSeek-V3.2, etc. | **Dot-versioned** new families: Qwen3.5-Plus, Qwen3.6-Plus, Qwen3 VL-Plus, etc. |
 
-**Why two providers**: Alibaba publishes the dot-versioned families (`qwen3.5-*` / `qwen3.6-*` / `qwen3-vl-*`) only on the OpenAI-compatible endpoint; the native protocol returns `400 InvalidParameter` for them. The two providers **share the same sk- key** ‚Äî paste it once, it works for both.
+**Why two providers**: Alibaba publishes the dot-versioned families (`qwen3.5-*` / `qwen3.6-*` / `qwen3-vl-*`) only on the OpenAI-compatible endpoint; the native protocol returns `400 InvalidParameter` for them. The two providers **share the same sk- key** ‚Ä?paste it once, it works for both.
 
 **Which to pick**:
-- Want Qwen-Max / Plus / Turbo + built-in search / DeepSeek-V3.2 ‚Üí **DashScope**
-- Want Qwen3.5-Plus / Qwen3.6-Plus / Qwen3 vision-language ‚Üí **DashScope (OpenAI-compatible)**
-- **Enable both** if you want ‚Äî same key, models just appear under different cards
+- Want Qwen-Max / Plus / Turbo + built-in search / DeepSeek-V3.2 ‚Ü?**DashScope**
+- Want Qwen3.5-Plus / Qwen3.6-Plus / Qwen3 vision-language ‚Ü?**DashScope (OpenAI-compatible)**
+- **Enable both** if you want ‚Ä?same key, models just appear under different cards
 
 ---
 
 ## Native Gemini
 
 ::: tip New in 1.4.0
-Gemini no longer rides on an OpenAI-compatibility shim ‚Äî MateClaw talks to Google's **native `generateContent` API** directly.
+Gemini no longer rides on an OpenAI-compatibility shim ‚Ä?GLClaw talks to Google's **native `generateContent` API** directly.
 :::
 
-Plenty of products bolt Gemini on as "just another OpenAI-compatible endpoint" and then hit walls around system instructions, function calling, and inline images. MateClaw speaks Gemini's own protocol instead:
+Plenty of products bolt Gemini on as "just another OpenAI-compatible endpoint" and then hit walls around system instructions, function calling, and inline images. GLClaw speaks Gemini's own protocol instead:
 
-- **Native chat builder** ‚Äî maps `systemInstruction`, `functionCall` / `functionResponse` (tool-call turns), and inline image parts (multimodal input) correctly
-- **Streaming SSE parsing** ‚Äî parses Gemini's streaming response format chunk by chunk
-- **JSON Schema sanitizing** ‚Äî automatically strips JSON Schema keywords Gemini rejects, so tool definitions aren't refused
-- **Startup liveness probe** ‚Äî sends a lightweight request at startup to confirm the credentials and model are reachable
+- **Native chat builder** ‚Ä?maps `systemInstruction`, `functionCall` / `functionResponse` (tool-call turns), and inline image parts (multimodal input) correctly
+- **Streaming SSE parsing** ‚Ä?parses Gemini's streaming response format chunk by chunk
+- **JSON Schema sanitizing** ‚Ä?automatically strips JSON Schema keywords Gemini rejects, so tool definitions aren't refused
+- **Startup liveness probe** ‚Ä?sends a lightweight request at startup to confirm the credentials and model are reachable
 
-Configure it under `Settings ‚Üí Models ‚Üí Add Provider`, pick the **Gemini** provider, paste your API key. Example models: `gemini-2.5-flash`, `gemini-3-pro-image-preview`, `gemini-2.5-flash-image`. Image generation runs through the same native path ‚Äî see [Multimodal ‚Üí Image generation](./multimodal#image-generation-six-providers).
+Configure it under `Settings ‚Ü?Models ‚Ü?Add Provider`, pick the **Gemini** provider, paste your API key. Example models: `gemini-2.5-flash`, `gemini-3-pro-image-preview`, `gemini-2.5-flash-image`. Image generation runs through the same native path ‚Ä?see [Multimodal ‚Ü?Image generation](./multimodal#image-generation-six-providers).
 
 ---
 
 ## Adding a provider
 
-**A fresh MateClaw install has an empty provider list. That's deliberate.**
+**A fresh GLClaw install has an empty provider list. That's deliberate.**
 
 You don't need to see 16 providers. You need **one that works.**
 
-`Settings ‚Üí Models ‚Üí Add Provider` opens a drawer with the full catalog. Local runtimes (Ollama, LM Studio, llama.cpp, MLX ‚Äî no API key required) appear first; cloud providers (DashScope, OpenAI, Anthropic, DeepSeek, etc.) follow.
+`Settings ‚Ü?Models ‚Ü?Add Provider` opens a drawer with the full catalog. Local runtimes (Ollama, LM Studio, llama.cpp, MLX ‚Ä?no API key required) appear first; cloud providers (DashScope, OpenAI, Anthropic, DeepSeek, etc.) follow.
 
 Three steps:
 
-1. **Find the row you want and click Enable** ‚Äî the provider joins your main list
-2. **Fill in the base URL** (pre-filled for known providers) **and paste your API key** ‚Äî encrypted at rest, masked in UI
-3. **Save ‚Üí Test Connection** ‚Äî the system sends a lightweight request and reports success or error
+1. **Find the row you want and click Enable** ‚Ä?the provider joins your main list
+2. **Fill in the base URL** (pre-filled for known providers) **and paste your API key** ‚Ä?encrypted at rest, masked in UI
+3. **Save ‚Ü?Test Connection** ‚Ä?the system sends a lightweight request and reports success or error
 
-Close the drawer and the main list shows only the providers you've enabled. **Model picker, chat page, agent editor ‚Äî every place that surfaces models, surfaces only the ones you opted in.**
+Close the drawer and the main list shows only the providers you've enabled. **Model picker, chat page, agent editor ‚Ä?every place that surfaces models, surfaces only the ones you opted in.**
 
 ::: tip Existing installs (V55 migration)
 Providers already in use are **not** turned off. V55 auto-marks a provider as enabled if any of these are true:
@@ -115,46 +115,46 @@ Providers already in use are **not** turned off. V55 auto-marks a provider as en
 - Has been used by a chat session in the last 30 days
 - Owns the current default model
 
-Untouched, never-used placeholder providers go back into the drawer ‚Äî flip them on the next time you need them.
+Untouched, never-used placeholder providers go back into the drawer ‚Ä?flip them on the next time you need them.
 :::
 
 ---
 
 ## Enabling / disabling a provider
 
-Every provider card in the main list has an **Enable / Disable** toggle. **You must enable a provider before you can use it** ‚Äî that's the core product contract from v1.1.0 onward.
+Every provider card in the main list has an **Enable / Disable** toggle. **You must enable a provider before you can use it** ‚Ä?that's the core product contract from v1.1.0 onward.
 
-- **Disable** ‚Äî the provider disappears from the model picker, chat page, and agent editor immediately. **Configuration is preserved**; flip it back on and everything is exactly where you left it.
-- **If you disable the provider that owns the current default model**, the system automatically promotes a model on a still-enabled provider as the new default ‚Äî no broken next-message.
-- **Enable** ‚Äî the provider reappears everywhere. If it has never had an API key set, you'll be prompted to configure it.
+- **Disable** ‚Ä?the provider disappears from the model picker, chat page, and agent editor immediately. **Configuration is preserved**; flip it back on and everything is exactly where you left it.
+- **If you disable the provider that owns the current default model**, the system automatically promotes a model on a still-enabled provider as the new default ‚Ä?no broken next-message.
+- **Enable** ‚Ä?the provider reappears everywhere. If it has never had an API key set, you'll be prompted to configure it.
 
 This separates "I have a key for this provider but I'm not using it today" from "I don't have this provider." Switching providers temporarily no longer means deleting configuration.
 
-### ChatGPT OAuth ‚Äî no API key needed
+### ChatGPT OAuth ‚Ä?no API key needed
 
-Have a ChatGPT Plus or Pro account? MateClaw can talk to OpenAI's chat endpoint through **browser-based OAuth** ‚Äî log in the way you normally would, your subscription is used directly. GPT-4o, o3, and o4-mini become available immediately.
+Have a ChatGPT Plus or Pro account? GLClaw can talk to OpenAI's chat endpoint through **browser-based OAuth** ‚Ä?log in the way you normally would, your subscription is used directly. GPT-4o, o3, and o4-mini become available immediately.
 
-`Settings ‚Üí Models ‚Üí Add Provider ‚Üí OpenAI OAuth`. A browser window opens. Token exchange happens on the backend; **credentials never leave your machine**.
+`Settings ‚Ü?Models ‚Ü?Add Provider ‚Ü?OpenAI OAuth`. A browser window opens. Token exchange happens on the backend; **credentials never leave your machine**.
 
-### Device authorization grant ‚Äî for remote / headless deployments
+### Device authorization grant ‚Ä?for remote / headless deployments
 
-Browser-callback OAuth needs the IDP's redirect to land back on a `localhost` port that *your* browser can reach. That's fine when MateClaw runs on your laptop and breaks the moment you put it on a server, in a container, or on a host that doesn't expose a loopback socket to your client.
+Browser-callback OAuth needs the IDP's redirect to land back on a `localhost` port that *your* browser can reach. That's fine when GLClaw runs on your laptop and breaks the moment you put it on a server, in a container, or on a host that doesn't expose a loopback socket to your client.
 
-For those cases, OpenAI OAuth automatically switches to **Device Authorization Grant (RFC 8628)** ‚Äî the same flow ChatGPT desktop and `gh auth login` use. No callback, no port mapping.
+For those cases, OpenAI OAuth automatically switches to **Device Authorization Grant (RFC 8628)** ‚Ä?the same flow ChatGPT desktop and `gh auth login` use. No callback, no port mapping.
 
-`Settings ‚Üí Models ‚Üí Add Provider ‚Üí OpenAI OAuth` on a non-localhost host pops a dialog showing:
+`Settings ‚Ü?Models ‚Ü?Add Provider ‚Ü?OpenAI OAuth` on a non-localhost host pops a dialog showing:
 
 - A short **user code** (monospace, copyable)
-- A **verification URL** at `auth.openai.com/codex/device` ‚Äî open it in any browser on any device
+- A **verification URL** at `auth.openai.com/codex/device` ‚Ä?open it in any browser on any device
 - A live **countdown** until the device code expires (default 15 min)
 
 Enter the user code in your browser, authorize, and the dialog closes itself the moment the backend's poll loop sees `COMPLETED`.
 
-**How MateClaw decides which flow to use:**
+**How GLClaw decides which flow to use:**
 
-| `mateclaw.oauth.openai.deployment-mode` | Behaviour |
+| `GLClaw.oauth.openai.deployment-mode` | Behaviour |
 |---|---|
-| `auto` *(default)* | `localhost` / `127.0.0.1` / `::1` ‚Üí browser callback; everything else ‚Üí device code |
+| `auto` *(default)* | `localhost` / `127.0.0.1` / `::1` ‚Ü?browser callback; everything else ‚Ü?device code |
 | `local` | Force browser callback (loopback server) |
 | `device_code` | Force device code |
 | `manual_paste` | Force the legacy paste-the-callback-URL flow |
@@ -165,8 +165,8 @@ If `local` mode can't bind a loopback port (port in use, sandbox refused), it fa
 
 | Method | Path | Purpose |
 |---|---|---|
-| `POST` | `/start` | Begin a session ‚Äî returns `deviceAuthId`, `userCode`, `verificationUrl`, `intervalSeconds`, `expiresInSeconds` |
-| `POST` | `/poll` | Poll one session by `deviceAuthId` ‚Äî returns `PENDING` / `COMPLETED` / `EXPIRED` |
+| `POST` | `/start` | Begin a session ‚Ä?returns `deviceAuthId`, `userCode`, `verificationUrl`, `intervalSeconds`, `expiresInSeconds` |
+| `POST` | `/poll` | Poll one session by `deviceAuthId` ‚Ä?returns `PENDING` / `COMPLETED` / `EXPIRED` |
 | `POST` | `/cancel` | Drop the session (e.g. user closed the dialog) |
 
 The frontend respects the `intervalSeconds` OpenAI returns (typically 5 s); the server enforces a min poll interval (default 3 s) to keep load bounded. Expired sessions are swept every 5 minutes.
@@ -175,12 +175,12 @@ Token persistence and refresh use the **same code path** as the browser-callback
 
 ### Anthropic Claude Code OAuth
 
-Same pattern, same outcome: have a Claude Pro / Max / Team subscription? Sign in with the **same OAuth flow Claude Code itself uses** ‚Äî no `sk-ant-‚Ä¶` API key required. Claude 4.7 / 4.6 / 4.5 Haiku come online through your subscription.
+Same pattern, same outcome: have a Claude Pro / Max / Team subscription? Sign in with the **same OAuth flow Claude Code itself uses** ‚Ä?no `sk-ant-‚Ä¶` API key required. Claude 4.7 / 4.6 / 4.5 Haiku come online through your subscription.
 
-`Settings ‚Üí Models ‚Üí Add Provider ‚Üí Anthropic Claude Code OAuth`. Two flows are supported:
+`Settings ‚Ü?Models ‚Ü?Add Provider ‚Ü?Anthropic Claude Code OAuth`. Two flows are supported:
 
-- **Browser callback** ‚Äî local install, browser pops up, you click through, token lands in GLClaw
-- **MANUAL_PASTE** ‚Äî for remote-server deployments where the browser can't reach the backend, you complete the auth in your local browser and paste the token in
+- **Browser callback** ‚Ä?local install, browser pops up, you click through, token lands in GLClaw
+- **MANUAL_PASTE** ‚Ä?for remote-server deployments where the browser can't reach the backend, you complete the auth in your local browser and paste the token in
 
 Anti-abuse-gate compliant: Claude Code identity is injected into the system prompt, the request shape (UA / accept headers / `system` array form / `mcp_` tool-name prefixes) matches Claude Code's wire format exactly so the requests aren't rejected.
 
@@ -188,29 +188,29 @@ Anti-abuse-gate compliant: Claude Code identity is injected into the system prom
 
 ## Model discovery
 
-Providers that expose a model list (OpenAI, Ollama, LM Studio, OpenRouter, etc.) support **Model Discovery** ‚Äî one click and MateClaw fetches every model the provider offers.
+Providers that expose a model list (OpenAI, Ollama, LM Studio, OpenRouter, etc.) support **Model Discovery** ‚Ä?one click and GLClaw fetches every model the provider offers.
 
-- `Settings ‚Üí Models ‚Üí [provider card] ‚Üí Discover Models`
+- `Settings ‚Ü?Models ‚Ü?[provider card] ‚Ü?Discover Models`
 - System queries the provider's `/v1/models` endpoint
 - Discovered models appear with name, context window, pricing
 - Add them one by one or all at once
 
-For OpenRouter specifically, Model Discovery surfaces the **200+ free-tier models** ‚Äî pick a free model and you have a working setup with zero cost.
+For OpenRouter specifically, Model Discovery surfaces the **200+ free-tier models** ‚Ä?pick a free model and you have a working setup with zero cost.
 
 ### Ollama auto-detection on startup
 
 No manual configuration needed. On startup:
 
 1. **Ping** `http://127.0.0.1:11434`
-2. **Discover** ‚Äî fetch pulled models via `/v1/models`
-3. **Register** ‚Äî add to `mate_model_config`
-4. **Enable** ‚Äî auto-enable matching pre-configured models
-5. **Tag rewrite** ‚Äî rewrites seed `:latest` tags to actual installed versions (`deepseek-r1:latest` ‚Üí `deepseek-r1:7b`), no more `model not found` 404s
+2. **Discover** ‚Ä?fetch pulled models via `/v1/models`
+3. **Register** ‚Ä?add to `mate_model_config`
+4. **Enable** ‚Ä?auto-enable matching pre-configured models
+5. **Tag rewrite** ‚Ä?rewrites seed `:latest` tags to actual installed versions (`deepseek-r1:latest` ‚Ü?`deepseek-r1:7b`), no more `model not found` 404s
 
 If Ollama isn't running, silently skipped.
 
 ::: tip Default behavior
-- Models without tool support (`deepseek-r1`, `gemma*`, `phi3/4`, etc.) won't accidentally activate as default ‚Äî they're blocklisted
+- Models without tool support (`deepseek-r1`, `gemma*`, `phi3/4`, etc.) won't accidentally activate as default ‚Ä?they're blocklisted
 - Models that are not callable on DashScope native protocol are auto-purged on startup; dot-versioned Qwen families now live on the DashScope (OpenAI-compatible) provider instead
 - DashScope model discovery uses protocol-aware probing, skipping non-chat modalities
 :::
@@ -234,7 +234,7 @@ ollama pull gemma3
 ollama pull qwen3
 ```
 
-Restart MateClaw. Auto-discovered, added, enabled.
+Restart GLClaw. Auto-discovered, added, enabled.
 
 ---
 
@@ -252,7 +252,7 @@ Restart MateClaw. Auto-discovered, added, enabled.
 | `api_key` | Encrypted API key |
 | `oauth_tokens` | OAuth tokens (ChatGPT Plus/Pro) |
 | `is_local` | True for local runtimes |
-| `enabled` | Provider master switch ‚Äî when off, hidden from every model picker; configuration is preserved (v1.1.0+) |
+| `enabled` | Provider master switch ‚Ä?when off, hidden from every model picker; configuration is preserved (v1.1.0+) |
 
 ### `mate_model_config`
 
@@ -262,7 +262,7 @@ Restart MateClaw. Auto-discovered, added, enabled.
 | `provider_id` | FK to `mate_model_provider` |
 | `model_name` | Actual model identifier |
 | `display_name` | Human-readable name |
-| `temperature` | Default temperature (0.0 ‚Äì 2.0) |
+| `temperature` | Default temperature (0.0 ‚Ä?2.0) |
 | `max_tokens` | Max output tokens |
 | `top_p` | Top-p sampling |
 | `group_name` | UI grouping (e.g., "Reasoning", "Fast", "Vision") |
@@ -270,15 +270,15 @@ Restart MateClaw. Auto-discovered, added, enabled.
 
 ### Embedding models
 
-No `EMBEDDING_API_KEY` env vars. Embedding models are regular rows in `mate_model_config` with `model_type='embedding'`. They show up alongside chat models in `Settings ‚Üí Models`. Knowledge bases pick their embedding model from a dropdown.
+No `EMBEDDING_API_KEY` env vars. Embedding models are regular rows in `mate_model_config` with `model_type='embedding'`. They show up alongside chat models in `Settings ‚Ü?Models`. Knowledge bases pick their embedding model from a dropdown.
 
-::: tip New in 1.4.0 ([issue #79](https://github.com/matevip/mateclaw/issues/79))
-**Embedding models from any provider.** In the embedding section of `Settings ‚Üí Models`, configure an embedding model from any provider ‚Äî it **reuses that provider's API key**, so there's no separate `EMBEDDING_API_KEY`. Each knowledge base picks its embedding model from a dropdown. Keyless local proxies use a no-op placeholder key; the protocol is resolved from the provider's chat-model / protocol setting, so you never hand-enter it.
+::: tip New in 1.4.0 ([issue #79](https://github.com/matevip/GLClaw/issues/79))
+**Embedding models from any provider.** In the embedding section of `Settings ‚Ü?Models`, configure an embedding model from any provider ‚Ä?it **reuses that provider's API key**, so there's no separate `EMBEDDING_API_KEY`. Each knowledge base picks its embedding model from a dropdown. Keyless local proxies use a no-op placeholder key; the protocol is resolved from the provider's chat-model / protocol setting, so you never hand-enter it.
 :::
 
 ### Anthropic prompt caching
 
-System prompts, agent personas, tool definitions ‚Äî automatically marked with `cache_control: ephemeral` on Anthropic-compatible endpoints. First request warms the cache, every follow-up gets a cache hit. The Dashboard tracks `cache_read_tokens` / `cache_write_tokens` daily.
+System prompts, agent personas, tool definitions ‚Ä?automatically marked with `cache_control: ephemeral` on Anthropic-compatible endpoints. First request warms the cache, every follow-up gets a cache hit. The Dashboard tracks `cache_read_tokens` / `cache_write_tokens` daily.
 
 ### Thinking depth / `reasoning_effort`
 
@@ -286,7 +286,7 @@ System prompts, agent personas, tool definitions ‚Äî automatically marked with `
 
 **Three product contracts**:
 
-1. **Chat models that don't support chain-of-thought** ignore the front-end "deep thinking = high" selector entirely ‚Äî this is a capability property, not a UI setting. The thinking-depth selector automatically grays out when the current model is not reasoning-capable.
+1. **Chat models that don't support chain-of-thought** ignore the front-end "deep thinking = high" selector entirely ‚Ä?this is a capability property, not a UI setting. The thinking-depth selector automatically grays out when the current model is not reasoning-capable.
 2. **`generateKwargs.reasoningEffort` at provider level** only takes effect on whitelisted providers. Setting it on DeepSeek / Kimi / other OpenAI-compatible providers is silently dropped with a WARN log; the parameter is never sent.
 3. **Failover** re-checks at egress time: if the primary is GPT-5 and the fallback is DeepSeek, `reasoning_effort` is stripped before hitting DeepSeek, so leaked primary options can't 400 the fallback.
 
@@ -297,34 +297,34 @@ System prompts, agent personas, tool definitions ‚Äî automatically marked with `
 
 **Kimi K2.5 thinking**: the model activates thinking natively; don't set `reasoning_effort`.
 
-**Multi-round tool calls + thinking**: thinking-capable models (DeepSeek-Reasoner / GPT-5 / Kimi K2.5 / Xiaomi MiMo) correctly round-trip historical `reasoning_content` during ReAct multi-round tool calls. Cross-user-turn history is cleared at the boundary, in-turn history is preserved ‚Äî matching DeepSeek's "pass back within a turn, reset across turns" contract.
+**Multi-round tool calls + thinking**: thinking-capable models (DeepSeek-Reasoner / GPT-5 / Kimi K2.5 / Xiaomi MiMo) correctly round-trip historical `reasoning_content` during ReAct multi-round tool calls. Cross-user-turn history is cleared at the boundary, in-turn history is preserved ‚Ä?matching DeepSeek's "pass back within a turn, reset across turns" contract.
 
-**Xiaomi MiMo thinking-mode multi-turn fix** ([issue #189](https://github.com/matevip/mateclaw/issues/189)): MiMo's `reasoning_content` is now kept correctly across turns in thinking mode, instead of being lost on subsequent turns.
+**Xiaomi MiMo thinking-mode multi-turn fix** ([issue #189](https://github.com/matevip/GLClaw/issues/189)): MiMo's `reasoning_content` is now kept correctly across turns in thinking mode, instead of being lost on subsequent turns.
 
 ---
 
 ## Grouped model selector
 
-When your deployment has a lot of models configured, the chat model picker groups them by provider and tag. Searchable dropdown lets you filter by name, provider, or group ‚Äî "all Qwen", "all reasoning models", "everything under 7B". Groups are defined in the `group_name` column.
+When your deployment has a lot of models configured, the chat model picker groups them by provider and tag. Searchable dropdown lets you filter by name, provider, or group ‚Ä?"all Qwen", "all reasoning models", "everything under 7B". Groups are defined in the `group_name` column.
 
-Became a real thing when agents could be bound to different models per task ‚Äî a reasoning model for Plan-Execute, a fast cheap model for Chat, a vision model for image understanding.
+Became a real thing when agents could be bound to different models per task ‚Ä?a reasoning model for Plan-Execute, a fast cheap model for Chat, a vision model for image understanding.
 
 ---
 
 ## Active model switching at runtime
 
-MateClaw uses a single **active model** as the global default. Agents that don't specify their own use it.
+GLClaw uses a single **active model** as the global default. Agents that don't specify their own use it.
 
-- **UI:** `Settings ‚Üí Models ‚Üí [model card] ‚Üí Set as Active`
+- **UI:** `Settings ‚Ü?Models ‚Ü?[model card] ‚Ü?Set as Active`
 - **API:** `PUT /api/v1/models/active`
 
-Takes effect **immediately** ‚Äî no restart. Next message uses the new model. In-flight conversations unaffected.
+Takes effect **immediately** ‚Ä?no restart. Next message uses the new model. In-flight conversations unaffected.
 
 Per-agent override supported: bind a specific agent to a specific model config.
 
 ::: tip New in 1.4.0
-- **Per-conversation model selection** ([issue #150](https://github.com/matevip/mateclaw/issues/150)): in the chat UI you can switch the model for **just the current conversation**, without touching the global active model or any other conversation. See [Chat & Messaging](./chat).
-- **A single bad model id no longer evicts the whole provider**: when discovery / probing hits one invalid model identifier, only that model is skipped ‚Äî the rest of the provider's models stay available.
+- **Per-conversation model selection** ([issue #150](https://github.com/matevip/GLClaw/issues/150)): in the chat UI you can switch the model for **just the current conversation**, without touching the global active model or any other conversation. See [Chat & Messaging](./chat).
+- **A single bad model id no longer evicts the whole provider**: when discovery / probing hits one invalid model identifier, only that model is skipped ‚Ä?the rest of the provider's models stay available.
 :::
 
 ---
@@ -345,30 +345,30 @@ Use it whenever you add a new provider or suspect a stale key.
 ## Multimodal sidecar (system-wide)
 
 ::: tip Added in 1.3.0
-Lets a text-only primary model still answer questions about uploaded images. See [issue #87](https://github.com/matevip/mateclaw/issues/87).
+Lets a text-only primary model still answer questions about uploaded images. See [issue #87](https://github.com/matevip/GLClaw/issues/87).
 :::
 
-Entry point: **Settings ‚Üí Models ‚Üí Multimodal sidecar**. Two independent cards:
+Entry point: **Settings ‚Ü?Models ‚Ü?Multimodal sidecar**. Two independent cards:
 
 | Card | Purpose | Status |
 |------|---------|--------|
 | **Vision sidecar model** | Captions an uploaded image once, then hands the structured description to the primary chat model | Live |
 | **Video sidecar model** | Same idea for video | Reserved (config persisted but not yet wired in v1) |
 
-The setting stores `mate_model_config.id` rather than `model_name` ‚Äî the same `model_name` can exist under multiple providers (e.g. `qwen-vl-max` lives on both DashScope and an OpenAI-Compatible custom row), so a name-keyed setting would collide. Two setting keys:
+The setting stores `mate_model_config.id` rather than `model_name` ‚Ä?the same `model_name` can exist under multiple providers (e.g. `qwen-vl-max` lives on both DashScope and an OpenAI-Compatible custom row), so a name-keyed setting would collide. Two setting keys:
 
 - `default.vision_model`
 - `default.video_model`
 
-The dropdown only lists models that **actually support the relevant modality** ‚Äî filtered by `ModelCapabilityService.supports(...)` on the backend; disabled providers or models without a declared vision capability never appear. Each card has its own Save button, independent of the other.
+The dropdown only lists models that **actually support the relevant modality** ‚Ä?filtered by `ModelCapabilityService.supports(...)` on the backend; disabled providers or models without a declared vision capability never appear. Each card has its own Save button, independent of the other.
 
-When does it fire? `MultimodalRouter` ([source](https://github.com/matevip/mateclaw/blob/main/mateclaw-server/src/main/java/vip/mate/llm/routing/MultimodalRouter.java)) decides per turn:
+When does it fire? `MultimodalRouter` ([source](https://github.com/matevip/GLClaw/blob/main/GLClaw-server/src/main/java/vip/mate/llm/routing/MultimodalRouter.java)) decides per turn:
 
-- Primary already supports vision ‚Üí no routing (native multimodal path)
-- Primary lacks vision + vision sidecar configured ‚Üí SIDECAR strategy, captions to text
-- Primary lacks vision + no sidecar ‚Üí skip the attachment + tell the user to configure one
+- Primary already supports vision ‚Ü?no routing (native multimodal path)
+- Primary lacks vision + vision sidecar configured ‚Ü?SIDECAR strategy, captions to text
+- Primary lacks vision + no sidecar ‚Ü?skip the attachment + tell the user to configure one
 
-For the end-user flow (badge, hint above the input box) see [Chat ‚Üí Primary model can't see images? "Multimodal sidecar" routing](./chat#primary-model-cant-see-images-multimodal-sidecar-routing).
+For the end-user flow (badge, hint above the input box) see [Chat ‚Ü?Primary model can't see images? "Multimodal sidecar" routing](./chat#primary-model-cant-see-images-multimodal-sidecar-routing).
 
 ---
 
@@ -377,20 +377,20 @@ For the end-user flow (badge, hint above the input box) see [Chat ‚Üí Primary mo
 ::: tip OpenAI was down for 30 minutes. My AI didn't stop for a second.
 During the last 30-minute DashScope rate-limit hiccup, our service uptime was 100%.
 
-Users saw their answers come through cleanly ‚Äî no red error toast, no "service unavailable, please try again." **Mid-answer, mid-token**, the runtime quietly rolled to the next healthy provider. The next token after the cut landed normally.
+Users saw their answers come through cleanly ‚Ä?no red error toast, no "service unavailable, please try again." **Mid-answer, mid-token**, the runtime quietly rolled to the next healthy provider. The next token after the cut landed normally.
 
 This isn't "automatic retry" in the engineering sense. It's **failover the user can't perceive**.
 :::
 
 Every provider you add joins an `AvailableProviderPool` that's probed at startup and re-probed on config change.
 
-- **Automatic fallback** ‚Äî if the primary provider returns an `AUTH_ERROR`, `BILLING`, `MODEL_NOT_FOUND`, `NETWORK`, or `5xx`, the runtime rolls forward to the next provider in the chain instead of bubbling up the error
-- **Per-agent priority** ‚Äî bind an agent to "OpenAI first, then Anthropic, then DashScope" via the drag-to-reorder editor in `Settings ‚Üí Models`
-- **Live pool state** ‚Äî green / amber / red badges show each provider's health
-- **4-protocol probe** ‚Äî DashScope, OpenAI-compatible, Anthropic, Ollama-style
-- **Manual reprobe + auto-reprobe on config change** ‚Äî no restart after rotating a key
-- **Egress sanitizer** ‚Äî provider-specific options (e.g., `reasoning_effort` for OpenAI reasoning models) are stripped at egress when failing over to a provider that doesn't support them, so leaked options can't 400 the fallback
-- **UI distinguishes 401 from session expiry** ‚Äî provider auth errors and user session expiry now show different messages with different remediation
+- **Automatic fallback** ‚Ä?if the primary provider returns an `AUTH_ERROR`, `BILLING`, `MODEL_NOT_FOUND`, `NETWORK`, or `5xx`, the runtime rolls forward to the next provider in the chain instead of bubbling up the error
+- **Per-agent priority** ‚Ä?bind an agent to "OpenAI first, then Anthropic, then DashScope" via the drag-to-reorder editor in `Settings ‚Ü?Models`
+- **Live pool state** ‚Ä?green / amber / red badges show each provider's health
+- **4-protocol probe** ‚Ä?DashScope, OpenAI-compatible, Anthropic, Ollama-style
+- **Manual reprobe + auto-reprobe on config change** ‚Ä?no restart after rotating a key
+- **Egress sanitizer** ‚Ä?provider-specific options (e.g., `reasoning_effort` for OpenAI reasoning models) are stripped at egress when failing over to a provider that doesn't support them, so leaked options can't 400 the fallback
+- **UI distinguishes 401 from session expiry** ‚Ä?provider auth errors and user session expiry now show different messages with different remediation
 
 ---
 
@@ -401,7 +401,7 @@ Every provider you add joins an `AvailableProviderPool` that's probed at startup
 curl http://localhost:18088/api/v1/models \
   -H "Authorization: Bearer YOUR_JWT_TOKEN"
 
-# List the full catalog (including disabled) ‚Äî what the Add Provider drawer uses
+# List the full catalog (including disabled) ‚Ä?what the Add Provider drawer uses
 curl http://localhost:18088/api/v1/models/catalog \
   -H "Authorization: Bearer YOUR_JWT_TOKEN"
 
@@ -447,19 +447,19 @@ curl -X POST http://localhost:18088/api/v1/models/{providerId}/test-connection \
 ## Everything goes through the UI
 
 ::: tip
-**Model configuration is 100% UI-driven.** There's no `spring.ai.*` YAML you need to touch. All providers, all API keys, all model configs, all switching ‚Äî it all lives in `Settings ‚Üí Models`, backed by the `mate_model_provider` and `mate_model_config` database tables.
+**Model configuration is 100% UI-driven.** There's no `spring.ai.*` YAML you need to touch. All providers, all API keys, all model configs, all switching ‚Ä?it all lives in `Settings ‚Ü?Models`, backed by the `mate_model_provider` and `mate_model_config` database tables.
 :::
 
 The UI handles everything you'd otherwise do in YAML, plus several things YAML can't do:
 
-- **Add a provider** ‚Äî pick a type, paste a key, save. Encrypted at rest, masked in the UI.
-- **Test connection** ‚Äî verify a provider before you trust it in production.
-- **Discover models** ‚Äî for providers that support `/v1/models`, one click pulls the whole list.
-- **Per-model test** ‚Äî send a test prompt and see the exact response, latency, and token usage.
-- **Switch active model at runtime** ‚Äî no restart, no config reload, takes effect on the next message.
-- **Per-agent override** ‚Äî bind a specific agent to a specific model config.
+- **Add a provider** ‚Ä?pick a type, paste a key, save. Encrypted at rest, masked in the UI.
+- **Test connection** ‚Ä?verify a provider before you trust it in production.
+- **Discover models** ‚Ä?for providers that support `/v1/models`, one click pulls the whole list.
+- **Per-model test** ‚Ä?send a test prompt and see the exact response, latency, and token usage.
+- **Switch active model at runtime** ‚Ä?no restart, no config reload, takes effect on the next message.
+- **Per-agent override** ‚Ä?bind a specific agent to a specific model config.
 
-LLM API keys are **no longer read from environment variables** ‚Äî setting `DASHSCOPE_API_KEY` / `OPENAI_API_KEY` and similar has no effect. Every provider, key, and model lives in the UI. A fresh install starts with no providers configured; add your first one under `Settings ‚Üí Models ‚Üí Add Provider`.
+LLM API keys are **no longer read from environment variables** ‚Ä?setting `DASHSCOPE_API_KEY` / `OPENAI_API_KEY` and similar has no effect. Every provider, key, and model lives in the UI. A fresh install starts with no providers configured; add your first one under `Settings ‚Ü?Models ‚Ü?Add Provider`.
 
 ### Reference: which Qwen model to pick
 
@@ -477,6 +477,6 @@ If you're on DashScope, here's the rough shape of the lineup:
 
 ## Next
 
-- [Configuration](./config) ‚Äî full config reference
-- [Agents](./agents) ‚Äî how agents use models
-- [Admin Console](./console) ‚Äî UI for model management
+- [Configuration](./config) ‚Ä?full config reference
+- [Agents](./agents) ‚Ä?how agents use models
+- [Admin Console](./console) ‚Ä?UI for model management

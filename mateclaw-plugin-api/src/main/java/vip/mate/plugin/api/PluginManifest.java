@@ -8,7 +8,7 @@ import java.util.Map;
 /**
  * Plugin manifest model — deserialized from {@code mateclaw-plugin.json} in the plugin JAR root.
  *
- * @author MateClaw Team
+ * @author GLClaw Team
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class PluginManifest {

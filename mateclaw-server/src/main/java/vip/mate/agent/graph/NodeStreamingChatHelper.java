@@ -509,26 +509,6 @@ public class NodeStreamingChatHelper {
             throw new CancellationException("Stream stopped by user");
         }
 
-        // RFC-009 P3.1 + Phase 4: short-circuit the primary retry loop in two cases.
-        //   (a) primary is in cooldown (P3.3) — soft, transient
-        //   (b) primary was HARD-removed from the pool (Phase 4) — auth/billing/missing model
-        // Either way, retrying the same model wastes seconds; head straight to fallback.
-        boolean primaryInCooldown = primaryProviderId != null
-                && healthTracker != null
-                && healthTracker.isInCooldown(primaryProviderId);
-        boolean primaryOutOfPool = primaryProviderId != null && !inPool(primaryProviderId);
-        boolean primarySkipped = primaryInCooldown || primaryOutOfPool;
-        if (primarySkipped) {
-            String reason = primaryOutOfPool ? "removed from pool" : "in cooldown";
-            log.warn("[{}] Primary provider={} {} — skipping straight to fallback chain",
-                    phase, primaryProviderId, reason);
-            if (broadcast) {
-                broadcastDelta(conversationId, "warning",
-                        buildDeltaJson("主模型暂时不可用（" + (primaryOutOfPool ? "已下线" : "冷却中")
-                                + "），直接尝试备选模型..."));
-            }
-        }
-
         // D-6: performance counters
         int retryCount = 0;
         long totalBackoffMs = 0;
@@ -538,7 +518,7 @@ public class NodeStreamingChatHelper {
 
         // 主模型重试循环
         StreamResult lastResult = null;
-        if (!primarySkipped) for (int attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+        for (int attempt = 0; attempt <= MAX_RETRIES; attempt++) {
             llmCallCount++;
             if (attempt > 0) retryCount++;
             lastResult = doStreamCall(chatModel, prompt, conversationId, phase, broadcast, attempt);
@@ -549,22 +529,15 @@ public class NodeStreamingChatHelper {
                 }
                 // AUTH: primary key 失效不会自愈，跳过同模型重试，交给 fallback chain
                 // — 其它 provider 的 key 可能仍然可用（与 BILLING / MODEL_NOT_FOUND 同策略）。
-                // recordPrimary(false) 仍记一次失败用于 healthTracker 冷却累计。
-                // 若 fallback chain 全部 401，walker 末尾会把最后一次 AUTH_ERROR 透出，
-                // 不会静默吞错。
                 if (lastResult.errorType() == ErrorType.AUTH_ERROR) {
                     log.warn("[{}] Primary auth failed — skipping same-model retries, handing off to fallback chain", phase);
-                    recordPrimary(false);
-                    removeFromPool(primaryProviderId, ErrorType.AUTH_ERROR, lastResult.errorMessage());
                     break;
                 }
                 // BILLING — provider-side hard failure (out of credit). Won't change
-                // on retry and affects every model on the provider, so evict it and
-                // hand off to the fallback chain (a different provider may have credits).
+                // on retry and affects every model on the provider, so hand off to
+                // the fallback chain (a different provider may have credits).
                 if (lastResult.errorType() == ErrorType.BILLING) {
                     log.warn("[{}] Primary billing failure — skipping same-model retries, handing off to fallback chain", phase);
-                    recordPrimary(false);
-                    removeFromPool(primaryProviderId, ErrorType.BILLING, lastResult.errorMessage());
                     break;
                 }
                 // MODEL_NOT_FOUND — the provider rejected this specific model id. The
@@ -595,22 +568,17 @@ public class NodeStreamingChatHelper {
                 // productive; a different provider has a better chance of succeeding.
                 if (lastResult.errorType() == ErrorType.EMPTY_RESPONSE) {
                     log.warn("[{}] Primary returned empty response — skipping same-model retries, handing off to fallback chain", phase);
-                    recordPrimary(false);
                     break;
                 }
                 // 成功
                 if (lastResult.errorMessage() == null || lastResult.errorType() == ErrorType.NONE) {
-                    recordPrimary(true);
-                    addToPool(primaryProviderId);
                     logPerfSummary(phase, conversationId, callStartMs, llmCallCount, retryCount, failoverCount);
                     return lastResult;
                 }
                 // RATE_LIMIT / SERVER_ERROR past their retry budget are provider-level
                 // failures: the same model will not recover within this turn, but a
                 // different provider can. Break to the fallback chain instead of
-                // returning — recordPrimary(false) runs once at the post-loop provider
-                // health check below, and if every fallback also fails the chain
-                // walker re-surfaces this same error to the caller.
+                // returning.
                 if (lastResult.errorType() == ErrorType.RATE_LIMIT
                         || lastResult.errorType() == ErrorType.SERVER_ERROR) {
                     log.warn("[{}] Primary exhausted retries (type={}) — handing off to fallback chain",
@@ -621,43 +589,20 @@ public class NodeStreamingChatHelper {
                 // chose NOT to retry must exit — otherwise we silently spin through
                 // attempts and waste seconds per turn on unrecoverable errors like
                 // DashScope's "url error" / unknown model.
-                recordPrimary(false);
                 logPerfSummary(phase, conversationId, callStartMs, llmCallCount, retryCount, failoverCount);
                 return lastResult;
             }
             // lastResult == null 表示需要重试
-        }
-        // If we exhausted the retry loop without a verdict, primary effectively
-        // failed. Only count it against provider health for provider-level errors —
-        // a MODEL_NOT_FOUND break above must not nudge the provider toward cooldown.
-        if (!primarySkipped && lastResult != null && isProviderLevelFailure(lastResult.errorType())) {
-            recordPrimary(false);
         }
 
         // Primary exhausted retries — walk the fallback chain in priority order.
         // Each fallback gets a single shot (no retry); first successful result wins.
         // Same-instance entries (e.g., primary accidentally included in the chain)
         // are skipped so we don't re-try the exact model that just failed.
-        // Providers in cooldown (RFC-009 P3.3) are also skipped so a known-bad
-        // provider doesn't add latency to every conversation turn.
         for (int i = 0; i < fallbackChain.size(); i++) {
             vip.mate.llm.failover.FallbackEntry entry = fallbackChain.get(i);
             ChatModel fallback = entry.chatModel();
             if (fallback == chatModel) continue;
-            // RFC-009 Phase 4 — pool gate (the real runtime fence). A provider
-            // HARD-removed earlier (or by another conversation) must not even
-            // be attempted here. Build-time filtering is best-effort; this is
-            // the one that matters when pool state changes mid-conversation.
-            if (!inPool(entry.providerId())) {
-                log.info("[{}] Skipping fallback {}/{} provider={} — not in pool",
-                        phase, i + 1, fallbackChain.size(), entry.providerId());
-                continue;
-            }
-            if (healthTracker != null && healthTracker.isInCooldown(entry.providerId())) {
-                log.info("[{}] Skipping fallback {}/{} provider={} — in cooldown",
-                        phase, i + 1, fallbackChain.size(), entry.providerId());
-                continue;
-            }
             log.warn("[{}] Primary exhausted, trying fallback {}/{} provider={} ({}) for conversation {}",
                     phase, i + 1, fallbackChain.size(), entry.providerId(),
                     fallback.getClass().getSimpleName(), conversationId);
@@ -675,23 +620,10 @@ public class NodeStreamingChatHelper {
             if (fallbackResult != null
                     && fallbackResult.errorType() == ErrorType.NONE
                     && fallbackResult.errorMessage() == null) {
-                if (healthTracker != null) healthTracker.recordSuccess(entry.providerId());
-                addToPool(entry.providerId());
                 logPerfSummary(phase, conversationId, callStartMs, llmCallCount, retryCount, failoverCount);
                 return fallbackResult;
             }
-            // Only provider-level failures count toward the cooldown tracker. A
-            // null result is a retryable soft failure; a MODEL_NOT_FOUND result is
-            // model-scoped and must not penalise an otherwise-healthy provider.
-            if (healthTracker != null
-                    && (fallbackResult == null || isProviderLevelFailure(fallbackResult.errorType()))) {
-                healthTracker.recordFailure(entry.providerId());
-            }
             if (fallbackResult != null) {
-                // HARD errors (auth / billing) evict the provider from the pool so
-                // later walks skip it outright. SOFT and model-scoped errors keep it
-                // in-pool — absorbed by the tracker's cooldown or simply retried.
-                removeFromPool(entry.providerId(), fallbackResult.errorType(), fallbackResult.errorMessage());
                 lastResult = fallbackResult; // remember most recent to report if the whole chain fails
             }
         }

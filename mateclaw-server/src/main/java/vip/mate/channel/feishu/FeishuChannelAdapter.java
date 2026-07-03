@@ -116,8 +116,10 @@ public class FeishuChannelAdapter extends AbstractChannelAdapter implements Stre
     /** 静默断连默认阈值（秒）：30 分钟无事件就视为可疑 */
     private static final long DEFAULT_SILENT_THRESHOLD_SECONDS = 1800L;
 
-    /** 旧事件过滤默认阈值（秒）：超过 30 秒的事件视为重连后回放 */
-    private static final long DEFAULT_STALE_THRESHOLD_SECONDS = 30L;
+    /** 旧事件过滤默认阈值（秒）：超过 120 秒的事件视为重连后回放
+     * <p>必须大于指数退避重连的最大累计耗时（2+4+8+16+30=60s 为 4 次重试），
+     * 否则重连后飞书回放的缓存消息会被误杀。设为 0 可禁用旧事件过滤。 */
+    private static final long DEFAULT_STALE_THRESHOLD_SECONDS = 120L;
 
     /** Bot's own open_id, fetched once from /open-apis/bot/v3/info and cached. */
     private volatile String botOpenId;
@@ -495,6 +497,11 @@ public class FeishuChannelAdapter extends AbstractChannelAdapter implements Stre
     private void startWebSocket(String appId, String appSecret) {
         wsClient = createWsClient(appId, appSecret);
 
+        // 看门狗必须在 wsThread 之前启动，否则存在竞态窗口：
+        // WebSocket 连上→收到事件→hasReceivedFirstEvent=true，但看门狗还没启动，
+        // ChannelHealthMonitor 可能在此期间看到旧的 lastEventTimeMs 而误判 stale 并触发重启。
+        startSilentDisconnectWatchdog();
+
         wsThread = new Thread(() -> {
             try {
                 log.info("[feishu] WebSocket connecting (long connection)...");
@@ -512,8 +519,6 @@ public class FeishuChannelAdapter extends AbstractChannelAdapter implements Stre
         }, "feishu-ws-" + channelEntity.getId());
         wsThread.setDaemon(true);
         wsThread.start();
-
-        startSilentDisconnectWatchdog();
     }
 
     /**
@@ -560,16 +565,21 @@ public class FeishuChannelAdapter extends AbstractChannelAdapter implements Stre
         cancelSilentDisconnectWatchdog();
         silentDisconnectWatchdog = ensureWatchdogExecutor().scheduleAtFixedRate(() -> {
             if (!running.get() || wsClient == null) return;
-            // 每次巡检都刷新活跃时间戳，防止 SDK ping/pong 不触发 touchActivity()
-            // 导致 ChannelHealthMonitor 误判闲置连接为僵死而反复重启
-            touchActivity();
-            if (!hasReceivedFirstEvent) return; // 没收到首个事件前不算静默
+            if (!hasReceivedFirstEvent) {
+                // 还没收到首个事件：仅刷新活跃时间戳，避免 ChannelHealthMonitor 误判
+                touchActivity();
+                return;
+            }
 
             long silentMs = System.currentTimeMillis() - lastEventTimeMs.get();
             if (silentMs > thresholdMs) {
                 log.warn("[feishu] Silent WebSocket detected: no events for {}s (threshold {}s), forcing reconnect",
                         silentMs / 1000, thresholdSec);
                 onDisconnected("silent disconnect: no events for " + (silentMs / 1000) + "s");
+            } else {
+                // 连接正常：刷新活跃时间戳，防止 ChannelHealthMonitor 误判
+                // （SDK ping/pong 不会触发应用层 touchActivity()）
+                touchActivity();
             }
         }, WATCHDOG_INTERVAL_SECONDS, WATCHDOG_INTERVAL_SECONDS, TimeUnit.SECONDS);
         log.info("[feishu] Silent disconnect watchdog started (threshold {}s, check every {}s)",
@@ -1181,69 +1191,79 @@ public class FeishuChannelAdapter extends AbstractChannelAdapter implements Stre
     // ==================== 联系人昵称 ====================
 
     /**
-     * 通过 open_id 获取用户昵称
-     * 优先查缓存 → 调用 Contact API → 降级返回 open_id 后缀
+     * 通过 open_id 获取用户昵称（非阻塞）。
+     * <p>
+     * 优先查缓存 → 降级返回 open_id 后缀。缓存未命中时触发后台异步拉取，
+     * 绝不阻塞 SDK 事件分发线程（Netty I/O 线程），否则会导致 WebSocket 帧积压、
+     * 飞书服务端判定客户端无响应而断开连接，造成消息丢失。
      */
-    @SuppressWarnings("unchecked")
     private String getUserName(String openId) {
         if (openId == null || openId.isBlank()) return openId;
 
-        // 1. 查缓存
+        // 1. 查缓存（快速路径，不阻塞）
         String cached = nicknameCache.get(openId);
         if (cached != null) return cached;
 
-        // 2. 调用 Contact API
-        try {
-            ensureTokenValid();
-            String apiBase = getApiBaseUrl();
-
-            HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create(apiBase + "/open-apis/contact/v3/users/" + openId + "?user_id_type=open_id"))
-                    .header("Authorization", "Bearer " + tenantAccessToken)
-                    .timeout(Duration.ofSeconds(2))
-                    .GET()
-                    .build();
-
-            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
-            if (response.statusCode() == 200) {
-                Map<String, Object> result = objectMapper.readValue(response.body(), Map.class);
-                Integer code = result.get("code") instanceof Number n ? n.intValue() : null;
-                if (code != null && code == 0) {
-                    Map<String, Object> data = (Map<String, Object>) result.get("data");
-                    if (data != null) {
-                        Map<String, Object> user = (Map<String, Object>) data.get("user");
-                        if (user != null) {
-                            String name = firstNonBlank(
-                                    (String) user.get("name"),
-                                    (String) user.get("en_name")
-                            );
-                            if (name != null) {
-                                // 缓存超限时清理最早的一半
-                                if (nicknameCache.size() >= NICKNAME_CACHE_MAX) {
-                                    int toRemove = nicknameCache.size() / 2;
-                                    var iterator = nicknameCache.keySet().iterator();
-                                    while (iterator.hasNext() && toRemove > 0) {
-                                        iterator.next();
-                                        iterator.remove();
-                                        toRemove--;
-                                    }
-                                }
-                                nicknameCache.put(openId, name);
-                                return name;
-                            }
-                        }
-                    }
-                } else {
-                    log.debug("[feishu] Contact API error for {}: code={}", openId, code);
-                }
-            }
-        } catch (Exception e) {
-            log.debug("[feishu] getUserName failed for {}: {}", openId, e.getMessage());
-        }
+        // 2. 后台异步拉取昵称（不阻塞当前线程）
+        fetchUserNameAsync(openId);
 
         // 3. 降级：返回 open_id 后 6 位
-        String fallback = openId.length() > 6 ? openId.substring(openId.length() - 6) : openId;
-        return fallback;
+        return openId.length() > 6 ? openId.substring(openId.length() - 6) : openId;
+    }
+
+    /**
+     * 后台异步拉取用户昵称并写入缓存（不阻塞调用线程）。
+     */
+    @SuppressWarnings("unchecked")
+    private void fetchUserNameAsync(String openId) {
+        Thread.ofVirtual().name("feishu-nickname-" + openId.substring(0, Math.min(8, openId.length())))
+                .start(() -> {
+            try {
+                ensureTokenValid();
+                String apiBase = getApiBaseUrl();
+
+                HttpRequest request = HttpRequest.newBuilder()
+                        .uri(URI.create(apiBase + "/open-apis/contact/v3/users/" + openId + "?user_id_type=open_id"))
+                        .header("Authorization", "Bearer " + tenantAccessToken)
+                        .timeout(Duration.ofSeconds(2))
+                        .GET()
+                        .build();
+
+                HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+                if (response.statusCode() == 200) {
+                    Map<String, Object> result = objectMapper.readValue(response.body(), Map.class);
+                    Integer code = result.get("code") instanceof Number n ? n.intValue() : null;
+                    if (code != null && code == 0) {
+                        Map<String, Object> data = (Map<String, Object>) result.get("data");
+                        if (data != null) {
+                            Map<String, Object> user = (Map<String, Object>) data.get("user");
+                            if (user != null) {
+                                String name = firstNonBlank(
+                                        (String) user.get("name"),
+                                        (String) user.get("en_name")
+                                );
+                                if (name != null) {
+                                    if (nicknameCache.size() >= NICKNAME_CACHE_MAX) {
+                                        int toRemove = nicknameCache.size() / 2;
+                                        var iterator = nicknameCache.keySet().iterator();
+                                        while (iterator.hasNext() && toRemove > 0) {
+                                            iterator.next();
+                                            iterator.remove();
+                                            toRemove--;
+                                        }
+                                    }
+                                    nicknameCache.put(openId, name);
+                                }
+                            }
+                        }
+                    } else {
+                        log.debug("[feishu] Contact API error for {}: code={}", openId, code);
+                    }
+                }
+            } catch (Exception e) {
+                log.debug("[feishu] Async getUserName failed for {}: {}", openId, e.getMessage());
+            }
+        });
     }
 
     private static String firstNonBlank(String... values) {

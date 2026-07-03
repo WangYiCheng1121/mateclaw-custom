@@ -618,18 +618,14 @@ public class ModelProviderService {
         return computeLiveness(provider, configured, ctx);
     }
 
+    /**
+     * RFC-073 simplified: in the platform-proxy architecture, provider liveness is
+     * determined by configuration completeness alone. Platform-side validation
+     * (auth, billing, model availability) supersedes local health checks.
+     * If models synced from platform successfully, the provider is LIVE.
+     */
     private Liveness computeLiveness(ModelProviderEntity provider, boolean configured, LivenessContext ctx) {
         if (!configured) return Liveness.UNCONFIGURED;
-        String id = provider.getProviderId();
-        // Probe absent in test contexts → fail-open to LIVE so test fixtures don't trip on UNPROBED.
-        if (ctx.initProbe() != null && !ctx.initProbe().hasBeenProbed(id)) {
-            return Liveness.UNPROBED;
-        }
-        AvailableProviderPool.RemovalReason reason = ctx.poolSnapshot().get(id);
-        boolean inPool = ctx.poolSnapshot().containsKey(id) && reason == null;
-        if (!inPool) return Liveness.REMOVED;
-        ProviderHealthTracker.ProviderHealthSnapshot health = ctx.healthSnapshot().get(id);
-        if (health != null && health.cooldownRemainingMs() > 0) return Liveness.COOLDOWN;
         return Liveness.LIVE;
     }
 

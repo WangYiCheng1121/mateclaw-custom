@@ -11,27 +11,27 @@ That's the only thing to remember. GLClaw is Apache 2.0, self-hosted, and shippe
 ### 1. Fork and clone
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/mateclaw.git
-cd mateclaw
+git clone https://github.com/YOUR_USERNAME/GLClaw.git
+cd GLClaw
 ```
 
 ### 2. Start the backend
 
 ```bash
-cd mateclaw-server
+cd GLClaw-server
 mvn spring-boot:run
 ```
 
 Backend starts on port 18088. H2 console at `/h2-console`, Swagger UI at `/swagger-ui.html`.
 
 ::: tip
-Model configuration is **UI-driven** â€” no need to set `DASHSCOPE_API_KEY` as an env var to start. Log in, go to `Settings â†’ Models`, add a provider there.
+Model configuration is **UI-driven** â€?no need to set `DASHSCOPE_API_KEY` as an env var to start. Log in, go to `Settings â†?Models`, add a provider there.
 :::
 
 ### 3. Start the frontend
 
 ```bash
-cd mateclaw-ui
+cd GLClaw-ui
 pnpm install
 pnpm dev
 ```
@@ -40,7 +40,7 @@ Frontend on port 5173, proxies `/api` to the backend.
 
 ### 4. Verify
 
-Open [http://localhost:5173](http://localhost:5173). Log in with `admin` / `admin123`. Add a model in `Settings â†’ Models`. Send a test message. If tokens stream back, you're ready.
+Open [http://localhost:5173](http://localhost:5173). Log in with `admin` / `admin123`. Add a model in `Settings â†?Models`. Send a test message. If tokens stream back, you're ready.
 
 ---
 
@@ -117,20 +117,20 @@ Put new code in the right `vip.mate.*` package:
 
 ### Code style
 
-- **Java 17+ features encouraged** â€” records, sealed classes, text blocks, pattern matching, `var` for obvious local types
+- **Java 17+ features encouraged** â€?records, sealed classes, text blocks, pattern matching, `var` for obvious local types
 - **Constructor injection**, not field injection
 - **Naming**: `XxxService`, `XxxController`, `XxxMapper`, `XxxEntity`
-- **Database**: MyBatis Plus, not JPA. `mate_` prefix. camelCase Java fields â†’ snake_case columns.
+- **Database**: MyBatis Plus, not JPA. `mate_` prefix. camelCase Java fields â†?snake_case columns.
 - **Logical delete** via `deleted` column
 - **Every table** needs `create_time`, `update_time`, `deleted`
 
 ### Agent graph is a StateGraph
 
-Don't look for a `BaseAgent` class hierarchy â€” the agent runtime is a **StateGraph** of nodes and edges. When you're adding agent behavior, think in terms of:
+Don't look for a `BaseAgent` class hierarchy â€?the agent runtime is a **StateGraph** of nodes and edges. When you're adding agent behavior, think in terms of:
 
-- **A node** (reasoning, action, observation, plan generation) â€” in `vip.mate.agent.graph.node` or `vip.mate.agent.graph.plan.node`
-- **An edge** or **dispatcher** â€” in `vip.mate.agent.graph.edge` or `vip.mate.agent.graph.plan.edge`
-- **A state key** â€” in `vip.mate.agent.graph.state.GLClawStateKeys`
+- **A node** (reasoning, action, observation, plan generation) â€?in `vip.mate.agent.graph.node` or `vip.mate.agent.graph.plan.node`
+- **An edge** or **dispatcher** â€?in `vip.mate.agent.graph.edge` or `vip.mate.agent.graph.plan.edge`
+- **A state key** â€?in `vip.mate.agent.graph.state.GLClawStateKeys`
 
 The builder that wires it up is `AgentGraphBuilder`. Streaming events from nodes go through `GraphEventPublisher` and `NodeStreamingChatHelper`.
 
@@ -151,7 +151,7 @@ public class MyNewTool {
 
 - Spring `@Component`
 - Every `@Tool` method becomes a callable tool
-- Use `@ToolParam` on every parameter â€” this is the LLM description
+- Use `@ToolParam` on every parameter â€?this is the LLM description
 - **If the tool is dangerous, add a Tool Guard rule for it**
 
 ### Adding a new channel
@@ -170,9 +170,9 @@ public class MyNewTool {
 
 ### SQL schema changes
 
-Schema is managed by **Flyway**. New DDL goes in a fresh `V{next}__description.sql` file under **both** `db/migration/h2/` and `db/migration/mysql/` directories. Each file must be compatible with its dialect (MySQL doesn't support `ADD COLUMN IF NOT EXISTS` â€” use an `INFORMATION_SCHEMA` guard; H2 supports it natively).
+Schema is managed by **Flyway**. New DDL goes in a fresh `V{next}__description.sql` file under **both** `db/migration/h2/` and `db/migration/mysql/` directories. Each file must be compatible with its dialect (MySQL doesn't support `ADD COLUMN IF NOT EXISTS` â€?use an `INFORMATION_SCHEMA` guard; H2 supports it natively).
 
-Seed data is loaded by `DatabaseBootstrapRunner` from `db/data-*.sql` â€” idempotent (`INSERT ... ON DUPLICATE KEY UPDATE` / `MERGE INTO`).
+Seed data is loaded by `DatabaseBootstrapRunner` from `db/data-*.sql` â€?idempotent (`INSERT ... ON DUPLICATE KEY UPDATE` / `MERGE INTO`).
 
 ---
 
@@ -181,16 +181,16 @@ Seed data is loaded by `DatabaseBootstrapRunner` from `db/data-*.sql` â€” idempo
 ### Code style
 
 - **Composition API with `<script setup>`** for all new components
-- **TypeScript required** â€” no `any` unless absolutely necessary
+- **TypeScript required** â€?no `any` unless absolutely necessary
 - **Pinia stores** for shared state, local `ref`/`reactive` for component state
 - **Element Plus** preferred over custom implementations
 - **TailwindCSS** utility classes; avoid inline styles
-- **Path alias** `@` â†’ `src/`
-- **Design tokens** in `src/assets/main.css` (`--mc-*` CSS variables) â€” don't hardcode colors
+- **Path alias** `@` â†?`src/`
+- **Design tokens** in `src/assets/main.css` (`--mc-*` CSS variables) â€?don't hardcode colors
 
 ### State ownership
 
-Each Pinia store owns its domain's state **exclusively**. External code calls store actions â€” it does not mutate state directly.
+Each Pinia store owns its domain's state **exclusively**. External code calls store actions â€?it does not mutate state directly.
 
 ```typescript
 // Correct
@@ -242,7 +242,7 @@ onMounted(async () => {
 ### Backend tests
 
 ```bash
-cd mateclaw-server
+cd GLClaw-server
 mvn test                                  # All tests
 mvn test -Dtest=StateGraphReActAgentTest  # Single class
 mvn test -Dtest=StateGraphReActAgentTest#testChat  # Single method
@@ -251,7 +251,7 @@ mvn test -Dtest=StateGraphReActAgentTest#testChat  # Single method
 ### Frontend type check and lint
 
 ```bash
-cd mateclaw-ui
+cd GLClaw-ui
 pnpm build          # vue-tsc type check + vite build
 pnpm lint           # ESLint with auto-fix
 ```
@@ -271,9 +271,9 @@ pnpm lint           # ESLint with auto-fix
 
 ## Documentation changes
 
-If your PR changes user-facing behavior â€” a new feature, a renamed endpoint, a changed config key â€” **update the docs in the same PR**.
+If your PR changes user-facing behavior â€?a new feature, a renamed endpoint, a changed config key â€?**update the docs in the same PR**.
 
-The docs live in `docs/`. Pick the relevant page and update both `docs/en/` and `docs/zh/`. The Chinese and English versions are **independently written**, not translations â€” match tone and style with the existing page.
+The docs live in `docs/`. Pick the relevant page and update both `docs/en/` and `docs/zh/`. The Chinese and English versions are **independently written**, not translations â€?match tone and style with the existing page.
 
 ```bash
 cd docs
@@ -286,11 +286,11 @@ Build must succeed with zero errors before you open the PR.
 
 ## Pull request process
 
-1. **Title** â€” conventional commit format
-2. **Description** â€” what, why, how; link issues
-3. **Screenshots** â€” for UI changes, before/after
-4. **Testing** â€” describe how you tested
-5. **Breaking changes** â€” note clearly at the top
+1. **Title** â€?conventional commit format
+2. **Description** â€?what, why, how; link issues
+3. **Screenshots** â€?for UI changes, before/after
+4. **Testing** â€?describe how you tested
+5. **Breaking changes** â€?note clearly at the top
 
 ### PR template
 
@@ -334,7 +334,7 @@ Good bug reports get good fixes.
 
 ## Next
 
-- [Quick Start](./quickstart) â€” setup walkthrough
-- [Introduction](./intro) â€” architecture overview
-- [Architecture](./architecture) â€” StateGraph deep-dive for developers
-- [Roadmap](./roadmap) â€” what we're working on next
+- [Quick Start](./quickstart) â€?setup walkthrough
+- [Introduction](./intro) â€?architecture overview
+- [Architecture](./architecture) â€?StateGraph deep-dive for developers
+- [Roadmap](./roadmap) â€?what we're working on next

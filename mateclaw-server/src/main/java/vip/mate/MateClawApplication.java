@@ -9,10 +9,10 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.scheduling.annotation.EnableScheduling;
 
 /**
- * MateClaw - Personal AI Assistant
+ * GLClaw - Personal AI Assistant
  * Powered by Spring AI Alibaba
  *
- * @author MateClaw Team
+ * @author GLClaw Team
  */
 @SpringBootApplication(exclude = {
     // Disable Spring AI MCP Client auto-configuration (lifecycle owned by McpClientManager).

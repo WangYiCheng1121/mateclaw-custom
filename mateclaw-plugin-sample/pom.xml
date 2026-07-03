@@ -14,11 +14,11 @@
     <artifactId>mateclaw-plugin-sample</artifactId>
     <packaging>jar</packaging>
 
-    <name>MateClaw Sample Plugin</name>
-    <description>A sample plugin demonstrating the MateClaw Plugin SDK</description>
+    <name>GLClaw Sample Plugin</name>
+    <description>A sample plugin demonstrating the GLClaw Plugin SDK</description>
 
     <dependencies>
-        <!-- MateClaw Plugin API -->
+        <!-- GLClaw Plugin API -->
         <dependency>
             <groupId>vip.mate</groupId>
             <artifactId>mateclaw-plugin-api</artifactId>

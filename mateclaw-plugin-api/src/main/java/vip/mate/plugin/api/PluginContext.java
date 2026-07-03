@@ -11,7 +11,7 @@ import java.util.function.Supplier;
 /**
  * Platform API provided to plugins for registering capabilities.
  *
- * @author MateClaw Team
+ * @author GLClaw Team
  */
 public interface PluginContext {
 

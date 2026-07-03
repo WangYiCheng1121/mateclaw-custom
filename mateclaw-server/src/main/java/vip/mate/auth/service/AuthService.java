@@ -39,7 +39,7 @@ public class AuthService {
     private final PlatformTokenHolder platformTokenHolder;
     private final WorkspaceService workspaceService;
 
-    @Value("${mateclaw.jwt.secret:MateClaw-Secret-Key-2024-Very-Long-String}")
+    @Value("${mateclaw.jwt.secret:GLClaw-Secret-Key-2024-Very-Long-String}")
     private String jwtSecret;
 
     @Value("${mateclaw.jwt.expiration:86400000}")
@@ -72,7 +72,7 @@ public class AuthService {
      * 启用平台认证时流程：
      * 1. 先调用平台 esp-auth OAuth2 验证用户名密码，获取 claw_access_token
      * 2. 同步本地用户（存在则复用，不存在则自动创建，角色默认 user）
-     * 3. 生成 MateClaw 本地 JWT token
+     * 3. 生成 GLClaw 本地 JWT token
      * 4. 同时返回 claw_access_token 和 token
      * <p>
      * 未启用平台认证时：走原始本地密码验证逻辑
@@ -115,7 +115,7 @@ public class AuthService {
         // Step 3: 获取或创建用户个人工作区（按用户隔离数据）
         Long workspaceId = workspaceService.getOrCreateUserWorkspace(user.getId(), user.getNickname());
 
-        // Step 4: 生成 MateClaw 本地 JWT token
+        // Step 4: 生成 GLClaw 本地 JWT token
         String token = generateToken(user);
 
         // Step 5: 缓存平台 access_token，供 Platform*Client 调用平台 API 时携带认证头

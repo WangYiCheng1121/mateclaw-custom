@@ -1879,7 +1879,6 @@ public class WikiProcessingService {
                     String pid = provider.getProviderId();
                     if (pid == null) continue;
                     if (pid.equals(failedProviderId)) continue;
-                    if (providerHealthTracker != null && providerHealthTracker.isInCooldown(pid)) continue;
                     ResolvedChatModel built = firstChatModelForProvider(pid, failedModelId);
                     if (built != null) return built;
                 }

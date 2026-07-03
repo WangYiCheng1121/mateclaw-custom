@@ -1,6 +1,6 @@
 export default {
   app: {
-    title: 'MateClaw - AI Assistant',
+    title: 'GLClaw - AI Assistant',
   },
   common: {
     save: 'Save',
@@ -629,7 +629,7 @@ export default {
     modelDesc: 'Manage provider presets and default model selection',
     systemTitle: 'System',
     systemDesc: 'Language and runtime behavior settings',
-    aboutTitle: 'About MateClaw',
+    aboutTitle: 'About GLClaw',
     aboutDesc: 'Version and system information',
     about: {
       heroDesc: 'A personal AI operating system that places models inside a continuous loop of context, memory, execution, knowledge, and delivery.',
@@ -798,7 +798,7 @@ export default {
       claudeCodeOauthDetect: 'Detect Claude Code Login',
       claudeCodeOauthHint: 'Reuses your local Claude Code Pro/Max subscription. Sign in via the Claude Code app first, then click "Detect" to pick up the credentials.',
       claudeCodeOauthInstructions: 'No Claude Code credentials found. Install Claude Code, sign in with a Pro/Max account, then click Detect again.',
-      claudeCodeOauthRevokeHint: 'Sign out from the Claude Code app to revoke. MateClaw does not modify Claude Code\'s on-disk credentials.',
+      claudeCodeOauthRevokeHint: 'Sign out from the Claude Code app to revoke. GLClaw does not modify Claude Code\'s on-disk credentials.',
       providerIdPlaceholder: 'e.g. my-local-gemma',
       providerIdHint: 'Used only as an internal key. Lowercase letters/digits, plus . _ - are fine — no slashes or spaces (cannot be changed after create).',
       providerIdInvalid: 'Provider ID may only contain letters, digits, dot, underscore, and hyphen (no slashes or spaces). Must start with a letter or digit and be 1–64 chars.',
@@ -1610,7 +1610,7 @@ export default {
       hints: {
         anthropic: 'Anthropic API key (sk-ant-…). Get one at https://console.anthropic.com/settings/keys',
         openai: 'OpenAI API key (sk-…). Get one at https://platform.openai.com/api-keys',
-        dashscope: 'Aliyun DashScope key — same value as MateClaw .env DASHSCOPE_API_KEY',
+        dashscope: 'Aliyun DashScope key — same value as GLClaw .env DASHSCOPE_API_KEY',
         google: 'Google AI Studio API key. Get one at https://aistudio.google.com/apikey',
         claudeOauth: 'Heads up: claude-code OAuth login (the one stored in ~/.claude/) does NOT work here, and worse — the Claude Agent SDK reads it BEFORE this env var, silently shadowing your API key. If you have ever run `claude login` on this host, clear the keychain first: (macOS) `claude logout` or `security delete-generic-password -s "Claude Code-credentials"`; (Linux/Windows) delete ~/.claude/credentials.json. Then put a real API key (sk-ant-…) above. Or switch to qwen-code / opencode to reuse a CLI login.',
       },
@@ -2673,7 +2673,7 @@ export default {
     kicker: 'AI Operating System',
     subtitle: 'Your intelligent AI assistant',
     heroTitle: 'Move beyond answers. Put AI inside a system that can keep working.',
-    heroDesc: 'MateClaw is not about stuffing more capability into a chat box. It is about pulling context, knowledge, execution, and memory into one reliable operating surface.',
+    heroDesc: 'GLClaw is not about stuffing more capability into a chat box. It is about pulling context, knowledge, execution, and memory into one reliable operating surface.',
     pointContext: 'Keep context continuous',
     pointKnowledge: 'Organize knowledge into use',
     pointExecution: 'Turn capability into action',
@@ -2891,7 +2891,7 @@ export default {
       authFailed: 'Authorization failed',
     },
     webHint: 'Web channel uses built-in SSE communication, no additional configuration needed.',
-    webchatHint: 'WebChat embeds the MateClaw chat widget into external websites. Configure an API key, title, and primary color, then load the WebChat SDK on your site.',
+    webchatHint: 'WebChat embeds the GLClaw chat widget into external websites. Configure an API key, title, and primary color, then load the WebChat SDK on your site.',
     webchatApiKeyGenerated: 'The platform will generate the API key after save. Reopen this channel to copy it.',
     webchatApiKeyReadOnly: 'This API key is generated and managed by the platform. It can be copied, but not edited manually.',
     webhookHint: 'Webhook channel configuration should be edited in the "Raw JSON" tab below.',
@@ -3427,7 +3427,7 @@ export default {
     loadFailed: 'Failed to load skill curator status',
   },
   onboarding: {
-    title: 'Welcome to MateClaw',
+    title: 'Welcome to GLClaw',
     subtitle: 'Set up your first AI model',
     stepPath: 'Choose Path',
     stepConfigure: 'Configure Model',
@@ -3449,7 +3449,7 @@ export default {
     verifyTitle: 'Verify Your Model',
     verifyMessage: 'Hello! Tell me briefly about yourself.',
     send: 'Send',
-    startUsing: 'Start Using MateClaw',
+    startUsing: 'Start Using GLClaw',
     skip: 'Skip',
     back: 'Back',
   },
@@ -3657,7 +3657,7 @@ export default {
     extract_pdf_text: 'Extract PDF',
     extract_docx_text: 'Extract Document',
     detect_file_type: 'Detect File Type',
-    readMateClawDoc: 'Read System Docs',
+    readGLClawDoc: 'Read System Docs',
 
     // Generative
     image_generate: 'Generate Image',

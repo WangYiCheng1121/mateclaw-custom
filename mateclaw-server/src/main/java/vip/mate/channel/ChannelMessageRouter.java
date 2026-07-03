@@ -328,38 +328,47 @@ public class ChannelMessageRouter {
     /**
      * Publish a {@link ChannelMessageReceivedEvent} so the trigger module's
      * bridge can fan the message out to channel_message + content_match
-     * triggers. Best-effort — a publish failure must never block the
-     * primary chat-routing path. {@code messageId} is used as the dedup
+     * triggers. Runs on a virtual thread so that synchronous Spring
+     * {@code @EventListener} handlers (which may perform DB I/O) never
+     * block the caller — critical when the caller is a WebSocket SDK's
+     * Netty event-loop thread (Feishu) or a webhook HTTP thread (DingTalk).
+     * <p>
+     * Best-effort — a publish failure must never block the primary
+     * chat-routing path. {@code messageId} is used as the dedup
      * key downstream so repeated webhook deliveries can't double-fire
      * the same trigger.
      */
     private void publishChannelEvent(ChannelMessage message, ChannelAdapter adapter,
                                      ChannelEntity channelEntity) {
         if (events == null || message == null || adapter == null || channelEntity == null) return;
-        try {
-            long ws = channelEntity.getWorkspaceId() == null ? 0L : channelEntity.getWorkspaceId();
-            String channelType = adapter.getChannelType();
-            // messageId may be null for adapters that don't surface one;
-            // fall back to a sender+timestamp composite so the dedup key
-            // is at least deterministic-ish per webhook delivery.
-            String messageId = message.getMessageId();
-            if (messageId == null || messageId.isBlank()) {
-                messageId = channelType + ":" + message.getSenderId() + ":"
-                        + (message.getTimestamp() == null ? System.currentTimeMillis()
-                                                          : message.getTimestamp());
-            }
-            events.publishEvent(new ChannelMessageReceivedEvent(
-                    ws,
-                    channelType,
-                    messageId,
-                    message.getSenderId(),
-                    message.getSenderName(),
-                    message.getChatId(),
-                    message.getContent()));
-        } catch (Exception e) {
-            log.warn("[ChannelMessageRouter] event publish failed for sender {}: {}",
-                    message.getSenderId(), e.getMessage());
+        long ws = channelEntity.getWorkspaceId() == null ? 0L : channelEntity.getWorkspaceId();
+        String channelType = adapter.getChannelType();
+        String messageId = message.getMessageId();
+        if (messageId == null || messageId.isBlank()) {
+            messageId = channelType + ":" + message.getSenderId() + ":"
+                    + (message.getTimestamp() == null ? System.currentTimeMillis()
+                                                      : message.getTimestamp());
         }
+        // Capture locals for the virtual thread lambda.
+        final long fWs = ws;
+        final String fChannelType = channelType;
+        final String fMessageId = messageId;
+        final String fSenderId = message.getSenderId();
+        final String fSenderName = message.getSenderName();
+        final String fChatId = message.getChatId();
+        final String fContent = message.getContent();
+        Thread.ofVirtual()
+                .name("channel-event-" + fChannelType + "-" + fMessageId.substring(0, Math.min(8, fMessageId.length())))
+                .start(() -> {
+            try {
+                events.publishEvent(new ChannelMessageReceivedEvent(
+                        fWs, fChannelType, fMessageId,
+                        fSenderId, fSenderName, fChatId, fContent));
+            } catch (Exception e) {
+                log.warn("[ChannelMessageRouter] event publish failed for sender {}: {}",
+                        fSenderId, e.getMessage());
+            }
+        });
     }
 
     /**

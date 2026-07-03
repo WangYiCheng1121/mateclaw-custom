@@ -2,7 +2,7 @@
 
 **A workspace is a box around one team's stuff.**
 
-GLClaw supports multiple teams in a single deployment by organizing every resource â€” agents, skills, wiki knowledge bases, conversations, memory files, tool guard rules, channels â€” into **workspaces**. When you're logged in, you see the workspaces you belong to and nothing else. When you switch workspace, the whole UI re-scopes: different agents, different skills, different knowledge, different channels.
+GLClaw supports multiple teams in a single deployment by organizing every resource â€?agents, skills, wiki knowledge bases, conversations, memory files, tool guard rules, channels â€?into **workspaces**. When you're logged in, you see the workspaces you belong to and nothing else. When you switch workspace, the whole UI re-scopes: different agents, different skills, different knowledge, different channels.
 
 The point is that one GLClaw deployment can serve a product team, an engineering team, and a research team without their data, agents, or conversations bleeding into each other.
 
@@ -38,7 +38,7 @@ What's **not** scoped (i.e., global):
 
 ## Workspace roles
 
-Each user is assigned to a workspace with one of four roles. Capabilities are **additive** â€” a higher role inherits everything below it:
+Each user is assigned to a workspace with one of four roles. Capabilities are **additive** â€?a higher role inherits everything below it:
 
 | Role | Capabilities (added on top of the tier below) |
 |------|-----------------------------------------------|
@@ -53,12 +53,12 @@ A user can belong to multiple workspaces with different roles. When they switch 
 
 These are two independent permission systems:
 
-- **Global admin** â€” `mate_user.role='admin'`, system-wide. Manages users, creates workspaces, and spans **all** workspaces with owner-equivalent power even where it isn't a member.
-- **Workspace role** â€” `mate_workspace_member.role`, one per workspace, the four roles above.
+- **Global admin** â€?`mate_user.role='admin'`, system-wide. Manages users, creates workspaces, and spans **all** workspaces with owner-equivalent power even where it isn't a member.
+- **Workspace role** â€?`mate_workspace_member.role`, one per workspace, the four roles above.
 
-System-level endpoints (models / providers / OAuth / datasources, user management, workspace creation) require a global admin (`@RequireGlobalAdmin`); workspace-scoped endpoints (skills / tools / plugins) require a workspace role â€” reads need Member, writes need Admin.
+System-level endpoints (models / providers / OAuth / datasources, user management, workspace creation) require a global admin (`@RequireGlobalAdmin`); workspace-scoped endpoints (skills / tools / plugins) require a workspace role â€?reads need Member, writes need Admin.
 
-### Capability scope â€” the backend is the source of truth
+### Capability scope â€?the backend is the source of truth
 
 Roles control **UI visibility** and **API access**, and **the backend is the single source of truth for capabilities**: it holds a `RoleCapabilities` mapping, and the frontend never derives them locally. After a workspace switch, or on a capability-related 403, the frontend calls `GET /api/v1/workspaces/{id}/access`, which returns `memberRole`, `isGlobalAdmin`, `effectiveRole`, and `capabilities`.
 
@@ -68,7 +68,7 @@ The frontend gates on this: routes declare a required capability; the sidebar fi
 
 ## Creating a workspace
 
-`Settings â†’ Workspaces â†’ New Workspace`.
+`Settings â†?Workspaces â†?New Workspace`.
 
 1. Name it after what the team does, not what the team is called ("Product Research" over "Alpha Team")
 2. Optional description
@@ -92,13 +92,13 @@ curl -X POST http://localhost:18088/api/v1/workspaces \
 
 ## Members & roles
 
-`Settings â†’ Members`. All member management requires **Admin or above**.
+`Settings â†?Members`. All member management requires **Admin or above**.
 
 ### Add a member
 
 Enter a username, pick a role (defaults to `member`), save.
 
-- If the user **doesn't exist**, the account is **created on the spot** â€” a password is required in that case.
+- If the user **doesn't exist**, the account is **created on the spot** â€?a password is required in that case.
 - If the user **exists** and you supply a password, their **password is reset** (useful when an admin removes a member, then re-adds them with a new password).
 - Nickname is optional.
 
@@ -153,7 +153,7 @@ Top-left of the admin console. Click the workspace name to open the switcher; pi
 - The Wiki list, skill list, channel list, etc. all change
 - Active conversations stay open (they belong to their own workspace)
 
-Workspace selection is persisted per user â€” when you log back in, you land on the last workspace you used.
+Workspace selection is persisted per user â€?when you log back in, you land on the last workspace you used.
 
 ---
 
@@ -163,7 +163,7 @@ This is where workspace isolation earns its keep.
 
 ### File Guard
 
-The default allowed-path list for File Guard is `workspace/{workspaceId}/...`. A tool call from an agent in workspace A cannot read or write files that belong to workspace B, regardless of path traversal tricks â€” the symlink check and path normalization catch it.
+The default allowed-path list for File Guard is `workspace/{workspaceId}/...`. A tool call from an agent in workspace A cannot read or write files that belong to workspace B, regardless of path traversal tricks â€?the symlink check and path normalization catch it.
 
 ### Tool Guard rules
 
@@ -190,10 +190,10 @@ Each channel binds to exactly one agent, so transitively to exactly one workspac
 
 ## What isolation does NOT cover
 
-- **Shared global config** â€” JWT secret, model provider API keys, MCP server definitions are global. A workspace admin can't change them.
-- **Audit log cross-workspace access** â€” security admins with the right permissions can query audit events across all workspaces. This is intentional â€” you want to see suspicious activity regardless of which workspace it happened in.
-- **Token usage reporting** â€” aggregated globally, broken down per-workspace, per-agent, per-model in the Dashboard.
-- **Model provider costs** â€” one billing relationship per provider at the global level; per-workspace quotas are on the [Roadmap](./roadmap).
+- **Shared global config** â€?JWT secret, model provider API keys, MCP server definitions are global. A workspace admin can't change them.
+- **Audit log cross-workspace access** â€?security admins with the right permissions can query audit events across all workspaces. This is intentional â€?you want to see suspicious activity regardless of which workspace it happened in.
+- **Token usage reporting** â€?aggregated globally, broken down per-workspace, per-agent, per-model in the Dashboard.
+- **Model provider costs** â€?one billing relationship per provider at the global level; per-workspace quotas are on the [Roadmap](./roadmap).
 
 ---
 
@@ -201,24 +201,24 @@ Each channel binds to exactly one agent, so transitively to exactly one workspac
 
 Not supported directly. You have two options:
 
-1. **Export and import** â€” some resources have JSON export (agents via API, wiki KBs via API). Re-create them in the target workspace.
-2. **Change ownership** â€” an admin or owner can directly update the `workspace_id` column in the database for simple resources. This is not officially supported; do it at your own risk and only with a backup.
+1. **Export and import** â€?some resources have JSON export (agents via API, wiki KBs via API). Re-create them in the target workspace.
+2. **Change ownership** â€?an admin or owner can directly update the `workspace_id` column in the database for simple resources. This is not officially supported; do it at your own risk and only with a backup.
 
-We'd like to support first-class moving in a future release. If you need this, leave a note on the [GitHub issue](https://github.com/matevip/mateclaw/issues).
+We'd like to support first-class moving in a future release. If you need this, leave a note on the [GitHub issue](https://github.com/matevip/GLClaw/issues).
 
 ---
 
 ## Deleting a workspace
 
-**Only the owner can delete a workspace.** `Settings â†’ Workspaces â†’ [workspace] â†’ Delete`.
+**Only the owner can delete a workspace.** `Settings â†?Workspaces â†?[workspace] â†?Delete`.
 
 Deleting a workspace:
 
-- Soft-deletes every resource belonging to it â€” agents, skills, KBs, conversations, memory files, channels
+- Soft-deletes every resource belonging to it â€?agents, skills, KBs, conversations, memory files, channels
 - Removes all member associations
 - Records an audit event
 
-Soft delete means the data isn't physically removed â€” it's marked `deleted = 1` and hidden from queries. If you delete by mistake, a database admin can restore it by flipping the flag. After the configured retention period, deleted data may be permanently purged by a cleanup job.
+Soft delete means the data isn't physically removed â€?it's marked `deleted = 1` and hidden from queries. If you delete by mistake, a database admin can restore it by flipping the flag. After the configured retention period, deleted data may be permanently purged by a cleanup job.
 
 ---
 
@@ -297,7 +297,7 @@ curl -X PUT http://localhost:18088/api/v1/workspaces/1/members/42/role \
 
 ## Next
 
-- [Admin Console](./console) â€” workspace switcher and UI
-- [Security & Approval](./security) â€” how workspace isolation interacts with Tool Guard and File Guard
-- [LLM Wiki](./wiki) â€” workspace-scoped knowledge bases
-- [Memory](./memory) â€” workspace memory files
+- [Admin Console](./console) â€?workspace switcher and UI
+- [Security & Approval](./security) â€?how workspace isolation interacts with Tool Guard and File Guard
+- [LLM Wiki](./wiki) â€?workspace-scoped knowledge bases
+- [Memory](./memory) â€?workspace memory files

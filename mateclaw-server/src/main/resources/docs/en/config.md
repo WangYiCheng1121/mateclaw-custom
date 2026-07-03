@@ -2,9 +2,9 @@
 
 **Three places to configure GLClaw: `application.yml`, environment variables, and the database.**
 
-Most settings live in `application.yml` (Spring Boot's default config file), with sensitive values overridden by environment variables. Anything you want to change at runtime â€” model providers, search keys, feature toggles â€” lives in the `mate_system_setting` table and is edited through the Settings page.
+Most settings live in `application.yml` (Spring Boot's default config file), with sensitive values overridden by environment variables. Anything you want to change at runtime â€?model providers, search keys, feature toggles â€?lives in the `mate_system_setting` table and is edited through the Settings page.
 
-Deep-dive topics have their own pages â€” Tool Guard rules in [Security & Approval](./security), model providers in [Models](./models), memory tuning in [Memory](./memory).
+Deep-dive topics have their own pages â€?Tool Guard rules in [Security & Approval](./security), model providers in [Models](./models), memory tuning in [Memory](./memory).
 
 ---
 
@@ -12,7 +12,7 @@ Deep-dive topics have their own pages â€” Tool Guard rules in [Security & Approv
 
 | Profile | Database | Activated by |
 |---------|----------|--------------|
-| `default` | H2 file at `./data/mateclaw` | No action needed |
+| `default` | H2 file at `./data/GLClaw` | No action needed |
 | `mysql` | MySQL 8.0+ | `spring.profiles.active=mysql` or `SPRING_PROFILES_ACTIVE=mysql` |
 
 Docker deployments activate `mysql` automatically. Desktop builds use `default`.
@@ -30,12 +30,12 @@ server:
     context-path: /
 ```
 
-### Database â€” H2 (development)
+### Database â€?H2 (development)
 
 ```yaml
 spring:
   datasource:
-    url: jdbc:h2:file:./data/mateclaw;MODE=MYSQL
+    url: jdbc:h2:file:./data/GLClaw;MODE=MYSQL
     username: sa
     password:
     driver-class-name: org.h2.Driver
@@ -44,26 +44,26 @@ spring:
       enabled: true              # Available at /h2-console (disable in production)
 ```
 
-### Database â€” MySQL (production)
+### Database â€?MySQL (production)
 
 ```yaml
 spring:
   profiles:
     active: mysql
   datasource:
-    url: jdbc:mysql://localhost:3306/mateclaw?useSSL=false&serverTimezone=UTC
+    url: jdbc:mysql://localhost:3306/GLClaw?useSSL=false&serverTimezone=UTC
     username: root
     password: ${MYSQL_ROOT_PASSWORD}
     driver-class-name: com.mysql.cj.jdbc.Driver
 ```
 
-### AI model â€” managed in the UI, not YAML
+### AI model â€?managed in the UI, not YAML
 
 ::: tip
-**Model configuration is 100% UI-driven.** Don't put `spring.ai.*` blocks in `application.yml` â€” every provider, key, and model config lives in `Settings â†’ Models`, backed by the `mate_model_provider` and `mate_model_config` tables.
+**Model configuration is 100% UI-driven.** Don't put `spring.ai.*` blocks in `application.yml` â€?every provider, key, and model config lives in `Settings â†?Models`, backed by the `mate_model_provider` and `mate_model_config` tables.
 :::
 
-**LLM API keys are not read from environment variables** â€” `DASHSCOPE_API_KEY` / `OPENAI_API_KEY` / etc. have no effect. A fresh install starts with no providers configured; log in and add your first one under `Settings â†’ Models â†’ Add Provider`. Full reference in [Models](./models).
+**LLM API keys are not read from environment variables** â€?`DASHSCOPE_API_KEY` / `OPENAI_API_KEY` / etc. have no effect. A fresh install starts with no providers configured; log in and add your first one under `Settings â†?Models â†?Add Provider`. Full reference in [Models](./models).
 
 ### Virtual threads (JDK 21)
 
@@ -140,7 +140,7 @@ Eight knobs. Details in [LLM Wiki](./wiki).
 ### Tool Guard (rule-based)
 
 ```yaml
-mateclaw:
+GLClaw:
   tool:
     guard:
       enabled: true
@@ -161,13 +161,13 @@ Details in [Security & Approval](./security).
 ### File Guard
 
 ```yaml
-mateclaw:
+GLClaw:
   security:
     file-guard:
       enabled: true
       allowed-paths:
         - "${user.dir}/workspace"
-        - "${java.io.tmpdir}/mateclaw"
+        - "${java.io.tmpdir}/GLClaw"
       denied-paths:
         - "/etc"
         - "/usr"
@@ -178,7 +178,7 @@ mateclaw:
 ### JWT authentication
 
 ```yaml
-mateclaw:
+GLClaw:
   auth:
     jwt:
       secret: ${JWT_SECRET:your-secret-key-at-least-32-characters-long}
@@ -193,10 +193,10 @@ Change the default JWT secret in production. Must be at least 32 characters. Use
 ### Skill workspace
 
 ```yaml
-mateclaw:
+GLClaw:
   skill:
     workspace:
-      root: ${user.home}/.mateclaw/skills
+      root: ${user.home}/.GLClaw/skills
       auto-init: true
       delete-policy: archive
       bundled-skills-path: skills
@@ -225,17 +225,17 @@ Details in [Multimodal](./multimodal).
 ## Environment variables
 
 ::: warning LLM keys are not read from env
-DashScope / OpenAI / Anthropic / DeepSeek / Kimi and other provider API keys are **not configured via environment variables**. The container starts with zero LLM keys; after login, add your first provider under `Settings â†’ Models â†’ Add Provider`.
+DashScope / OpenAI / Anthropic / DeepSeek / Kimi and other provider API keys are **not configured via environment variables**. The container starts with zero LLM keys; after login, add your first provider under `Settings â†?Models â†?Add Provider`.
 :::
 
 | Variable | Required | Purpose |
 |----------|----------|---------|
-| `SERPER_API_KEY` | â€” | Google Serper search key (search tools not yet UI-managed) |
-| `TAVILY_API_KEY` | â€” | Tavily search key (same as above) |
-| `JWT_SECRET` | â€” | JWT signing secret (recommended in production) |
-| `MATECLAW_CORS_ALLOWED_ORIGINS` | â€” | CORS allowlist (recommended in production) |
+| `SERPER_API_KEY` | â€?| Google Serper search key (search tools not yet UI-managed) |
+| `TAVILY_API_KEY` | â€?| Tavily search key (same as above) |
+| `JWT_SECRET` | â€?| JWT signing secret (recommended in production) |
+| `GLClaw_CORS_ALLOWED_ORIGINS` | â€?| CORS allowlist (recommended in production) |
 | `DB_PASSWORD` / `DB_ROOT_PASSWORD` | Docker | MySQL app user / root password |
-| `SPRING_PROFILES_ACTIVE` | â€” | Set to `mysql` for production |
+| `SPRING_PROFILES_ACTIVE` | â€?| Set to `mysql` for production |
 
 ### Setting them
 
@@ -260,7 +260,7 @@ DB_ROOT_PASSWORD=different-secure-password-here
 JWT_SECRET=your-production-secret-at-least-32-chars
 ```
 
-After startup, open `http://localhost:18080`, sign in as `admin / admin123`, and add your first LLM provider under `Settings â†’ Models â†’ Add Provider`.
+After startup, open `http://localhost:18080`, sign in as `admin / admin123`, and add your first LLM provider under `Settings â†?Models â†?Add Provider`.
 
 ---
 
@@ -268,9 +268,9 @@ After startup, open `http://localhost:18080`, sign in as `admin / admin123`, and
 
 GLClaw uses **Flyway** for schema migrations:
 
-1. `db/migration/h2/V*__*.sql` â€” H2-dialect migration scripts
-2. `db/migration/mysql/V*__*.sql` â€” MySQL-dialect migration scripts
-3. After migrations, seed data is loaded from `db/data-*.sql` â€” idempotent
+1. `db/migration/h2/V*__*.sql` â€?H2-dialect migration scripts
+2. `db/migration/mysql/V*__*.sql` â€?MySQL-dialect migration scripts
+3. After migrations, seed data is loaded from `db/data-*.sql` â€?idempotent
 
 Flyway auto-selects the correct dialect path based on the active Spring profile. Every startup runs a `repair` before `migrate`, self-healing checksum drift and partially-failed migrations (especially important for desktop users upgrading offline).
 
@@ -287,14 +287,14 @@ Flyway auto-selects the correct dialect path based on the active Spring profile.
 
 | Field | Value |
 |-------|-------|
-| JDBC URL | `jdbc:h2:file:./data/mateclaw` |
+| JDBC URL | `jdbc:h2:file:./data/GLClaw` |
 | Username | `sa` |
 | Password | *(empty)* |
 
 ### Switching to MySQL
 
 ```sql
-CREATE DATABASE mateclaw CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE DATABASE GLClaw CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 ```
 
 ```bash
@@ -324,7 +324,7 @@ Things you want to change without restarting:
 | `stream_enabled` | Boolean | SSE streaming output |
 | `debug_mode` | Boolean | Show extra debug info in UI |
 
-All editable from `Settings â†’ System`. Changes take effect immediately.
+All editable from `Settings â†?System`. Changes take effect immediately.
 
 ### Search service configuration
 
@@ -348,7 +348,7 @@ logging:
     root: INFO
 ```
 
-For deep debugging, set `vip.mate: TRACE`. Log volume is high â€” don't leave it on in production.
+For deep debugging, set `vip.mate: TRACE`. Log volume is high â€?don't leave it on in production.
 
 ---
 
@@ -359,7 +359,7 @@ Development: Vite's dev server handles CORS via its proxy. Production: frontend 
 If you deploy the frontend separately:
 
 ```yaml
-mateclaw:
+GLClaw:
   cors:
     allowed-origins:
       - http://localhost:5173
@@ -382,8 +382,8 @@ Settings resolve in this order (highest priority first):
 
 ## Next
 
-- [Models](./models) â€” provider and model config in detail
-- [Security & Approval](./security) â€” JWT, Tool Guard, File Guard, audit log
-- [Memory](./memory) â€” memory tuning parameters
-- [LLM Wiki](./wiki) â€” `mate.wiki` block explained
-- [Channels](./channels) â€” channel-specific configuration
+- [Models](./models) â€?provider and model config in detail
+- [Security & Approval](./security) â€?JWT, Tool Guard, File Guard, audit log
+- [Memory](./memory) â€?memory tuning parameters
+- [LLM Wiki](./wiki) â€?`mate.wiki` block explained
+- [Channels](./channels) â€?channel-specific configuration

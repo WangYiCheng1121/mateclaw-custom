@@ -1,42 +1,42 @@
 ---
-title: MCP Integration — Model Context Protocol Tool Extension
-description: MateClaw acts as an MCP client, connecting to any external tool server via Model Context Protocol. JSON-RPC dynamic discovery, SSE/stdio dual transport, seamless unification with built-in tools.
+title: MCP Integration �?Model Context Protocol Tool Extension
+description: GLClaw acts as an MCP client, connecting to any external tool server via Model Context Protocol. JSON-RPC dynamic discovery, SSE/stdio dual transport, seamless unification with built-in tools.
 head:
   - - meta
     - name: keywords
       content: MCP,Model Context Protocol,MCP client,tool protocol,JSON-RPC,AI tool extension,Anthropic MCP
 ---
 
-# MCP — Model Context Protocol
+# MCP �?Model Context Protocol
 
-**MCP is how MateClaw talks to tools someone else built.**
+**MCP is how GLClaw talks to tools someone else built.**
 
-Model Context Protocol is an open standard from Anthropic for connecting AI models to external tools and data. An MCP server is a process — local or remote — that advertises a set of tools over JSON-RPC. MateClaw acts as an MCP *client*: it connects, discovers tools via `tools/list`, and exposes them to your agents as if they were native. **From the agent's point of view, there's no difference between a built-in `@Tool` Spring bean and a tool coming from an MCP server.**
+Model Context Protocol is an open standard from Anthropic for connecting AI models to external tools and data. An MCP server is a process �?local or remote �?that advertises a set of tools over JSON-RPC. GLClaw acts as an MCP *client*: it connects, discovers tools via `tools/list`, and exposes them to your agents as if they were native. **From the agent's point of view, there's no difference between a built-in `@Tool` Spring bean and a tool coming from an MCP server.**
 
-This is the escape hatch. If you need a capability MateClaw doesn't ship with — filesystem access for a sandboxed directory, Tavily search, a custom internal data service, a browser automation suite — there's probably already an MCP server for it, and you can plug it in without writing a line of Java.
+This is the escape hatch. If you need a capability GLClaw doesn't ship with �?filesystem access for a sandboxed directory, Tavily search, a custom internal data service, a browser automation suite �?there's probably already an MCP server for it, and you can plug it in without writing a line of Java.
 
 ---
 
 ## What MCP actually is
 
 ```
-┌───────────────────────┐              ┌───────────────────────┐
-│     MateClaw           │              │     MCP Server        │
-│     (MCP Client)       │              │     (Tool Provider)   │
-│                       │   JSON-RPC   │                       │
-│  Agent Engine  ───────┼──────────────┼──► Tool A             │
-│                       │              │    Tool B             │
-│  Tool Registry ◄──────┼──────────────┼─── Tool Discovery     │
-│                       │              │    (tools/list)       │
-└───────────────────────┘              └───────────────────────┘
+┌───────────────────────�?             ┌───────────────────────�?
+�?    GLClaw           �?             �?    MCP Server        �?
+�?    (MCP Client)       �?             �?    (Tool Provider)   �?
+�?                      �?  JSON-RPC   �?                      �?
+�? Agent Engine  ───────┼──────────────┼──�?Tool A             �?
+�?                      �?             �?   Tool B             �?
+�? Tool Registry ◄──────┼──────────────┼─── Tool Discovery     �?
+�?                      �?             �?   (tools/list)       �?
+└───────────────────────�?             └───────────────────────�?
 ```
 
 Core concepts:
 
-- **MCP Client** — MateClaw, connecting to servers, discovering tools, forwarding invocations
-- **MCP Server** — a third-party process declaring its available tools and executing calls
-- **Tool Discovery** — the client sends `tools/list` to retrieve every tool and its parameter schema
-- **Tool Invocation** — when the agent decides to call a tool, the client forwards the request to the right MCP server
+- **MCP Client** �?GLClaw, connecting to servers, discovering tools, forwarding invocations
+- **MCP Server** �?a third-party process declaring its available tools and executing calls
+- **Tool Discovery** �?the client sends `tools/list` to retrieve every tool and its parameter schema
+- **Tool Invocation** �?when the agent decides to call a tool, the client forwards the request to the right MCP server
 
 New tool capabilities become available to agents **without modifying code or restarting the service**.
 
@@ -48,10 +48,10 @@ Three transports for different deployment scenarios:
 
 ### stdio (Standard I/O)
 
-MateClaw spawns a local child process and exchanges JSON-RPC messages via stdin/stdout.
+GLClaw spawns a local child process and exchanges JSON-RPC messages via stdin/stdout.
 
 ```
-MateClaw  ── stdin ──►  MCP Server subprocess
+GLClaw  ── stdin ──�? MCP Server subprocess
           ◄─ stdout ──
 ```
 
@@ -64,7 +64,7 @@ MateClaw  ── stdin ──►  MCP Server subprocess
 Standard HTTP POST for JSON-RPC, responses streamed back over HTTP. **Recommended for production.**
 
 ```
-MateClaw  ── HTTP POST ──►  Remote MCP Server
+GLClaw  ── HTTP POST ──�? Remote MCP Server
           ◄─ HTTP Stream ──
 ```
 
@@ -82,34 +82,34 @@ Earlier HTTP transport using SSE for server-to-client push. Legacy compatibility
 | Deployment | Local only | Local or remote | Local or remote |
 | Network requirement | None | HTTP reachable | HTTP reachable |
 | Authentication | Environment variables | HTTP Headers | HTTP Headers |
-| Process management | MateClaw manages subprocess | External | External |
+| Process management | GLClaw manages subprocess | External | External |
 | Recommendation | Local tools | Remote services | Legacy compatibility |
 
 ---
 
 ## Configuration via UI
 
-`Tools → MCP Servers → Add MCP Server`. Fill in:
+`Tools �?MCP Servers �?Add MCP Server`. Fill in:
 
-- **Name** — unique identifier (letters, numbers, `_`, `-`, `.`, spaces; 1–128 chars)
-- **Description** — optional
-- **Transport type** — `stdio`, `streamable_http`, or `sse`
-- **Command** (stdio) — `npx`, `node`, `python`, etc.
-- **Arguments** (stdio) — JSON array (e.g., `["-y", "@anthropic/mcp-filesystem", "/path"]`)
-- **Working directory** (stdio) — optional
-- **Environment variables** (stdio) — JSON object; supports `${ENV_VAR}` references
-- **URL** (streamable_http/sse) — server endpoint
-- **HTTP Headers** (streamable_http/sse) — JSON object (e.g., `{"Authorization": "Bearer token"}`)
-- **Connect timeout** — default 30s
-- **Read timeout** — default 30s
+- **Name** �?unique identifier (letters, numbers, `_`, `-`, `.`, spaces; 1�?28 chars)
+- **Description** �?optional
+- **Transport type** �?`stdio`, `streamable_http`, or `sse`
+- **Command** (stdio) �?`npx`, `node`, `python`, etc.
+- **Arguments** (stdio) �?JSON array (e.g., `["-y", "@anthropic/mcp-filesystem", "/path"]`)
+- **Working directory** (stdio) �?optional
+- **Environment variables** (stdio) �?JSON object; supports `${ENV_VAR}` references
+- **URL** (streamable_http/sse) �?server endpoint
+- **HTTP Headers** (streamable_http/sse) �?JSON object (e.g., `{"Authorization": "Bearer token"}`)
+- **Connect timeout** �?default 30s
+- **Read timeout** �?default 30s
 
-Save. If enabled, MateClaw auto-attempts to connect and discover tools.
+Save. If enabled, GLClaw auto-attempts to connect and discover tools.
 
 ### Testing, enabling, status
 
-- **Test Connection** — sends `tools/list`, returns result, latency, tool list
-- **Enable/Disable toggle** — drop connection without deleting config
-- **Status** — `connected` / `disconnected` / `error` with error detail
+- **Test Connection** �?sends `tools/list`, returns result, latency, tool list
+- **Enable/Disable toggle** �?drop connection without deleting config
+- **Status** �?`connected` / `disconnected` / `error` with error detail
 
 ---
 
@@ -126,7 +126,7 @@ curl -s http://localhost:18088/api/v1/mcp/servers \
 
 Response includes `headersJson` and `envJson` automatically **sanitized** (`sk-****abcd`).
 
-### Create — stdio
+### Create �?stdio
 
 ```bash
 curl -X POST http://localhost:18088/api/v1/mcp/servers \
@@ -141,7 +141,7 @@ curl -X POST http://localhost:18088/api/v1/mcp/servers \
   }'
 ```
 
-### Create — streamable_http
+### Create �?streamable_http
 
 ```bash
 curl -X POST http://localhost:18088/api/v1/mcp/servers \
@@ -191,7 +191,7 @@ curl -X POST http://localhost:18088/api/v1/mcp/servers/refresh \
 
 ## Practical examples
 
-### Example 1 — Filesystem MCP (stdio)
+### Example 1 �?Filesystem MCP (stdio)
 
 ```bash
 curl -X POST http://localhost:18088/api/v1/mcp/servers \
@@ -211,7 +211,7 @@ Discovered tools: `read_file`, `write_file`, `list_directory`, `search_files`, `
 
 Security: `@anthropic/mcp-filesystem` only allows access to the specified directory and subdirectories.
 
-### Example 2 — Remote HTTP with auth
+### Example 2 �?Remote HTTP with auth
 
 ```bash
 curl -X POST http://localhost:18088/api/v1/mcp/servers \
@@ -230,7 +230,7 @@ curl -X POST http://localhost:18088/api/v1/mcp/servers \
 
 **Header values support environment variable references**: `{"Authorization": "Bearer ${MCP_API_KEY}"}` is replaced at runtime, **secrets don't land in the database**.
 
-### Example 3 — Tavily search (stdio + env vars)
+### Example 3 �?Tavily search (stdio + env vars)
 
 ```bash
 curl -X POST http://localhost:18088/api/v1/mcp/servers \
@@ -252,63 +252,63 @@ curl -X POST http://localhost:18088/api/v1/mcp/servers \
 
 ```
 Application startup
-   │
-   ▼
+   �?
+   �?
 Iterate enabled MCP servers
-   │
-   ▼
-Connect by transport → initialize → list tools → cache
-   │
-   ▼
+   �?
+   �?
+Connect by transport �?initialize �?list tools �?cache
+   �?
+   �?
 Tool registry (aggregates built-in tools + MCP tools)
-   │
-   ▼
+   �?
+   �?
 Agent tool set
 ```
 
-**Key:** the agent fetches the **latest** active tool list on every invocation, so adding or removing MCP servers takes effect **without restarting**. From the agent's perspective, **MCP tools and built-in tools are identical** — no difference.
+**Key:** the agent fetches the **latest** active tool list on every invocation, so adding or removing MCP servers takes effect **without restarting**. From the agent's perspective, **MCP tools and built-in tools are identical** �?no difference.
 
 ---
 
 ## Per-agent tool binding
 
 ::: tip New in 1.3.0
-Before v1.2.0, all employees could call every MCP tool by default — it was a global switch. v1.3.0 makes the binding **per-employee**, and adds dirty-state detection plus namespace collision handling.
+Before v1.2.0, all employees could call every MCP tool by default �?it was a global switch. v1.3.0 makes the binding **per-employee**, and adds dirty-state detection plus namespace collision handling.
 :::
 
 ### Three problems it solves
 
 **Problem 1: Tool namespace collisions.**
-Two MCP servers both expose `read_file` — which one wins? v1.3.0 internally uses a **stable server-prefixed callback name** (`{serverName}__{toolName}`) and persists it to `mate_mcp_server.cached_tools`. The picker shows them as `serverA__read_file` and `serverB__read_file`; the agent's prompt maps them back to original names to save tokens and avoid LLM confusion.
+Two MCP servers both expose `read_file` �?which one wins? v1.3.0 internally uses a **stable server-prefixed callback name** (`{serverName}__{toolName}`) and persists it to `mate_mcp_server.cached_tools`. The picker shows them as `serverA__read_file` and `serverB__read_file`; the agent's prompt maps them back to original names to save tokens and avoid LLM confusion.
 
 **Problem 2: MCP server / tool rename breaks bindings.**
-In v1.2.0, renaming a server orphaned every employee bound to it. v1.3.0 introduces a **persistent tool cache**: every successful list-tools writes tool metadata to a `cached_tools` JSON column on `mate_mcp_server`. When validating bindings and the server is temporarily unreachable, the cache is consulted as fallback — bindings stay marked `stale` and become live again the moment the server reconnects.
+In v1.2.0, renaming a server orphaned every employee bound to it. v1.3.0 introduces a **persistent tool cache**: every successful list-tools writes tool metadata to a `cached_tools` JSON column on `mate_mcp_server`. When validating bindings and the server is temporarily unreachable, the cache is consulted as fallback �?bindings stay marked `stale` and become live again the moment the server reconnects.
 
 **Problem 3: Save silently accepted non-existent tool references.**
 A typo'd `nonexistent-server.weird-tool` would save fine and blow up at runtime. v1.3.0 runs `AgentBindingService.validate(...)` on save:
 
 | Status | Meaning | Save behavior |
 |---|---|---|
-| `connected` | Server online, tool visible | ✅ Persist normally |
-| `stale` | Server temporarily offline but in cache | ✅ Persist (marked stale) |
-| `unavailable` | Server disabled | ✅ Persist (marked unavailable) |
-| `orphan` | Server / tool no longer exists at all | ❌ Reject save, prompt user to clear |
+| `connected` | Server online, tool visible | �?Persist normally |
+| `stale` | Server temporarily offline but in cache | �?Persist (marked stale) |
+| `unavailable` | Server disabled | �?Persist (marked unavailable) |
+| `orphan` | Server / tool no longer exists at all | �?Reject save, prompt user to clear |
 
 ### Where to see tool status
 
-`Agents → pick employee → Tools` — see [Agent tool binding](./agents#tool-binding-per-agent-tool-picker).
+`Agents �?pick employee �?Tools` �?see [Agent tool binding](./agents#tool-binding-per-agent-tool-picker).
 
 ### Data contract
 
 - `mate_mcp_server.cached_tools` (new column in v1.3.0): JSON array, each element `{name, description, inputSchema, lastSeenAt}`
 - `mate_agent_tool.tool_name`: stores the **prefixed callback name** `{serverName}__{toolName}` rather than the raw name, so a server rename surfaces immediately as an observable join miss
-- `AgentBindingService.getEffectiveToolNames(agentId)` is the single source of truth for tool dispatch — runs every turn, ensuring the editor view and the runtime view always agree
+- `AgentBindingService.getEffectiveToolNames(agentId)` is the single source of truth for tool dispatch �?runs every turn, ensuring the editor view and the runtime view always agree
 
 ### Server-side rules
 
 - MCP servers bridged in via ACP **cannot** be edited from the MCP server list (they're owned by the ACP server's own lifecycle)
-- A tool marked `unavailable` is **not listed** in the agent's system prompt — the LLM won't reach for it, but the binding row is preserved
-- `returnDirect=true` tools (whose output replaces the assistant turn) go through the same ACL — they **do not bypass** binding
+- A tool marked `unavailable` is **not listed** in the agent's system prompt �?the LLM won't reach for it, but the binding row is preserved
+- `returnDirect=true` tools (whose output replaces the assistant turn) go through the same ACL �?they **do not bypass** binding
 
 ---
 
@@ -334,10 +334,10 @@ For stdio servers, cleanup happens on: disable/delete, config replacement, appli
 
 After each connection operation, results persist:
 
-- `last_status` — `connected` / `disconnected` / `error`
-- `last_error` — error message
-- `last_connected_time` — timestamp of last success
-- `tool_count` — currently discovered tools
+- `last_status` �?`connected` / `disconnected` / `error`
+- `last_error` �?error message
+- `last_connected_time` �?timestamp of last success
+- `tool_count` �?currently discovered tools
 
 ### Manual refresh
 
@@ -345,12 +345,12 @@ After each connection operation, results persist:
 
 ---
 
-## Database storage — `mate_mcp_server`
+## Database storage �?`mate_mcp_server`
 
 | Column | Type | Default | Purpose |
 |--------|------|---------|---------|
-| `id` | BIGINT | — | Primary key |
-| `name` | VARCHAR(128) | — | Unique identifier |
+| `id` | BIGINT | �?| Primary key |
+| `name` | VARCHAR(128) | �?| Unique identifier |
 | `description` | TEXT | NULL | Server description |
 | `transport` | VARCHAR(32) | `stdio` | `stdio` / `streamable_http` / `sse` |
 | `url` | VARCHAR(512) | NULL | Remote URL |
@@ -367,7 +367,7 @@ After each connection operation, results persist:
 | `last_connected_time` | DATETIME | NULL | Last successful connection |
 | `tool_count` | INT | 0 | Discovered tool count |
 | `builtin` | BOOLEAN | FALSE | Whether it's a built-in server |
-| `create_time` / `update_time` | DATETIME | — | Timestamps |
+| `create_time` / `update_time` | DATETIME | �?| Timestamps |
 | `deleted` | INT | 0 | Logical delete |
 
 ### Sensitive data sanitization
@@ -376,8 +376,8 @@ After each connection operation, results persist:
 
 ### Environment variable references
 
-- `${VAR_NAME}` — exact match and replacement
-- `$VAR_NAME` — regex match
+- `${VAR_NAME}` �?exact match and replacement
+- `$VAR_NAME` �?regex match
 
 Keeps secrets out of the database.
 
@@ -422,12 +422,12 @@ Keeps secrets out of the database.
 
 ### Orphaned subprocesses (stdio)
 
-Subprocesses are cleaned up on normal shutdown. If MateClaw was force-killed (`kill -9`), subprocesses may remain. `ps aux | grep mcp` and terminate.
+Subprocesses are cleaned up on normal shutdown. If GLClaw was force-killed (`kill -9`), subprocesses may remain. `ps aux | grep mcp` and terminate.
 
 ---
 
 ## Next
 
-- [Tools](./tools) — how MCP tools relate to built-in tools
-- [Skills](./skills) — MCP-backed skills
-- [Configuration](./config) — full configuration reference
+- [Tools](./tools) �?how MCP tools relate to built-in tools
+- [Skills](./skills) �?MCP-backed skills
+- [Configuration](./config) �?full configuration reference

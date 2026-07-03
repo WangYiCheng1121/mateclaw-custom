@@ -9,8 +9,8 @@
     <version>${revision}</version>
     <packaging>pom</packaging>
 
-    <name>MateClaw</name>
-    <description>MateClaw monorepo reactor and Maven parent</description>
+    <name>GLClaw</name>
+    <description>GLClaw monorepo reactor and Maven parent</description>
 
     <!-- Reactor modules. Keep plugin-api before consumers for predictable local builds. -->
     <modules>
@@ -20,7 +20,7 @@
     </modules>
 
     <properties>
-        <!-- MateClaw release version shared by all Maven modules. -->
+        <!-- GLClaw release version shared by all Maven modules. -->
         <revision>1.4.0</revision>
 
         <!-- Java -->
@@ -101,7 +101,7 @@
                 <scope>import</scope>
             </dependency>
 
-            <!-- ==================== MateClaw Modules ==================== -->
+            <!-- ==================== GLClaw Modules ==================== -->
             <!-- Internal module dependencies share the same revision-controlled version. -->
             <dependency>
                 <groupId>vip.mate</groupId>

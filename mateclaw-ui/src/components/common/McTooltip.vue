@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /**
- * MateClaw-styled tooltip.
+ * GLClaw-styled tooltip.
  *
  * A thin wrapper over Element Plus `el-tooltip` that pins the app's
  * visual identity onto every tooltip: a frosted-glass surface, rounded

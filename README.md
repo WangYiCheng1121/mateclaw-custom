@@ -1,10 +1,10 @@
 <div align="center">
 
 <p align="center">
-  <img src="mateclaw-ui/public/logo/mateclaw_logo_s.png" alt="MateClaw Logo" width="120">
+  <img src="mateclaw-ui/public/logo/mateclaw_logo_s.png" alt="GLClaw Logo" width="120">
 </p>
 
-# MateClaw
+# GLClaw
 
 <p align="center"><b>Your second brain</b></p>
 
@@ -25,12 +25,12 @@
 </div>
 
 <p align="center">
-  <img src="assets/images/preview.png" alt="MateClaw Preview" width="800">
+  <img src="assets/images/preview.png" alt="GLClaw Preview" width="800">
 </p>
 
 ---
 
-> **Other personal AI agents are built for one person. MateClaw is the one your IT department can actually sign off on.**
+> **Other personal AI agents are built for one person. GLClaw is the one your IT department can actually sign off on.**
 >
 > Multi-user workspaces. Approval-gated sensitive actions. Full audit trail. Spring Boot Actuator health monitoring. Per-channel error isolation so one chat platform's outage doesn't take down the rest. One JAR on your own machine, zero data egress.
 >
@@ -38,7 +38,7 @@
 
 Most AI tools die when their vendor has a bad day. Most forget you the moment the tab closes. Most give you a chatbox and call it a product.
 
-**MateClaw is the whole widget.** One deployment. Reasoning, knowledge, memory, tools, channels — built together, not bolted on. And when your primary model goes down, the next one picks up mid-sentence.
+**GLClaw is the whole widget.** One deployment. Reasoning, knowledge, memory, tools, channels — built together, not bolted on. And when your primary model goes down, the next one picks up mid-sentence.
 
 ---
 
@@ -48,7 +48,7 @@ Most AI tools die when their vendor has a bad day. Most forget you the moment th
 
 Primary key expired. Vendor returns 401. Network blip. Quota drained.
 
-Other tools hand you a red error card. MateClaw routes to the next healthy provider — DashScope, OpenAI, Anthropic, Gemini, DeepSeek, Kimi, Ollama, LM Studio, MLX, 14+ in total — and the user sees the reply finish. A provider health tracker parks bad vendors in a cooldown window so they don't waste seconds on every turn.
+Other tools hand you a red error card. GLClaw routes to the next healthy provider — DashScope, OpenAI, Anthropic, Gemini, DeepSeek, Kimi, Ollama, LM Studio, MLX, 14+ in total — and the user sees the reply finish. A provider health tracker parks bad vendors in a cooldown window so they don't waste seconds on every turn.
 
 You don't write a retry script. You drag providers into priority order in **Settings → Models** and watch the health dashboard fill with green dots as requests route around failures in real time.
 
@@ -56,7 +56,7 @@ You don't write a retry script. You drag providers into priority order in **Sett
 
 Upload a PDF, a batch of markdown, a scraped page — raw material in.
 
-MateClaw's **LLM Wiki** digests it into structured pages, builds `[[links]]` between them, and remembers where every sentence came from. Click a citation, see the exact source chunk. Ask a question, the page you get is stitched from the right chunks — with references you can verify.
+GLClaw's **LLM Wiki** digests it into structured pages, builds `[[links]]` between them, and remembers where every sentence came from. Click a citation, see the exact source chunk. Ask a question, the page you get is stitched from the right chunks — with references you can verify.
 
 This is the difference between a warehouse and a library.
 
@@ -114,13 +114,13 @@ On March 2, 2026, Claude went dark for 4 hours across API, web, and mobile. Thre
 
 This is the same shift databases went through around 2010 and cloud went through around 2018: the winning layer stops being tied to one supplier. **57% of companies now run AI agents in production.** None of them want one vendor's bad day to become their bad day.
 
-**MateClaw is that layer — built the Spring Boot way.**
+**GLClaw is that layer — built the Spring Boot way.**
 
 ---
 
-## Why MateClaw
+## Why GLClaw
 
-| | MateClaw | [OpenClaw](https://github.com/openclaw/openclaw) | [Hermes Agent](https://github.com/NousResearch/hermes-agent) | [Claude Code](https://github.com/anthropics/claude-code) | [Cursor](https://cursor.com) |
+| | GLClaw | [OpenClaw](https://github.com/openclaw/openclaw) | [Hermes Agent](https://github.com/NousResearch/hermes-agent) | [Claude Code](https://github.com/anthropics/claude-code) | [Cursor](https://cursor.com) |
 |:---|:---:|:---:|:---:|:---:|:---:|
 | **Multi-vendor failover** | **Chain + health tracker + cooldown** | Swap providers via config | Orchestration w/ retry | Anthropic only | One model |
 | **Knowledge digestion** | **LLM Wiki + page-level citations** | Canvas + memory | Skills Hub + memory | — | Code index |
@@ -130,9 +130,9 @@ This is the same shift databases went through around 2010 and cloud went through
 | **Stack** | **Java (Spring Boot)** | TypeScript | Python | TypeScript | Electron/TS |
 | **License / Price** | **Apache 2.0 · Free** | MIT · Free | MIT · Free | Proprietary · $20–200/mo | Proprietary · $0–200/mo |
 
-**OpenClaw and Hermes Agent are excellent personal AI platforms** — pick either if you're running one user on one laptop, building your own agent from CLI, and treating everything as config files to hand-tune. Both have bigger communities than MateClaw today.
+**OpenClaw and Hermes Agent are excellent personal AI platforms** — pick either if you're running one user on one laptop, building your own agent from CLI, and treating everything as config files to hand-tune. Both have bigger communities than GLClaw today.
 
-**MateClaw is the version built for teams.** RBAC per digital employee, per model, per tool. An approval flow that pauses risky actions for review. Full audit trail. The Admin Runtime Console gives one operator real-time visibility into 50 employees running across 14 vendors — stuck? force-recycle in one click. Spring Boot inside — drop-in for any Java shop already running production services.
+**GLClaw is the version built for teams.** RBAC per digital employee, per model, per tool. An approval flow that pauses risky actions for review. Full audit trail. The Admin Runtime Console gives one operator real-time visibility into 50 employees running across 14 vendors — stuck? force-recycle in one click. Spring Boot inside — drop-in for any Java shop already running production services.
 
 Same "whole widget" philosophy. Different center of gravity.
 

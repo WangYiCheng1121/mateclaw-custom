@@ -81,7 +81,7 @@ public class BrowserUseTool {
 
     @Tool(description = """
         Control a browser (Playwright with multi-strategy launch: system Chrome/Edge channel, explicit path, bundled, or external CDP).
-        Default is headless. Use headed=true with action=start for a visible window.
+        Default is headed (visible). Use headed=false with action=start for headless mode.
         Typical flow: start → open(url) → snapshot → click/type → stop.
         If start fails, run action=diagnose for a full report of what's missing and how to fix it.
 
@@ -92,7 +92,7 @@ public class BrowserUseTool {
         as a search alternative.
 
         Supported actions:
-        - start: Launch a new browser (tries system Chrome, system Edge, then Playwright bundled). Optional headed=true.
+        - start: Launch a new browser (tries system Chrome, system Edge, then Playwright bundled). Optional headed=false for headless.
         - stop: Close browser. If connected via CDP, only disconnects (Chrome keeps running).
         - open: Navigate to a URL. Requires url parameter. Auto-starts browser if not running.
         - snapshot: Get page text content, interactive elements, and title.
@@ -112,7 +112,7 @@ public class BrowserUseTool {
             @ToolParam(description = "Text to type (for action=type)", required = false) String text,
             @ToolParam(description = "JavaScript code to execute (for action=eval). Top-level await is allowed; add `return` to return a value when the snippet uses await.", required = false) String code,
             @ToolParam(description = "File path to save screenshot (for action=screenshot)", required = false) String path,
-            @ToolParam(description = "Launch visible browser window (for action=start, default false)", required = false) Boolean headed,
+            @ToolParam(description = "Launch visible browser window (for action=start, default true). Set false for headless.", required = false) Boolean headed,
             @ToolParam(description = "Single CDP port to scan (for action=list_cdp_targets)", required = false) Integer cdpPort,
             // RFC-063r §2.5: hidden from LLM by JsonSchemaGenerator.
             @Nullable ToolContext ctx
@@ -131,7 +131,7 @@ public class BrowserUseTool {
 
         try {
             return switch (action.toLowerCase().trim()) {
-                case "start" -> doStart(sessionKey, Boolean.TRUE.equals(headed));
+                case "start" -> doStart(sessionKey, !Boolean.FALSE.equals(headed));
                 case "stop" -> doStop(sessionKey);
                 case "open" -> doOpen(sessionKey, url);
                 case "snapshot" -> doSnapshot(sessionKey);
@@ -522,7 +522,7 @@ public class BrowserUseTool {
 
         BrowserSession session = getSession(sessionKey);
         if (session == null) {
-            String startResp = doStart(sessionKey, false);
+            String startResp = doStart(sessionKey, true);
             session = getSession(sessionKey);
             if (session == null) {
                 return startResp;

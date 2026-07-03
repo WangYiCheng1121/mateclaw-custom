@@ -3,7 +3,7 @@ package vip.mate.plugin.api;
 /**
  * Runtime exception for plugin-related errors.
  *
- * @author MateClaw Team
+ * @author GLClaw Team
  */
 public class PluginException extends RuntimeException {
 

@@ -880,7 +880,7 @@ browser_use(action="stop")
 
 | Action | 说明 | 必需参数 |
 |--------|------|----------|
-| start | 启动浏览器 | headed（可选，默认 false） |
+| start | 启动浏览器 | headed（可选，默认 true） |
 | stop | 关闭浏览器 | — |
 | open | 打开 URL | url |
 | snapshot | 获取页面文本和结构 | — |
@@ -892,7 +892,7 @@ browser_use(action="stop")
 ## 注意事项
 - 每次会话只有一个浏览器实例，如需重启请先 stop
 - 空闲 30 分钟后浏览器自动关闭
-- 如果浏览器未启动，open 操作会自动以 headless 模式启动
+- 如果浏览器未启动，open 操作会自动以 headed 模式启动
 - selector 使用标准 CSS 选择器语法
 ' WHERE id = 1000000010;
 

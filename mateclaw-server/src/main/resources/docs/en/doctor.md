@@ -2,9 +2,9 @@
 
 **The Doctor page answers one question: is this thing actually working right now?**
 
-MateClaw has a lot of moving parts — the backend, the database, model providers, MCP servers, IM channels, cron jobs, memory consolidation, wiki digestion. When something goes sideways, the symptom ("my agent isn't responding") usually has a specific cause ("the DashScope API key expired yesterday") buried several layers away from where you'd notice. Doctor is a single page that runs every check at once and tells you what's green, what's yellow, and what's red.
+GLClaw has a lot of moving parts 鈥?the backend, the database, model providers, MCP servers, IM channels, cron jobs, memory consolidation, wiki digestion. When something goes sideways, the symptom ("my agent isn't responding") usually has a specific cause ("the DashScope API key expired yesterday") buried several layers away from where you'd notice. Doctor is a single page that runs every check at once and tells you what's green, what's yellow, and what's red.
 
-Open it with `Settings → Doctor` or just navigate to `/doctor`.
+Open it with `Settings 鈫?Doctor` or just navigate to `/doctor`.
 
 ---
 
@@ -12,15 +12,15 @@ Open it with `Settings → Doctor` or just navigate to `/doctor`.
 
 Each check runs independently and reports one of three states:
 
-- **✅ OK** — everything is working as expected
-- **⚠️ Warning** — working but degraded (e.g., using a fallback provider, nearing a quota, a non-critical cron job is paused)
-- **❌ Error** — broken in a way you need to fix
+- **鉁?OK** 鈥?everything is working as expected
+- **鈿狅笍 Warning** 鈥?working but degraded (e.g., using a fallback provider, nearing a quota, a non-critical cron job is paused)
+- **鉂?Error** 鈥?broken in a way you need to fix
 
 ### Core infrastructure
 
 | Check | What it verifies |
 |-------|-----------------|
-| **Backend version** | MateClaw is running and reports its version |
+| **Backend version** | GLClaw is running and reports its version |
 | **Database connection** | The configured datasource is reachable and queries succeed |
 | **Database schema** | All expected `mate_*` tables exist; migration state is clean |
 | **Disk usage** | The data directory has enough free space (warns under 20%, errors under 5%) |
@@ -86,16 +86,16 @@ Doctor runs two ways:
 
 ### On demand
 
-Click **Run All Checks** on the Doctor page. The button fires off every check in parallel; the UI streams results back as each finishes. Most checks complete in under a second; the slowest (MCP server connection tests) can take 10–30 seconds.
+Click **Run All Checks** on the Doctor page. The button fires off every check in parallel; the UI streams results back as each finishes. Most checks complete in under a second; the slowest (MCP server connection tests) can take 10鈥?0 seconds.
 
 ### On a schedule
 
-Doctor also runs **automatically every 15 minutes** in the background. Results are cached in memory and persisted to `mate_doctor_check` so the page loads instantly when you open it — you're seeing the last cached state until you click **Run All Checks**.
+Doctor also runs **automatically every 15 minutes** in the background. Results are cached in memory and persisted to `mate_doctor_check` so the page loads instantly when you open it 鈥?you're seeing the last cached state until you click **Run All Checks**.
 
 You can tune the schedule in `application.yml`:
 
 ```yaml
-mateclaw:
+GLClaw:
   doctor:
     enabled: true
     schedule-minutes: 15
@@ -126,10 +126,10 @@ Each check returns:
 
 The UI renders:
 
-- **Category tabs** at the top — Infrastructure, Models, Agents, Memory, Wiki, Channels, MCP, Cron
-- **Status counters** — green / yellow / red
-- **Check list** — name, status, message, time since last check, "View details" expand, optional "Fix" button that navigates to the relevant settings page
-- **History graph** — (for each check) a sparkline of the last 50 runs so you can see flapping checks at a glance
+- **Category tabs** at the top 鈥?Infrastructure, Models, Agents, Memory, Wiki, Channels, MCP, Cron
+- **Status counters** 鈥?green / yellow / red
+- **Check list** 鈥?name, status, message, time since last check, "View details" expand, optional "Fix" button that navigates to the relevant settings page
+- **History graph** 鈥?(for each check) a sparkline of the last 50 runs so you can see flapping checks at a glance
 
 ---
 
@@ -137,12 +137,12 @@ The UI renders:
 
 For actionable checks, the Doctor row includes a **Fix** button that navigates directly to the relevant settings page:
 
-- Model provider failure → `Settings → Models`
-- Tool Guard `default-policy: allow` → `Settings → Security & Approval`
-- H2 console in production → `Settings → System` (or show a config snippet to copy)
-- JWT default secret → `Settings → System` (or show a config snippet)
-- MCP server disconnected → `Tools → MCP Servers`
-- Stuck wiki digestion → `Wiki → [KB] → Raw Material`
+- Model provider failure 鈫?`Settings 鈫?Models`
+- Tool Guard `default-policy: allow` 鈫?`Settings 鈫?Security & Approval`
+- H2 console in production 鈫?`Settings 鈫?System` (or show a config snippet to copy)
+- JWT default secret 鈫?`Settings 鈫?System` (or show a config snippet)
+- MCP server disconnected 鈫?`Tools 鈫?MCP Servers`
+- Stuck wiki digestion 鈫?`Wiki 鈫?[KB] 鈫?Raw Material`
 
 Clicking Fix takes you to the exact page where you can address the issue. When possible, the target page is pre-filtered to highlight the failing item.
 
@@ -180,7 +180,7 @@ Point your external uptime monitor (UptimeRobot, Pingdom, internal Prometheus) a
 GET /api/v1/doctor/checks
 ```
 
-The endpoint returns HTTP 200 with JSON summary — aggregate pass/fail counts and per-category breakdown. Your monitor should alert when `errorCount > 0`.
+The endpoint returns HTTP 200 with JSON summary 鈥?aggregate pass/fail counts and per-category breakdown. Your monitor should alert when `errorCount > 0`.
 
 For a simpler health check, use:
 
@@ -192,16 +192,16 @@ which follows Spring Boot's standard format.
 
 ### During upgrades
 
-After deploying a new MateClaw version, run Doctor to verify nothing regressed:
+After deploying a new GLClaw version, run Doctor to verify nothing regressed:
 
 1. Open `/doctor`
 2. Click **Run All Checks**
 3. Look for any yellows or reds that weren't there before
-4. Pay special attention to **Database schema** — a mismatched schema after an upgrade usually means a migration didn't run
+4. Pay special attention to **Database schema** 鈥?a mismatched schema after an upgrade usually means a migration didn't run
 
 ### When something's broken
 
-Doctor is the first place to look when a user reports "it's not working". Open the page, see which check is red, click **Fix**, solve the problem. If no check is red but the user still has an issue, it's probably something Doctor doesn't cover yet — file it as a [GitHub issue](https://github.com/matevip/mateclaw/issues) so we can add a check.
+Doctor is the first place to look when a user reports "it's not working". Open the page, see which check is red, click **Fix**, solve the problem. If no check is red but the user still has an issue, it's probably something Doctor doesn't cover yet 鈥?file it as a [GitHub issue](https://github.com/matevip/GLClaw/issues) so we can add a check.
 
 ---
 
@@ -227,7 +227,7 @@ Historical results go into `mate_doctor_check_history` with the same columns plu
 
 ## Next
 
-- [Admin Console](./console) — the UI Doctor lives in
-- [Configuration](./config) — things you might configure based on Doctor warnings
-- [Security & Approval](./security) — what Doctor checks in Tool Guard
-- [Contributing](./contributing) — add a new Doctor check if something's missing
+- [Admin Console](./console) 鈥?the UI Doctor lives in
+- [Configuration](./config) 鈥?things you might configure based on Doctor warnings
+- [Security & Approval](./security) 鈥?what Doctor checks in Tool Guard
+- [Contributing](./contributing) 鈥?add a new Doctor check if something's missing

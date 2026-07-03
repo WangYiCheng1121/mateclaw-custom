@@ -929,7 +929,7 @@ browser_use(action="stop")
 
 | Action | Description | Required Parameters |
 |--------|-------------|---------------------|
-| start | Start browser | headed (optional, default false) |
+| start | Start browser | headed (optional, default true) |
 | stop | Close browser | — |
 | open | Open URL | url |
 | snapshot | Get page text and structure | — |
@@ -941,7 +941,7 @@ browser_use(action="stop")
 ## Notes
 - Only one browser instance per session; stop first to restart
 - Browser auto-closes after 30 minutes of inactivity
-- If browser not started, open action auto-starts in headless mode
+- If browser not started, open action auto-starts in headed mode
 - selector uses standard CSS selector syntax
 ' WHERE id = 1000000010;
 

@@ -2,29 +2,29 @@
 
 **Strong hands, firm limits.**
 
-GLClaw gives agents real capability â€” shell access, file writes, browser automation, delegation to other agents, remote tools over MCP. That's the "strong hands" half. This page is about the other half: the limits that keep strong hands from doing stupid things.
+GLClaw gives agents real capability â€?shell access, file writes, browser automation, delegation to other agents, remote tools over MCP. That's the "strong hands" half. This page is about the other half: the limits that keep strong hands from doing stupid things.
 
-- **JWT auth** â€” who you are
-- **Tool Guard (rule-based)** â€” what each agent is allowed to do
-- **Approval workflow** â€” when a human needs to decide before execution
-- **File Guard** â€” what the filesystem looks like to an agent
-- **Workspace isolation** â€” what each team can see
-- **Audit log** â€” what everybody did, in order, forever
+- **JWT auth** â€?who you are
+- **Tool Guard (rule-based)** â€?what each agent is allowed to do
+- **Approval workflow** â€?when a human needs to decide before execution
+- **File Guard** â€?what the filesystem looks like to an agent
+- **Workspace isolation** â€?what each team can see
+- **Audit log** â€?what everybody did, in order, forever
 
 If you're running GLClaw in production, read this page top to bottom.
 
 ::: tip Agentic, but not autonomous
-Every IT department and CISO in 2025â€“2026 has the same question before buying AI:
+Every IT department and CISO in 2025â€?026 has the same question before buying AI:
 
 > **"What if the agent goes off the rails and deletes the wrong thing?"**
 
-Anyone who tells you "AI won't go off the rails" is lying. GLClaw's answer is different â€” **the agent asks you first when it matters.**
+Anyone who tells you "AI won't go off the rails" is lying. GLClaw's answer is different â€?**the agent asks you first when it matters.**
 
-When the agent wants to delete a file, send an email, run a write-side SQL, or hit a paid API â€” any tool call matched by a Tool Guard rule **pauses mid-turn**. An approval notification is pushed to your IM (Feishu / DingTalk / Slack / email). You tap approve, the agent resumes from where it stopped. Every action lands in `mate_tool_guard_audit_log` â€” append-only, retained as long as you want, CSV-exportable.
+When the agent wants to delete a file, send an email, run a write-side SQL, or hit a paid API â€?any tool call matched by a Tool Guard rule **pauses mid-turn**. An approval notification is pushed to your IM (Feishu / DingTalk / Slack / email). You tap approve, the agent resumes from where it stopped. Every action lands in `mate_tool_guard_audit_log` â€?append-only, retained as long as you want, CSV-exportable.
 
-**Agentic â€” it acts. Not autonomous â€” it doesn't act on its own initiative for the things that matter.**
+**Agentic â€?it acts. Not autonomous â€?it doesn't act on its own initiative for the things that matter.**
 
-That's the line between "let AI do work for you" and "let AI make decisions for you." GLClaw stays on the left side of that line â€” which is also the side your CISO doesn't immediately say no to.
+That's the line between "let AI do work for you" and "let AI make decisions for you." GLClaw stays on the left side of that line â€?which is also the side your CISO doesn't immediately say no to.
 :::
 
 ---
@@ -72,7 +72,7 @@ GLClaw does sliding-window token renewal. When a token's remaining lifetime fall
 ### Configuration
 
 ```yaml
-mateclaw:
+GLClaw:
   auth:
     jwt:
       secret: your-secret-key-must-be-at-least-32-characters-long
@@ -91,7 +91,7 @@ mateclaw:
 | 401 | Token missing, expired, or invalid | `{"code": 401, "message": "Unauthorized"}` |
 | 403 | Valid token but insufficient permissions | `{"code": 403, "message": "Forbidden"}` |
 
-Frontend handles both uniformly â€” redirect to login, clear stored tokens.
+Frontend handles both uniformly â€?redirect to login, clear stored tokens.
 
 ### Default credentials
 
@@ -99,51 +99,51 @@ GLClaw ships with `admin` / `admin123`. **Change this immediately in any deploym
 
 ### Spring Security config
 
-- **Stateless sessions** â€” no server-side session; all state in the JWT
-- **Public endpoints** â€” `/api/v1/auth/login`, `/h2-console/**`, `/swagger-ui/**`
-- **Protected endpoints** â€” everything else under `/api/v1/**`
-- **CSRF disabled** â€” not needed for stateless JWT
+- **Stateless sessions** â€?no server-side session; all state in the JWT
+- **Public endpoints** â€?`/api/v1/auth/login`, `/h2-console/**`, `/swagger-ui/**`
+- **Protected endpoints** â€?everything else under `/api/v1/**`
+- **CSRF disabled** â€?not needed for stateless JWT
 
 ---
 
-## Tool Guard â€” rule-based permission engine
+## Tool Guard â€?rule-based permission engine
 
-Tool Guard is how GLClaw decides what a tool call is allowed to do. **It's not a flat dangerous-tools list.** It's a rule engine. Each rule specifies: *for this tool, optionally matching these arguments, in this workspace, do X* â€” where X is `allow`, `deny`, or `require_approval`.
+Tool Guard is how GLClaw decides what a tool call is allowed to do. **It's not a flat dangerous-tools list.** It's a rule engine. Each rule specifies: *for this tool, optionally matching these arguments, in this workspace, do X* â€?where X is `allow`, `deny`, or `require_approval`.
 
 ### The three tables
 
 | Table | Purpose |
 |-------|---------|
-| **`mate_tool_guard_config`** | Global config â€” enabled, default policy, approval timeout, notification channels |
-| **`mate_tool_guard_rule`** | Individual rules â€” tool pattern, optional arg regex, workspace scope, action, priority |
-| **`mate_tool_guard_audit_log`** | Every guarded call gets an entry â€” tool, args, rule matched, decision, user, timestamp |
+| **`mate_tool_guard_config`** | Global config â€?enabled, default policy, approval timeout, notification channels |
+| **`mate_tool_guard_rule`** | Individual rules â€?tool pattern, optional arg regex, workspace scope, action, priority |
+| **`mate_tool_guard_audit_log`** | Every guarded call gets an entry â€?tool, args, rule matched, decision, user, timestamp |
 
 ### How a rule is evaluated
 
 ```
 Tool call arrives
-      â”‚
-      â–¼
+      â”?
+      â–?
 Load rules for this workspace + global rules, sorted by priority
-      â”‚
-      â–¼
+      â”?
+      â–?
 For each rule in priority order:
   â”Œâ”€ Does the tool name match the pattern?
-  â”‚  â””â”€ No â†’ next rule
+  â”? â””â”€ No â†?next rule
   â”œâ”€ Does the arg pattern match (if any)?
-  â”‚  â””â”€ No â†’ next rule
-  â””â”€ Yes on both â†’ apply this rule's action and stop
-      â”‚
-      â–¼
-No rules matched â†’ apply default policy
-      â”‚
-      â–¼
+  â”? â””â”€ No â†?next rule
+  â””â”€ Yes on both â†?apply this rule's action and stop
+      â”?
+      â–?
+No rules matched â†?apply default policy
+      â”?
+      â–?
 Action: allow / deny / require_approval
-      â”‚
-      â–¼
+      â”?
+      â–?
 Write audit log entry
-      â”‚
-      â–¼
+      â”?
+      â–?
 Execute / reject / suspend for approval
 ```
 
@@ -152,21 +152,21 @@ Rules with higher priority run first. First matching rule wins. A rule can be sc
 ### Example rules
 
 ```
-Rule 1 (priority 100):  ShellExecuteTool, arg matches "^(ls|cat|grep|find)\\s"  â†’ allow
-Rule 2 (priority 50):   ShellExecuteTool                                        â†’ require_approval
-Rule 3 (priority 50):   WriteFileTool, arg.path starts with "/tmp"              â†’ allow
-Rule 4 (priority 40):   WriteFileTool                                           â†’ require_approval
-Rule 5 (priority 30):   *                                                        â†’ allow (default)
+Rule 1 (priority 100):  ShellExecuteTool, arg matches "^(ls|cat|grep|find)\\s"  â†?allow
+Rule 2 (priority 50):   ShellExecuteTool                                        â†?require_approval
+Rule 3 (priority 50):   WriteFileTool, arg.path starts with "/tmp"              â†?allow
+Rule 4 (priority 40):   WriteFileTool                                           â†?require_approval
+Rule 5 (priority 30):   *                                                        â†?allow (default)
 ```
 
 Read-only shell commands execute immediately. Anything else needs approval. File writes under `/tmp` are free; elsewhere they need approval. Everything else runs.
 
 ### Managing rules
 
-`Settings â†’ Security & Approval â†’ Tool Guard Rules`: list, create, edit, reorder, disable. Or via config:
+`Settings â†?Security & Approval â†?Tool Guard Rules`: list, create, edit, reorder, disable. Or via config:
 
 ```yaml
-mateclaw:
+GLClaw:
   tool:
     guard:
       enabled: true
@@ -204,7 +204,7 @@ curl -X POST http://localhost:18088/api/v1/security/guard/rules \
 
 ### Credential-rule toggles (1.4.0)
 
-Credential rules now support **per-rule control** â€” each rule can be enabled/disabled individually, each rule carries its own decision (allow / deny / require_approval), and the entire guard rule set can be **exported and imported as JSON** for migrating between deployments or version-controlling your policy.
+Credential rules now support **per-rule control** â€?each rule can be enabled/disabled individually, each rule carries its own decision (allow / deny / require_approval), and the entire guard rule set can be **exported and imported as JSON** for migrating between deployments or version-controlling your policy.
 
 ### Dangerous pattern detection
 
@@ -212,48 +212,48 @@ In addition to user-defined rules, GLClaw's shell tool has built-in detection fo
 
 ---
 
-## Approval workflow â€” human in the loop
+## Approval workflow â€?human in the loop
 
 When a rule evaluates to `require_approval`, GLClaw doesn't fail the call. It **suspends the agent mid-turn**, creates a pending approval, surfaces it to the user, and resumes exactly where it left off once the user decides.
 
 ::: tip From 1.3.0: workflows ride the same approval rail
-The v1.3.0 [workflow](./workflow) `await_approval` step suspends the entire workflow run on the same `mate_tool_approval` table â€” persisted across restarts. Approval requests fan out to the approver's channel (Feishu / DingTalk / Slack / WeCom); once resolved, the workflow runtime auto-resumes the next step. One audit log, one notification pipeline, one "pause / resume" semantic â€” covering both agent tool calls and workflow steps.
+The v1.3.0 [workflow](./workflow) `await_approval` step suspends the entire workflow run on the same `mate_tool_approval` table â€?persisted across restarts. Approval requests fan out to the approver's channel (Feishu / DingTalk / Slack / WeCom); once resolved, the workflow runtime auto-resumes the next step. One audit log, one notification pipeline, one "pause / resume" semantic â€?covering both agent tool calls and workflow steps.
 :::
 
 ### How it flows
 
 ```
 Agent calls tool
-     â”‚
-     â–¼
+     â”?
+     â–?
 Tool Guard: require_approval
-     â”‚
-     â–¼
+     â”?
+     â–?
 Create mate_tool_approval row (status=pending)
-     â”‚
-     â–¼
+     â”?
+     â–?
 Set AWAITING_APPROVAL=true in graph state
-     â”‚
-     â–¼
+     â”?
+     â–?
 Emit approval_required SSE event
-     â”‚
-     â–¼
+     â”?
+     â–?
 Graph terminates cleanly
-     â”‚
-     â–¼
+     â”?
+     â–?
 Frontend shows approval card
-     â”‚
-     â–¼
+     â”?
+     â–?
 User clicks Approve or Reject
-     â”‚
-     â–¼
+     â”?
+     â–?
 POST /api/v1/approvals/{id}/resolve
-     â”‚
-     â”œâ”€ Approved â†’ reload agent, replay tool call, continue reasoning
-     â””â”€ Rejected â†’ send rejection as observation, continue reasoning
+     â”?
+     â”œâ”€ Approved â†?reload agent, replay tool call, continue reasoning
+     â””â”€ Rejected â†?send rejection as observation, continue reasoning
 ```
 
-The "replay" mechanism is important. When the agent resumes, it **doesn't re-reason from scratch** â€” it skips straight to the approved tool call, executes it, and continues from the observation. No duplicate LLM calls, no wasted tokens.
+The "replay" mechanism is important. When the agent resumes, it **doesn't re-reason from scratch** â€?it skips straight to the approved tool call, executes it, and continues from the observation. No duplicate LLM calls, no wasted tokens.
 
 ### The `mate_tool_approval` table
 
@@ -273,7 +273,7 @@ The "replay" mechanism is important. When the agent resumes, it **doesn't re-rea
 
 ### Placeholder substitution
 
-Sometimes the agent's tool arguments contain placeholders â€” a computed file path, a templated command. The approval workflow **resolves placeholders before showing the dialog**, so users see the actual values they're approving. Approval returns the resolved values too, so what the agent executes is exactly what the user saw.
+Sometimes the agent's tool arguments contain placeholders â€?a computed file path, a templated command. The approval workflow **resolves placeholders before showing the dialog**, so users see the actual values they're approving. Approval returns the resolved values too, so what the agent executes is exactly what the user saw.
 
 ### Timeouts
 
@@ -281,7 +281,7 @@ Pending approvals expire after a configurable timeout (default: 10 minutes). Exp
 
 ### Notifications
 
-GLClaw can notify through `channel/notification/` adapters â€” email, in-app alert, DingTalk/Feishu push. Configure in `Settings â†’ Security & Approval â†’ Notifications`.
+GLClaw can notify through `channel/notification/` adapters â€?email, in-app alert, DingTalk/Feishu push. Configure in `Settings â†?Security & Approval â†?Notifications`.
 
 ### Resolving via API
 
@@ -313,20 +313,20 @@ File Guard is filesystem-level access control. It sits underneath any tool or sk
 
 ```
 File access request
-     â”‚
-     â–¼
+     â”?
+     â–?
 Path normalization (resolve .., symlinks, relative paths)
-     â”‚
-     â–¼
+     â”?
+     â–?
 Allowlist check: is the path inside an allowed directory?
-     â”‚
-     â–¼
+     â”?
+     â–?
 Denylist check: is the path inside a denied directory?
-     â”‚
-     â–¼
+     â”?
+     â–?
 Symlink check: does following the path escape the sandbox?
-     â”‚
-     â–¼
+     â”?
+     â–?
 Allow / Deny
 ```
 
@@ -343,13 +343,13 @@ Allow / Deny
 ### Configuration
 
 ```yaml
-mateclaw:
+GLClaw:
   security:
     file-guard:
       enabled: true
       allowed-paths:
         - "${user.dir}/workspace"
-        - "${java.io.tmpdir}/mateclaw"
+        - "${java.io.tmpdir}/GLClaw"
       denied-paths:
         - "/etc"
         - "/usr"
@@ -358,7 +358,7 @@ mateclaw:
         - "${user.home}/.env"
 ```
 
-Visual editor on `Settings â†’ Security & Approval â†’ File Guard`.
+Visual editor on `Settings â†?Security & Approval â†?File Guard`.
 
 ---
 
@@ -368,15 +368,15 @@ Workspaces are how GLClaw keeps multiple teams' data separate. Every agent, skil
 
 ### Security primitives that follow workspace boundaries
 
-- **File Guard** â€” path allowlists default to `workspace/{workspaceId}/...`
-- **Tool Guard rules** â€” can be scoped to a specific workspace
-- **Wiki knowledge bases** â€” owned by a workspace, readable only by members
-- **Memory files** â€” every agent's memory is under its workspace's directory
-- **Channels** â€” each channel belongs to a workspace
+- **File Guard** â€?path allowlists default to `workspace/{workspaceId}/...`
+- **Tool Guard rules** â€?can be scoped to a specific workspace
+- **Wiki knowledge bases** â€?owned by a workspace, readable only by members
+- **Memory files** â€?every agent's memory is under its workspace's directory
+- **Channels** â€?each channel belongs to a workspace
 
 ### Roles (four-tier RBAC)
 
-Capabilities are **additive** â€” a higher role inherits everything below it.
+Capabilities are **additive** â€?a higher role inherits everything below it.
 
 | Role | Capabilities (added on top of the tier below) |
 |------|-----------------------------------------------|
@@ -385,22 +385,22 @@ Capabilities are **additive** â€” a higher role inherits everything below it.
 | **Admin** | Member + `manage:skills`, `manage:channels`, `manage:models`, `manage:security`, `manage:settings` |
 | **Owner** | Same as Admin, plus owner-only: delete the workspace, transfer ownership |
 
-**The backend is the single source of truth for capabilities** â€” it holds a `RoleCapabilities` mapping, and the frontend never derives them locally. After a workspace switch, or on a capability-related 403, the frontend calls `GET /api/v1/workspaces/{id}/access`, which returns `memberRole`, `isGlobalAdmin`, `effectiveRole`, and `capabilities`.
+**The backend is the single source of truth for capabilities** â€?it holds a `RoleCapabilities` mapping, and the frontend never derives them locally. After a workspace switch, or on a capability-related 403, the frontend calls `GET /api/v1/workspaces/{id}/access`, which returns `memberRole`, `isGlobalAdmin`, `effectiveRole`, and `capabilities`.
 
-**Global admin vs workspace role**: `mate_user.role='admin'` is the system-wide global admin â€” it manages users, creates workspaces, and spans **all** workspaces with owner-equivalent power even where it isn't a member; `mate_workspace_member.role` is per-workspace. System-level endpoints (models / providers / OAuth / datasources, user management, workspace creation) require a global admin (`@RequireGlobalAdmin`); workspace-scoped endpoints (skills / tools / plugins) require a workspace role â€” reads need Member, writes need Admin.
+**Global admin vs workspace role**: `mate_user.role='admin'` is the system-wide global admin â€?it manages users, creates workspaces, and spans **all** workspaces with owner-equivalent power even where it isn't a member; `mate_workspace_member.role` is per-workspace. System-level endpoints (models / providers / OAuth / datasources, user management, workspace creation) require a global admin (`@RequireGlobalAdmin`); workspace-scoped endpoints (skills / tools / plugins) require a workspace role â€?reads need Member, writes need Admin.
 
 Full details in [Workspaces](./workspaces).
 
 ### What isolation does NOT cover
 
-- **Shared global config** â€” JWT secret, model provider keys, MCP server definitions are global
-- **Audit logs** â€” all workspaces' security events are in the same audit log; only admins with audit access read across workspaces
+- **Shared global config** â€?JWT secret, model provider keys, MCP server definitions are global
+- **Audit logs** â€?all workspaces' security events are in the same audit log; only admins with audit access read across workspaces
 
 ---
 
 ## Audit log
 
-Every security-relevant action is recorded in `mate_audit_event`. **Append-only** â€” you can't modify an entry, and rows are retained for the configured window (default 90 days).
+Every security-relevant action is recorded in `mate_audit_event`. **Append-only** â€?you can't modify an entry, and rows are retained for the configured window (default 90 days).
 
 ### What gets logged
 
@@ -429,7 +429,7 @@ workspace_id    Which workspace this belongs to
 
 ### Querying
 
-`Settings â†’ Security & Approval â†’ Audit Log`: filterable view by time range, event type, user, workspace, result. Export to CSV.
+`Settings â†?Security & Approval â†?Audit Log`: filterable view by time range, event type, user, workspace, result. Export to CSV.
 
 Via API:
 
@@ -461,14 +461,14 @@ Custom skills are scanned for dangerous patterns before they become active:
 | `LOW` | Logged only |
 | `INFO` | Logged only |
 
-Scan reports live in `Settings â†’ Security & Approval â†’ Skill Scans`.
+Scan reports live in `Settings â†?Security & Approval â†?Skill Scans`.
 
 ---
 
 ## API key protection
 
 - API keys encrypted at rest in the database
-- Keys **masked** (`sk-****abcd`) in every API response â€” never returned in full after creation
+- Keys **masked** (`sk-****abcd`) in every API response â€?never returned in full after creation
 - MCP server `env_json` and `headers_json` values sanitized the same way
 - Environment variable references (`${VAR}`) in MCP config resolve at runtime from the process environment
 
@@ -491,10 +491,10 @@ Scan reports live in `Settings â†’ Security & Approval â†’ Skill Scans`.
 ```nginx
 server {
     listen 443 ssl;
-    server_name mateclaw.example.com;
+    server_name GLClaw.example.com;
 
-    ssl_certificate /etc/ssl/certs/mateclaw.pem;
-    ssl_certificate_key /etc/ssl/private/mateclaw.key;
+    ssl_certificate /etc/ssl/certs/GLClaw.pem;
+    ssl_certificate_key /etc/ssl/private/GLClaw.key;
 
     location / {
         proxy_pass http://localhost:18080;
@@ -521,7 +521,7 @@ server {
 5. **Configure File Guard.** Lock down allowed/denied paths before any agent touches the filesystem in anger.
 6. **Review audit logs regularly.** Set a recurring reminder. Look for anomalies.
 7. **Watch your skill scans.** CRITICAL findings shouldn't be bypassed lightly.
-8. **Isolate networks.** Ollama, H2 console, internal MCP servers â€” none should be public.
+8. **Isolate networks.** Ollama, H2 console, internal MCP servers â€?none should be public.
 9. **Don't skip approvals in production.** Auto-approve rules should be narrow and specific. `allow *` is a crisis waiting to happen.
 
 ---
@@ -529,7 +529,7 @@ server {
 ## Security configuration reference
 
 ```yaml
-mateclaw:
+GLClaw:
   auth:
     jwt:
       secret: ${JWT_SECRET:your-secret-key-at-least-32-chars}
@@ -568,8 +568,8 @@ mateclaw:
 
 ## Next
 
-- [Tools](./tools) â€” tool details and Tool Guard rule patterns
-- [Skills](./skills) â€” skill security scanning details
-- [Workspaces](./workspaces) â€” workspace isolation primitives
-- [Agents](./agents) â€” how approval pauses and resumes an agent turn
-- [Configuration](./config) â€” full configuration reference
+- [Tools](./tools) â€?tool details and Tool Guard rule patterns
+- [Skills](./skills) â€?skill security scanning details
+- [Workspaces](./workspaces) â€?workspace isolation primitives
+- [Agents](./agents) â€?how approval pauses and resumes an agent turn
+- [Configuration](./config) â€?full configuration reference

@@ -36,8 +36,8 @@ public class BrowserProperties {
     /** Try system-installed browsers (channel + path scan) before Playwright's bundled Chromium. */
     private boolean preferSystem = true;
 
-    /** Default headless for auto-started sessions. {@code action=start headed=true} overrides. */
-    private boolean headless = true;
+    /** Default headed (visible) for auto-started sessions. Use {@code action=start headed=false} for headless. */
+    private boolean headless = false;
 
     /** Enable the last-resort strategy: spawn chrome --remote-debugging-port=0 and connect via CDP. */
     private boolean allowExternalCdpFallback = true;

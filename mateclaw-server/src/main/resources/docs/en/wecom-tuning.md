@@ -2,7 +2,7 @@
 
 **A bot that actually works for a group of 50 internal employees needs much more than "just connecting".**
 
-The [Channels → WeCom](./channels#wecom) section covers wiring up the channel; this document covers what MateClaw does **after** the channel is up — every non-obvious optimization, every platform corner the adapter handles, and why.
+The [Channels �?WeCom](./channels#wecom) section covers wiring up the channel; this document covers what GLClaw does **after** the channel is up �?every non-obvious optimization, every platform corner the adapter handles, and why.
 
 Audience:
 
@@ -18,9 +18,9 @@ Audience:
 
 It gives you three primitives:
 
-1. **Receive events** — long-poll WebSocket or webhook delivers user @-mentions
-2. **Reply** (within the same conversation) — `aibot_respond_msg` "attaches" your answer to a specific inbound frame
-3. **Push proactively** (not in reply to anything) — `aibot_send_msg`, but **single chats only**
+1. **Receive events** �?long-poll WebSocket or webhook delivers user @-mentions
+2. **Reply** (within the same conversation) �?`aibot_respond_msg` "attaches" your answer to a specific inbound frame
+3. **Push proactively** (not in reply to anything) �?`aibot_send_msg`, but **single chats only**
 
 **The hidden rule that matters most**: primitive #2 and #3 behave differently in groups vs. single chats. Every optimization below is scaffolded around that matrix.
 
@@ -34,26 +34,26 @@ When users A, B, C all @ the bot in one group, the platform delivers each as a s
 
 If you naively partition conversations by chatId (the obvious approach), you get:
 
-- Persisted history is just `user: ...` with no sender prefix — the model sees an unattributed wall when reading prior turns
+- Persisted history is just `user: ...` with no sender prefix �?the model sees an unattributed wall when reading prior turns
 - The debounce window (500ms / 2.5s adaptive) merges A's and B's rapid messages into one
 - A asks "I want X", B follows with "I want Y", and the model thinks "user asked two unrelated things"
 
-### MateClaw's fix
+### GLClaw's fix
 
 **Two layers**:
 
 **1. Sender-boundary debounce.** When two messages land in the same conversation back-to-back, check senderId first:
 
-- Same sender → merge (typical case: paste-split fragments)
-- Different sender → flush the existing pending immediately, start a new window for the new sender
+- Same sender �?merge (typical case: paste-split fragments)
+- Different sender �?flush the existing pending immediately, start a new window for the new sender
 
-The decision lives in [`ChannelMessageRouter.isSameSender`](https://github.com/anthropics/mateclaw/blob/main/mateclaw-server/src/main/java/vip/mate/channel/ChannelMessageRouter.java). Null-defensive: if either senderId is missing, refuse to merge — better to flush twice than to mis-attribute one fragment.
+The decision lives in [`ChannelMessageRouter.isSameSender`](https://github.com/anthropics/GLClaw/blob/main/GLClaw-server/src/main/java/vip/mate/channel/ChannelMessageRouter.java). Null-defensive: if either senderId is missing, refuse to merge �?better to flush twice than to mis-attribute one fragment.
 
 **2. `[@sender]` prefix on persisted content + prompt.** Every group message (`chatId != null`) gets wrapped before save and before the LLM call:
 
 ```
-[@XuZhanFu] @MateClawBot I want to query X
-[@xuzf] @MateClawBot I want to query Y
+[@XuZhanFu] @GLClawBot I want to query X
+[@xuzf] @GLClawBot I want to query Y
 ```
 
 So:
@@ -62,7 +62,7 @@ So:
 - The persisted timeline reads as `[@A] ...; [@B] ...; [@A] ...`, the model can disambiguate follow-ups, quote-replies, mutual corrections
 - Single chats (`chatId == null`) are zero-overhead, behavior unchanged
 
-`senderName` takes priority over `senderId` (friendlier display); both null → return null (no `[@null]` garbage tag).
+`senderName` takes priority over `senderId` (friendlier display); both null �?return null (no `[@null]` garbage tag).
 
 ### What you'll see in logs
 
@@ -88,15 +88,15 @@ WeCom enforces **hard size limits** at the chunk-finish step (after all bytes ar
 | Voice | **2 MB** | **must be AMR** (other formats rejected by platform) |
 | Global | **20 MB** | absolute ceiling |
 
-### MateClaw's handling
+### GLClaw's handling
 
 **Client-side pre-check** to avoid pointless uploads. `applyWeComUploadLimits(fileSize, mediaType, contentType)` returns:
 
-- File > 20 MB → reject, tell user "exceeds 20MB limit"
-- Image > 10 MB → downgrade to file upload (still visible as attachment, just no thumbnail)
-- Video > 10 MB → downgrade to file upload
-- Voice > 2 MB **or** mime ≠ `audio/amr` → downgrade to file upload
-- Anything > 20 MB → reject (absolute ceiling, no exception)
+- File > 20 MB �?reject, tell user "exceeds 20MB limit"
+- Image > 10 MB �?downgrade to file upload (still visible as attachment, just no thumbnail)
+- Video > 10 MB �?downgrade to file upload
+- Voice > 2 MB **or** mime �?`audio/amr` �?downgrade to file upload
+- Anything > 20 MB �?reject (absolute ceiling, no exception)
 
 The downgrade carries a friendly note ("image > 10MB, sent as file attachment"), so the user knows what just happened.
 
@@ -106,10 +106,10 @@ WeCom-forwarded files often arrive **without a filename field**. Saving them as 
 
 Fix: magic-byte sniff:
 
-- `%PDF` → `.pdf`
+- `%PDF` �?`.pdf`
 - `PK\x03\x04` is a ZIP container; peek inside the first few entries to distinguish `.docx` / `.xlsx` / `.pptx` / `.odt` / `.epub` / `.jar`
 - Other common formats (PNG / JPEG / MP4 / MP3 / WAV) all recognized
-- Truly unknown → keep `.bin`, don't pretend it's something else
+- Truly unknown �?keep `.bin`, don't pretend it's something else
 
 Implemented in `WeComChannelAdapter.sniffMagic()` + `refineZipKind()`.
 
@@ -123,18 +123,18 @@ Users quoting a previous message (image, file, text, voice, miniprogram) and the
 
 | Quote type | What the bot sees | Further processing |
 |----------|------------|------------------|
-| Text | `[Quote: prior text]\nuser's new question` | ✅ text passed to model |
-| Voice | `[Quote: [voice] ASR transcript]\nuser's new question` | ✅ ASR result as context |
-| Image | `[Quote: [image]]\nuser's new question` + image attached part | ✅ vision sidecar reads it |
-| File | `[Quote: [file: report.pdf]]\nuser's new question` + file attached part | ✅ file tool can read |
-| Mixed | Each sub-type expanded by the rules above | ✅ |
+| Text | `[Quote: prior text]\nuser's new question` | �?text passed to model |
+| Voice | `[Quote: [voice] ASR transcript]\nuser's new question` | �?ASR result as context |
+| Image | `[Quote: [image]]\nuser's new question` + image attached part | �?vision sidecar reads it |
+| File | `[Quote: [file: report.pdf]]\nuser's new question` + file attached part | �?file tool can read |
+| Mixed | Each sub-type expanded by the rules above | �?|
 
 ### Implementation notes
 
-- **Media is downloaded too**: a quoted image/file isn't just a marker string — it's actually downloaded, AES-256-CBC decrypted, persisted to `data/chat-uploads/{conversationId}/...`, and attached as a MessageContentPart for the agent
+- **Media is downloaded too**: a quoted image/file isn't just a marker string �?it's actually downloaded, AES-256-CBC decrypted, persisted to `data/chat-uploads/{conversationId}/...`, and attached as a MessageContentPart for the agent
 - **Path alignment**: the conversationId used for media must match the conversationId in `mate_conversation`, otherwise `/api/v1/chat/files/{convId}/{name}` 403s on `isConversationOwner` and the frontend `<img>` shows broken-icon
 
-Historical bug: an early version's `inboundConversationId()` added a `wecom:group:` infix for groups, but the router persisted as `wecom:{chatId}` without the infix — every group-quoted image was broken until both sides aligned. Fixed.
+Historical bug: an early version's `inboundConversationId()` added a `wecom:group:` infix for groups, but the router persisted as `wecom:{chatId}` without the infix �?every group-quoted image was broken until both sides aligned. Fixed.
 
 ---
 
@@ -153,9 +153,9 @@ Unknown subtypes fall back to `[appmsg: title]` so the model at least knows "use
 
 ### Public-account articles
 
-mp.weixin.qq.com articles are served as **captcha-gated SSR** — no LLM tool can fetch the body. If the bot pretends it can read it, the model **invents content from the title** (production-observed: "the article makes three points..." — pure hallucination).
+mp.weixin.qq.com articles are served as **captcha-gated SSR** �?no LLM tool can fetch the body. If the bot pretends it can read it, the model **invents content from the title** (production-observed: "the article makes three points..." �?pure hallucination).
 
-When MateClaw detects `mp.weixin.qq.com` in the link branch, it appends a directive to the model:
+When GLClaw detects `mp.weixin.qq.com` in the link branch, it appends a directive to the model:
 
 > (Hint: this link is a public-account article. The body needs to be opened in WeChat and pasted by the user. Please ask the user to paste the article text rather than guessing from the title.)
 
@@ -168,26 +168,26 @@ Effect: the model stops fabricating and asks the user to paste the body. Other n
 ### Platform rules
 
 ```
-Single chat:  aibot_send_msg ✓     aibot_respond_msg ✓
-Group:        aibot_send_msg ✗     aibot_respond_msg ✓ (must bind to a prior frame's reqId)
+Single chat:  aibot_send_msg �?    aibot_respond_msg �?
+Group:        aibot_send_msg �?    aibot_respond_msg �?(must bind to a prior frame's reqId)
 ```
 
 In groups, any proactive message from the bot (cron summaries, async-task completions, image-generation results) must **piggyback** on a prior user inbound's frameReqId. Otherwise the platform rejects it.
 
-### MateClaw's handling
+### GLClaw's handling
 
 **LRU cache of recent inbound reqIds**. `lastChatReqIds: ConcurrentHashMap<chatId, latest-reqId>` is updated on every group inbound, capped at 1000 chats.
 
 **Unified outbound `sendOutboundFrame(chatId, body)`**:
 
-- Cache hit → `aibot_respond_msg` + cached reqId
-- Cache miss → fall back to `aibot_send_msg` (single chat or new chat)
+- Cache hit �?`aibot_respond_msg` + cached reqId
+- Cache miss �?fall back to `aibot_send_msg` (single chat or new chat)
 
 This way:
 
-- Cron summaries → group has prior activity → respond succeeds; never any → degrade to send_msg, still fails but doesn't blanket-fail
-- Async tasks (image / music / video generation) completing → `AsyncTaskMediaDispatcher` calls the unified outbound
-- Multi-chunk LLM reply → same reqId reused
+- Cron summaries �?group has prior activity �?respond succeeds; never any �?degrade to send_msg, still fails but doesn't blanket-fail
+- Async tasks (image / music / video generation) completing �?`AsyncTaskMediaDispatcher` calls the unified outbound
+- Multi-chunk LLM reply �?same reqId reused
 
 ### What you'll see in logs
 
@@ -199,7 +199,7 @@ This way:
 
 ## Async-task forwarding
 
-Image generation (`image_generate`) / music generation (`music_generate`) / video generation (`video_generate`) / 3D model generation (`model3d_generate`) are all **async tasks** — the agent returns a task id immediately; the actual artifact arrives 30 seconds to several minutes later.
+Image generation (`image_generate`) / music generation (`music_generate`) / video generation (`video_generate`) / 3D model generation (`model3d_generate`) are all **async tasks** �?the agent returns a task id immediately; the actual artifact arrives 30 seconds to several minutes later.
 
 Earlier bug: artifacts only showed up in the Web console's history view, **invisible in the WeCom group**.
 
@@ -218,18 +218,18 @@ Files live at `data/chat-uploads/{conversationId}/`, served at `/api/v1/chat/fil
 
 ## Model behavior: faking tool calls
 
-Observation: **qwen3.6-plus** sometimes "lazes out" in long-context, tool-call-heavy scenarios — it produces a Markdown code block that **mimics** a tool call, but `toolCallCount=0`:
+Observation: **qwen3.6-plus** sometimes "lazes out" in long-context, tool-call-heavy scenarios �?it produces a Markdown code block that **mimics** a tool call, but `toolCallCount=0`:
 
 ````
-🎵 《Title》 generation task submitted!
-⏳ ETA 1-2 minutes, audio will be pushed when ready...
+🎵 《Title�?generation task submitted!
+�?ETA 1-2 minutes, audio will be pushed when ready...
 
 ```json
 { "prompt": "...", "lyrics": "..." }
 ```
 ````
 
-Backend never sees a tool_call → music generation never starts → user never receives the song.
+Backend never sees a tool_call �?music generation never starts �?user never receives the song.
 
 **Current mitigation**: switch to a model that executes tool_calls reliably (kimi-for-coding, claude-sonnet-4.5, deepseek-r1). Change the agent's default model in [Models](./models).
 
@@ -242,19 +242,19 @@ Possible future: server-side detection of "task submitted + toolCallCount=0" pat
 Another sporadic failure: the model gets stuck in a "thinking-output" loop, repeating the same Chinese answer dozens of times until max_tokens (16384) runs out. Production-observed pattern:
 
 ```
-"Wait, I should X." → write Chinese answer → "Done." → write same answer → "Wait, Y." → same again → ...
+"Wait, I should X." �?write Chinese answer �?"Done." �?write same answer �?"Wait, Y." �?same again �?...
 ```
 
 Users stare at "generating..." for tens of seconds to minutes, finally receive a wall of duplicates.
 
-### MateClaw's handling
+### GLClaw's handling
 
 **Two-layer guard**:
 
-1. **Detection**: [`hasRepeatingSuffix`](https://github.com/anthropics/mateclaw/blob/main/mateclaw-server/src/main/java/vip/mate/agent/graph/NodeStreamingChatHelper.java) checks if the buffer ends with the same 24-240 character unit repeated 4+ times consecutively → immediately disposes the upstream subscription
+1. **Detection**: [`hasRepeatingSuffix`](https://github.com/anthropics/GLClaw/blob/main/GLClaw-server/src/main/java/vip/mate/agent/graph/NodeStreamingChatHelper.java) checks if the buffer ends with the same 24-240 character unit repeated 4+ times consecutively �?immediately disposes the upstream subscription
 2. **Dedup + flag**: `dedupTrailingRepeats` collapses N trailing copies to 1; ReasoningNode sets finishReason to `INCOMPLETE`; the frontend renders a truncation banner with a "regenerate" button
 
-Why not just emit a warning: the user already saw the duplicates in the SSE stream (one-way push, can't unsend), but the **DB-persisted finalAnswer** and **WeCom outbound** both use `finalAnswer` — so the IM group only sees one clean copy of the answer + an INCOMPLETE banner.
+Why not just emit a warning: the user already saw the duplicates in the SSE stream (one-way push, can't unsend), but the **DB-persisted finalAnswer** and **WeCom outbound** both use `finalAnswer` �?so the IM group only sees one clean copy of the answer + an INCOMPLETE banner.
 
 The threshold is **deliberately narrow** (4 verbatim consecutive copies) to avoid false-positives on legitimate "TL;DR / body / TL;DR" three-stage outputs.
 
@@ -273,17 +273,17 @@ DashScope / OpenAI / various LLM gateways occasionally produce on the public int
 
 Previously these would surface as `LLM call failed` red text with no retry.
 
-Fix: classify all of these as `SERVER_ERROR`, route through the existing exponential-backoff retry: 3s → 6s → 12s (with jitter) up to 5 attempts. See [Agent engine](./agents#error-recovery).
+Fix: classify all of these as `SERVER_ERROR`, route through the existing exponential-backoff retry: 3s �?6s �?12s (with jitter) up to 5 attempts. See [Agent engine](./agents#error-recovery).
 
 ### Keepalive
 
-Group replies via `aibot_respond_msg` have a **60-second TTL** per stream — no new data within 60s and the platform drops the slot, the eventual real reply is silently rejected.
+Group replies via `aibot_respond_msg` have a **60-second TTL** per stream �?no new data within 60s and the platform drops the slot, the eventual real reply is silently rejected.
 
 Agents handling complex tasks (multi-tool + LLM reasoning) often exceed 60s. `WeComKeepaliveScheduler` sends a noop "processing..." heartbeat every 30 seconds; the slot never expires. A 180-second hard cap force-finishes the stream so a genuinely-stuck task doesn't keep keepalive ticking forever.
 
 ### Reconnect with exponential backoff
 
-When the WeCom long-connection drops (NAT timeout, network blip), the adapter reconnects: 2s → 4s → 8s → 16s → 30s cap. **Never gives up** — as long as the process is alive, it'll resume message reception when the network does.
+When the WeCom long-connection drops (NAT timeout, network blip), the adapter reconnects: 2s �?4s �?8s �?16s �?30s cap. **Never gives up** �?as long as the process is alive, it'll resume message reception when the network does.
 
 The control panel's health view shows current reconnect count, ops can read it directly.
 
@@ -297,7 +297,7 @@ These are **WeCom platform** constraints, can't be worked around in code, only i
 
 API-mode bot ticking **any data permission** in the WeCom admin (e.g. "read messages", "get group info") **auto-restricts the bot to creator only**. Other members' messages get ignored.
 
-**Fix**: in the admin panel, **uncheck** all 7 data permissions. The bot becomes available to all authorized members. MateClaw uses webhooks for messages, doesn't need data permissions.
+**Fix**: in the admin panel, **uncheck** all 7 data permissions. The bot becomes available to all authorized members. GLClaw uses webhooks for messages, doesn't need data permissions.
 
 ### Visibility × data-permission matrix
 
@@ -310,7 +310,7 @@ API-mode bot ticking **any data permission** in the WeCom admin (e.g. "read mess
 
 ### Group requires @bot
 
-The bot in a WeCom group must be `@`-mentioned to receive a message. Direct messages (1:1) don't need `@`. Platform behavior, no workaround. MateClaw doesn't broadcast-listen to all group messages (and couldn't if it tried).
+The bot in a WeCom group must be `@`-mentioned to receive a message. Direct messages (1:1) don't need `@`. Platform behavior, no workaround. GLClaw doesn't broadcast-listen to all group messages (and couldn't if it tried).
 
 ---
 
@@ -347,7 +347,7 @@ If the group doesn't see the bot's reply but logs show this line with a non-null
 ### Verify keepalive
 
 ```bash
-grep "wecom-keepalive" logs/mateclaw.log | tail
+grep "wecom-keepalive" logs/GLClaw.log | tail
 ```
 
 Expect periodic "Heartbeat sent" + "Heartbeat ACK received", with occasional "force-finished stream" hard-finishes.
@@ -360,8 +360,8 @@ Expect periodic "Heartbeat sent" + "Heartbeat ACK received", with occasional "fo
 |------|---------|---------|
 | First group message is a cron push (no prior chat activity) | Cache empty, falls back to `aibot_send_msg`, platform rejects | Ring-buffer multi-reqId cache (limited gain, not implementing) |
 | Model "lazes out" in long sessions | User retries / switch model | Server-side detection + corrective inject |
-| 3 different senders concurrent in same group | Serial processing, each user gets own window (works) | — |
-| User refuses to paste public-account body | Bot politely guides | — |
+| 3 different senders concurrent in same group | Serial processing, each user gets own window (works) | �?|
+| User refuses to paste public-account body | Bot politely guides | �?|
 | OOXML magic-byte misclassification (very rare) | Falls back to `.zip` | ZIP entry peek covers 90% |
 
 ---
@@ -369,51 +369,51 @@ Expect periodic "Heartbeat sent" + "Heartbeat ACK received", with occasional "fo
 ## At-a-glance
 
 ```
-                 ┌─────────────────────┐
-                 │  WeCom group user    │
-                 └──────────┬──────────┘
-                            │ inbound (with chatId)
-                            ▼
-      ┌────────────────────────────────────────┐
-      │  WeComChannelAdapter                    │
-      │  ├─ chunk upload pre-check (4 categories)│
-      │  ├─ magic-byte sniff (OOXML peek)       │
-      │  ├─ AES decrypt + chat-uploads/{convId}/ │
-      │  ├─ quote parsing (5 sub-types)         │
-      │  ├─ appmsg parsing (4 sub-types + hint) │
-      │  └─ cache lastChatReqIds[chatId]        │
-      └──────────────┬─────────────────────────┘
-                     │ ChannelMessage(content="[@xxx] ...")
-                     ▼
-      ┌────────────────────────────────────────┐
-      │  ChannelMessageRouter                   │
-      │  ├─ adaptive debounce (500ms / 2.5s)    │
-      │  ├─ sender boundary cut (group critical) │
-      │  ├─ applyGroupTag → DB + LLM            │
-      │  └─ queue + sessionLock serialize       │
-      └──────────────┬─────────────────────────┘
-                     │
-                     ▼
-                ┌──────────┐
-                │  Agent   │  ← StateGraph + ReAct
-                └─────┬────┘
-                     │ finalAnswer / tool_calls
-                     ▼
-      ┌────────────────────────────────────────┐
-      │  sendOutboundFrame(chatId, body)        │
-      │  ├─ cache hit → aibot_respond_msg       │
-      │  ├─ cache miss → aibot_send_msg         │
-      │  ├─ keepalive (60s TTL extend)          │
-      │  └─ reconnect backoff (NAT/blip self-heal)│
-      └────────────────────────────────────────┘
+                 ┌─────────────────────�?
+                 �? WeCom group user    �?
+                 └──────────┬──────────�?
+                            �?inbound (with chatId)
+                            �?
+      ┌────────────────────────────────────────�?
+      �? WeComChannelAdapter                    �?
+      �? ├─ chunk upload pre-check (4 categories)�?
+      �? ├─ magic-byte sniff (OOXML peek)       �?
+      �? ├─ AES decrypt + chat-uploads/{convId}/ �?
+      �? ├─ quote parsing (5 sub-types)         �?
+      �? ├─ appmsg parsing (4 sub-types + hint) �?
+      �? └─ cache lastChatReqIds[chatId]        �?
+      └──────────────┬─────────────────────────�?
+                     �?ChannelMessage(content="[@xxx] ...")
+                     �?
+      ┌────────────────────────────────────────�?
+      �? ChannelMessageRouter                   �?
+      �? ├─ adaptive debounce (500ms / 2.5s)    �?
+      �? ├─ sender boundary cut (group critical) �?
+      �? ├─ applyGroupTag �?DB + LLM            �?
+      �? └─ queue + sessionLock serialize       �?
+      └──────────────┬─────────────────────────�?
+                     �?
+                     �?
+                ┌──────────�?
+                �? Agent   �? �?StateGraph + ReAct
+                └─────┬────�?
+                     �?finalAnswer / tool_calls
+                     �?
+      ┌────────────────────────────────────────�?
+      �? sendOutboundFrame(chatId, body)        �?
+      �? ├─ cache hit �?aibot_respond_msg       �?
+      �? ├─ cache miss �?aibot_send_msg         �?
+      �? ├─ keepalive (60s TTL extend)          �?
+      �? └─ reconnect backoff (NAT/blip self-heal)�?
+      └────────────────────────────────────────�?
 ```
 
 ---
 
 ## Related reading
 
-- [Channels](./channels) — overview of all 9 channels + setup
-- [Agent engine](./agents) — TLS retry, error classification, self-loop detection
-- [Models](./models) — switching default model, failover chain
-- [Security & approval](./security) — approval flow for high-risk tools in groups
-- [Doctor](./doctor) — diagnostic commands for channel troubleshooting
+- [Channels](./channels) �?overview of all 9 channels + setup
+- [Agent engine](./agents) �?TLS retry, error classification, self-loop detection
+- [Models](./models) �?switching default model, failover chain
+- [Security & approval](./security) �?approval flow for high-risk tools in groups
+- [Doctor](./doctor) �?diagnostic commands for channel troubleshooting

@@ -274,6 +274,16 @@ public class QQChannelAdapter extends AbstractChannelAdapter {
         return true;
     }
 
+    /**
+     * QQ WebSocket 心跳约 45s 一次，代理/NAT 的 idle timeout 通常 2-5 分钟。
+     * 心跳 ACK 已刷新 touchActivity()，因此设置 5 分钟 stale 阈值，配合
+     * {@code ChannelHealthMonitor} 每 1 分钟扫描，确保真正断连后最多 5 分钟内被重启。
+     */
+    @Override
+    public Duration stalenessThreshold() {
+        return Duration.ofMinutes(5);
+    }
+
     // ==================== Access Token 管理 ====================
 
     /**
@@ -489,7 +499,10 @@ public class QQChannelAdapter extends AbstractChannelAdapter {
             switch (op) {
                 case OP_HELLO -> handleHello((Map<String, Object>) data, ws);
                 case OP_DISPATCH -> handleDispatch(eventType, data);
-                case OP_HEARTBEAT_ACK -> log.trace("[qq] Heartbeat ACK received");
+                case OP_HEARTBEAT_ACK -> {
+                    touchActivity();
+                    log.trace("[qq] Heartbeat ACK received");
+                }
                 case OP_RECONNECT -> {
                     log.info("[qq] Server requested reconnect");
                     ws.sendClose(WebSocket.NORMAL_CLOSURE, "reconnect");
