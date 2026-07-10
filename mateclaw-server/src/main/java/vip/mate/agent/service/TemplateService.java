@@ -1,17 +1,16 @@
 package vip.mate.agent.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.core.io.Resource;
-import org.springframework.core.io.support.PathMatchingResourcePatternResolver;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import vip.mate.agent.AgentService;
 import vip.mate.agent.binding.service.AgentBindingService;
 import vip.mate.agent.model.AgentEntity;
 import vip.mate.agent.model.TemplateDTO;
+import vip.mate.agent.platform.PlatformAgentClient;
+import vip.mate.agent.platform.PlatformServiceException;
 import vip.mate.exception.MateClawException;
 import vip.mate.skill.model.SkillEntity;
 import vip.mate.skill.repository.SkillMapper;
@@ -19,8 +18,6 @@ import vip.mate.tool.model.AvailableToolDTO;
 import vip.mate.tool.service.AvailableToolService;
 import vip.mate.workspace.document.WorkspaceFileService;
 
-import java.io.IOException;
-import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -30,8 +27,10 @@ import java.util.stream.Collectors;
 /**
  * Agent 模板服务
  * <p>
- * 扫描 classpath:templates/*.json 下的模板文件，
+ * 从平台端实时拉取预置助手模板列表（不再读取本地 classpath JSON）。
  * 支持列出模板和应用模板创建 Agent。
+ * <p>
+ * 助手创建后由客户端完全自治管理，与平台端模板不再有关联。
  *
  * @author MateClaw Team
  */
@@ -42,34 +41,46 @@ public class TemplateService {
 
     private final AgentService agentService;
     private final WorkspaceFileService workspaceFileService;
-    private final ObjectMapper objectMapper;
     private final AgentBindingService agentBindingService;
     private final SkillMapper skillMapper;
     private final AvailableToolService availableToolService;
+    private final PlatformAgentClient platformAgentClient;
 
     /**
-     * 列出所有可用模板
+     * 列出所有可用模板（从平台端实时拉取）。
+     * <p>
+     * 平台不可达时抛出 PlatformServiceException，前端可捕获并显示具体错误信息。
+     *
+     * @throws PlatformServiceException 平台服务调用失败时抛出
      */
     public List<TemplateDTO> listTemplates() {
-        List<TemplateDTO> templates = new ArrayList<>();
-        PathMatchingResourcePatternResolver resolver = new PathMatchingResourcePatternResolver();
-
         try {
-            Resource[] resources = resolver.getResources("classpath:templates/*.json");
-            for (Resource resource : resources) {
-                try (InputStream is = resource.getInputStream()) {
-                    TemplateDTO dto = objectMapper.readValue(is, TemplateDTO.class);
-                    templates.add(dto);
-                } catch (IOException e) {
-                    log.warn("Failed to parse template file: {}", resource.getFilename(), e);
-                }
+            List<TemplateDTO> templates = platformAgentClient.fetchPresets(null);
+            if (templates.isEmpty()) {
+                log.debug("No preset templates returned from platform");
             }
-        } catch (IOException e) {
-            log.error("Failed to scan template files", e);
+            templates.sort(Comparator.comparing(TemplateDTO::getId));
+            return templates;
+        } catch (PlatformServiceException e) {
+            log.warn("Failed to fetch templates from platform: {}", e.getMessage());
+            throw e;
         }
+    }
 
-        templates.sort(Comparator.comparing(TemplateDTO::getId));
-        return templates;
+    /**
+     * 按关键词搜索模板（从平台端实时拉取）。
+     *
+     * @throws PlatformServiceException 平台服务调用失败时抛出
+     */
+    public List<TemplateDTO> listTemplates(String keyword) {
+        try {
+            List<TemplateDTO> templates = platformAgentClient.fetchPresets(keyword);
+            templates.sort(Comparator.comparing(TemplateDTO::getId));
+            return templates;
+        } catch (PlatformServiceException e) {
+            log.warn("Failed to fetch templates from platform with keyword '{}': {}", keyword, e.getMessage());
+            throw e;
+        }
     }
 
     /**
@@ -91,6 +102,8 @@ public class TemplateService {
      * @param workspaceId     target workspace ID (from X-Workspace-Id header)
      * @param creatorUserId   current user ID (creator attribution)
      * @param acceptLanguage  raw Accept-Language header; null/blank → English
+     * @throws PlatformServiceException 平台服务调用失败时抛出（无法获取模板列表）
+     * @throws MateClawException 模板不存在时抛出
      */
     @Transactional
     public AgentEntity applyTemplate(String templateId, Long workspaceId, Long creatorUserId, String acceptLanguage) {
@@ -121,6 +134,7 @@ public class TemplateService {
         }
         agent.setWorkspaceId(workspaceId);
         agent.setCreatorUserId(creatorUserId);
+        agent.setPresetId(templateId);  // trace: records which platform preset created this instance
         AgentEntity created = agentService.createAgent(agent);
 
         // 2. 创建工作区文件
@@ -158,6 +172,15 @@ public class TemplateService {
         // setToolBindings exception still propagates (same contract as
         // skills) — see helper Javadoc.
         applyDefaultToolBindings(template, created);
+
+        // 6. Pre-bind provider preferences the template declares.
+        applyDefaultProviderPreferences(template, created);
+
+        // 7. Pre-bind platform knowledge bases the template declares.
+        applyDefaultKnowledgeBaseBindings(template, created);
+
+        // 8. Pre-bind platform MCPs the template declares.
+        applyDefaultMcpBindings(template, created);
 
         return created;
     }
@@ -271,5 +294,74 @@ public class TemplateService {
         if (acceptLanguage == null || acceptLanguage.isBlank()) return false;
         String first = acceptLanguage.split(",")[0].trim().toLowerCase();
         return first.startsWith("zh");
+    }
+
+    /**
+     * Pre-bind provider preferences declared by the template.
+     *
+     * <p>Simply passes through to {@link AgentBindingService#setProviderPreferences}.
+     * Provider IDs are used as-is; any provider that doesn't exist locally simply
+     * won't match at runtime (same behavior as the UI picker).
+     */
+    private void applyDefaultProviderPreferences(TemplateDTO template, AgentEntity created) {
+        List<String> providerIds = template.getDefaultProviderIds();
+        if (providerIds == null || providerIds.isEmpty()) return;
+
+        List<String> validIds = new ArrayList<>();
+        for (String providerId : providerIds) {
+            if (providerId == null || providerId.isBlank()) continue;
+            validIds.add(providerId.trim());
+        }
+        if (validIds.isEmpty()) return;
+
+        agentBindingService.setProviderPreferences(created.getId(), validIds);
+        log.info("[Template] template {} pre-bound {} provider(s) on agent {}",
+                template.getId(), validIds.size(), created.getId());
+    }
+
+    /**
+     * Pre-bind platform knowledge bases declared by the template.
+     *
+     * <p>Failure contract mirrors {@link #applyDefaultSkillBindings}:
+     * missing IDs are logged and skipped; a service-layer exception propagates
+     * and rolls back the hire.
+     */
+    private void applyDefaultKnowledgeBaseBindings(TemplateDTO template, AgentEntity created) {
+        List<String> kbIds = template.getDefaultKnowledgeIds();
+        if (kbIds == null || kbIds.isEmpty()) return;
+
+        List<String> validIds = new ArrayList<>();
+        for (String kbId : kbIds) {
+            if (kbId == null || kbId.isBlank()) continue;
+            validIds.add(kbId.trim());
+        }
+        if (validIds.isEmpty()) return;
+
+        agentBindingService.setKnowledgeBaseBindings(created.getId(), validIds);
+        log.info("[Template] template {} pre-bound {} knowledge base(s) on agent {}",
+                template.getId(), validIds.size(), created.getId());
+    }
+
+    /**
+     * Pre-bind platform MCPs declared by the template.
+     *
+     * <p>Failure contract mirrors {@link #applyDefaultSkillBindings}:
+     * missing IDs are logged and skipped; a service-layer exception propagates
+     * and rolls back the hire.
+     */
+    private void applyDefaultMcpBindings(TemplateDTO template, AgentEntity created) {
+        List<Integer> mcpIds = template.getDefaultMcpIds();
+        if (mcpIds == null || mcpIds.isEmpty()) return;
+
+        List<Integer> validIds = new ArrayList<>();
+        for (Integer mcpId : mcpIds) {
+            if (mcpId == null) continue;
+            validIds.add(mcpId);
+        }
+        if (validIds.isEmpty()) return;
+
+        agentBindingService.setMcpBindings(created.getId(), validIds);
+        log.info("[Template] template {} pre-bound {} MCP(s) on agent {}",
+                template.getId(), validIds.size(), created.getId());
     }
 }

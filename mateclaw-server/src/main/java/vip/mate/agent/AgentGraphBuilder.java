@@ -1297,7 +1297,10 @@ public class AgentGraphBuilder {
         // Wiki 知识库上下文注入
         String wikiContext = wikiContextService.buildWikiContext(entity.getId());
 
-        return basePrompt + toolGuidance + searchGuidance + wikiContext;
+        // 平台端知识库 / MCP 绑定引用注入
+        String platformContext = buildPlatformBindingContext(entity.getId());
+
+        return basePrompt + toolGuidance + searchGuidance + wikiContext + platformContext;
     }
 
     /**
@@ -1313,6 +1316,63 @@ public class AgentGraphBuilder {
         Long workspaceId = entity.getWorkspaceId();
         return loaded -> skillRuntimeService.buildSkillPromptEnhancement(
                 boundSkillIds, boundTools, maxInputTokens, agentId, workspaceId, loaded);
+    }
+
+    /**
+     * Build a prompt section declaring the agent's platform knowledge base
+     * and MCP bindings so the platform proxy can route accordingly.
+     *
+     * <p>Returns an empty string when there are no bindings. The format is a
+     * machine-readable section the platform proxy can parse to inject
+     * knowledge base context and register MCP tools at the gateway level.
+     */
+    private String buildPlatformBindingContext(Long agentId) {
+        try {
+            List<vip.mate.agent.binding.model.AgentKnowledgeBaseBinding> kbBindings =
+                    agentBindingService.listKnowledgeBaseBindings(agentId);
+            List<vip.mate.agent.binding.model.AgentMcpBinding> mcpBindings =
+                    agentBindingService.listMcpBindings(agentId);
+
+            if ((kbBindings == null || kbBindings.isEmpty())
+                    && (mcpBindings == null || mcpBindings.isEmpty())) {
+                return "";
+            }
+
+            StringBuilder sb = new StringBuilder();
+            sb.append("\n\n## Platform Bindings\n");
+
+            if (kbBindings != null && !kbBindings.isEmpty()) {
+                List<String> kbRefs = kbBindings.stream()
+                        .filter(b -> Boolean.TRUE.equals(b.getEnabled()))
+                        .map(vip.mate.agent.binding.model.AgentKnowledgeBaseBinding::getKbRefId)
+                        .filter(id -> id != null && !id.isBlank())
+                        .toList();
+                if (!kbRefs.isEmpty()) {
+                    sb.append("<!-- platform_knowledge_ids: ").append(String.join(",", kbRefs)).append(" -->\n");
+                    sb.append("- Knowledge Bases: ").append(kbRefs.size()).append(" bound\n");
+                }
+            }
+
+            if (mcpBindings != null && !mcpBindings.isEmpty()) {
+                List<Integer> mcpRefs = mcpBindings.stream()
+                        .filter(b -> Boolean.TRUE.equals(b.getEnabled()))
+                        .map(vip.mate.agent.binding.model.AgentMcpBinding::getMcpRefId)
+                        .filter(id -> id != null)
+                        .toList();
+                if (!mcpRefs.isEmpty()) {
+                    String mcpIdsStr = mcpRefs.stream()
+                            .map(Object::toString)
+                            .collect(java.util.stream.Collectors.joining(","));
+                    sb.append("<!-- platform_mcp_ids: ").append(mcpIdsStr).append(" -->\n");
+                    sb.append("- MCPs: ").append(mcpRefs.size()).append(" bound\n");
+                }
+            }
+
+            return sb.toString();
+        } catch (Exception e) {
+            log.warn("Failed to build platform binding context for agent {}: {}", agentId, e.getMessage());
+            return "";
+        }
     }
 
     /**

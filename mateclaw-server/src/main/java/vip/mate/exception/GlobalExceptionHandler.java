@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.context.request.async.AsyncRequestTimeoutException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
+import vip.mate.agent.platform.PlatformServiceException;
 import vip.mate.common.result.R;
 import vip.mate.i18n.I18nService;
 import vip.mate.skill.lifecycle.ConfirmRequiredException;
@@ -86,6 +87,43 @@ public class GlobalExceptionHandler {
         body.put("message", e.getMessage());
         body.put("boundAgents", e.getBoundAgents());
         return ResponseEntity.status(HttpStatus.CONFLICT).body(body);
+    }
+
+    /**
+     * Platform service call failures (network errors, auth errors, business errors).
+     * <p>
+     * Returns HTTP 503 for unreachable platform, 401 for auth errors, and 502 for other platform errors.
+     */
+    @ExceptionHandler(PlatformServiceException.class)
+    public ResponseEntity<R<Void>> handlePlatformServiceException(PlatformServiceException e) {
+        log.warn("Platform service error [{}]: {}", e.getErrorType(), e.getMessage());
+
+        int httpCode;
+        String message;
+
+        switch (e.getErrorType()) {
+            case UNREACHABLE:
+                httpCode = 503;
+                message = "平台服务不可用，请稍后重试";
+                break;
+            case AUTH_ERROR:
+                httpCode = 401;
+                message = "平台认证失败，请重新登录";
+                break;
+            case BUSINESS_ERROR:
+                httpCode = 502;
+                message = "平台业务错误: " + e.getMessage();
+                break;
+            case PARSE_ERROR:
+                httpCode = 502;
+                message = "平台响应解析失败";
+                break;
+            default:
+                httpCode = 500;
+                message = "平台服务调用失败";
+        }
+
+        return ResponseEntity.status(httpCode).body(R.fail(httpCode, message));
     }
 
     @ExceptionHandler(BindException.class)

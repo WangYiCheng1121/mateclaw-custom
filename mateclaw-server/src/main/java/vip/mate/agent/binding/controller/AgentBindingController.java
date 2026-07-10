@@ -5,6 +5,8 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 import vip.mate.agent.AgentService;
+import vip.mate.agent.binding.model.AgentKnowledgeBaseBinding;
+import vip.mate.agent.binding.model.AgentMcpBinding;
 import vip.mate.agent.binding.model.AgentProviderPreference;
 import vip.mate.agent.binding.model.AgentSkillBinding;
 import vip.mate.agent.binding.model.AgentToolBinding;
@@ -127,6 +129,58 @@ public class AgentBindingController {
         agentService.invalidateAgentCache(agentId);
         auditEventService.record("UPDATE", "AGENT_PROVIDER_PREF", String.valueOf(agentId),
                 "providers=" + providerIds.size(), null);
+        return R.ok();
+    }
+
+    // ==================== Knowledge Base Bindings ====================
+
+    @Operation(summary = "获取 Agent 已绑定的知识库")
+    @GetMapping("/knowledge-bases")
+    @RequireWorkspaceRole("viewer")
+    public R<List<AgentKnowledgeBaseBinding>> listKnowledgeBases(
+            @PathVariable Long agentId,
+            @RequestHeader(value = "X-Workspace-Id", required = false) Long workspaceId) {
+        verifyAgentWorkspace(agentId, workspaceId);
+        return R.ok(bindingService.listKnowledgeBaseBindings(agentId));
+    }
+
+    @Operation(summary = "批量设置 Agent 的知识库绑定")
+    @PutMapping("/knowledge-bases")
+    @RequireWorkspaceRole("member")
+    public R<Void> setKnowledgeBases(@PathVariable Long agentId,
+                                      @RequestBody List<String> kbRefIds,
+                                      @RequestHeader(value = "X-Workspace-Id", required = false) Long workspaceId) {
+        verifyAgentWorkspace(agentId, workspaceId);
+        bindingService.setKnowledgeBaseBindings(agentId, kbRefIds);
+        agentService.invalidateAgentCache(agentId);
+        auditEventService.record("UPDATE", "AGENT_KB", String.valueOf(agentId),
+                "kbs=" + (kbRefIds != null ? kbRefIds.size() : 0), null);
+        return R.ok();
+    }
+
+    // ==================== MCP Bindings ====================
+
+    @Operation(summary = "获取 Agent 已绑定的 MCP")
+    @GetMapping("/mcps")
+    @RequireWorkspaceRole("viewer")
+    public R<List<AgentMcpBinding>> listMcps(
+            @PathVariable Long agentId,
+            @RequestHeader(value = "X-Workspace-Id", required = false) Long workspaceId) {
+        verifyAgentWorkspace(agentId, workspaceId);
+        return R.ok(bindingService.listMcpBindings(agentId));
+    }
+
+    @Operation(summary = "批量设置 Agent 的 MCP 绑定")
+    @PutMapping("/mcps")
+    @RequireWorkspaceRole("member")
+    public R<Void> setMcps(@PathVariable Long agentId,
+                            @RequestBody List<Integer> mcpRefIds,
+                            @RequestHeader(value = "X-Workspace-Id", required = false) Long workspaceId) {
+        verifyAgentWorkspace(agentId, workspaceId);
+        bindingService.setMcpBindings(agentId, mcpRefIds);
+        agentService.invalidateAgentCache(agentId);
+        auditEventService.record("UPDATE", "AGENT_MCP", String.valueOf(agentId),
+                "mcps=" + (mcpRefIds != null ? mcpRefIds.size() : 0), null);
         return R.ok();
     }
 

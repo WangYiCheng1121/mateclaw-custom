@@ -7,9 +7,13 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
+import vip.mate.agent.binding.model.AgentKnowledgeBaseBinding;
+import vip.mate.agent.binding.model.AgentMcpBinding;
 import vip.mate.agent.binding.model.AgentProviderPreference;
 import vip.mate.agent.binding.model.AgentSkillBinding;
 import vip.mate.agent.binding.model.AgentToolBinding;
+import vip.mate.agent.binding.repository.AgentKnowledgeBaseBindingMapper;
+import vip.mate.agent.binding.repository.AgentMcpBindingMapper;
 import vip.mate.agent.binding.repository.AgentProviderPreferenceMapper;
 import vip.mate.agent.binding.repository.AgentSkillBindingMapper;
 import vip.mate.agent.binding.repository.AgentToolBindingMapper;
@@ -56,6 +60,8 @@ public class AgentBindingService implements AgentBindingResolver {
     private final AgentSkillBindingMapper skillBindingMapper;
     private final AgentToolBindingMapper toolBindingMapper;
     private final AgentProviderPreferenceMapper providerPreferenceMapper;
+    private final AgentKnowledgeBaseBindingMapper kbBindingMapper;
+    private final AgentMcpBindingMapper mcpBindingMapper;
     /**
      * {@code @Lazy} — SkillRuntimeService and AgentBindingService both sit
      * near the agent boot path; the lazy proxy avoids a circular bean
@@ -94,6 +100,8 @@ public class AgentBindingService implements AgentBindingResolver {
     public AgentBindingService(AgentSkillBindingMapper skillBindingMapper,
                                AgentToolBindingMapper toolBindingMapper,
                                AgentProviderPreferenceMapper providerPreferenceMapper,
+                               AgentKnowledgeBaseBindingMapper kbBindingMapper,
+                               AgentMcpBindingMapper mcpBindingMapper,
                                @Lazy SkillRuntimeService skillRuntimeService,
                                AvailableToolService availableToolService,
                                AgentMapper agentMapper,
@@ -102,6 +110,8 @@ public class AgentBindingService implements AgentBindingResolver {
         this.skillBindingMapper = skillBindingMapper;
         this.toolBindingMapper = toolBindingMapper;
         this.providerPreferenceMapper = providerPreferenceMapper;
+        this.kbBindingMapper = kbBindingMapper;
+        this.mcpBindingMapper = mcpBindingMapper;
         this.skillRuntimeService = skillRuntimeService;
         this.availableToolService = availableToolService;
         this.agentMapper = agentMapper;
@@ -854,6 +864,66 @@ public class AgentBindingService implements AgentBindingResolver {
             row.setSortOrder(order++);
             row.setEnabled(true);
             providerPreferenceMapper.insert(row);
+        }
+    }
+
+    // ==================== Knowledge Base Bindings ====================
+
+    /** List knowledge base bindings for an agent. */
+    public List<AgentKnowledgeBaseBinding> listKnowledgeBaseBindings(Long agentId) {
+        return kbBindingMapper.selectList(
+                new LambdaQueryWrapper<AgentKnowledgeBaseBinding>()
+                        .eq(AgentKnowledgeBaseBinding::getAgentId, agentId)
+                        .orderByAsc(AgentKnowledgeBaseBinding::getCreateTime));
+    }
+
+    /**
+     * Replace the agent's knowledge base binding set.
+     * Only stores reference IDs and names; actual traffic is routed through
+     * the platform LLM proxy at chat time.
+     */
+    public void setKnowledgeBaseBindings(Long agentId, List<String> kbRefIds) {
+        kbBindingMapper.delete(
+                new LambdaQueryWrapper<AgentKnowledgeBaseBinding>()
+                        .eq(AgentKnowledgeBaseBinding::getAgentId, agentId));
+        if (kbRefIds == null || kbRefIds.isEmpty()) return;
+        for (String kbRefId : kbRefIds) {
+            if (kbRefId == null || kbRefId.isBlank()) continue;
+            AgentKnowledgeBaseBinding binding = new AgentKnowledgeBaseBinding();
+            binding.setAgentId(agentId);
+            binding.setKbRefId(kbRefId.trim());
+            binding.setEnabled(true);
+            kbBindingMapper.insert(binding);
+        }
+    }
+
+    // ==================== MCP Bindings ====================
+
+    /** List MCP bindings for an agent. */
+    public List<AgentMcpBinding> listMcpBindings(Long agentId) {
+        return mcpBindingMapper.selectList(
+                new LambdaQueryWrapper<AgentMcpBinding>()
+                        .eq(AgentMcpBinding::getAgentId, agentId)
+                        .orderByAsc(AgentMcpBinding::getCreateTime));
+    }
+
+    /**
+     * Replace the agent's MCP binding set.
+     * Only stores reference IDs and names; actual traffic is routed through
+     * the platform LLM proxy at chat time.
+     */
+    public void setMcpBindings(Long agentId, List<Integer> mcpRefIds) {
+        mcpBindingMapper.delete(
+                new LambdaQueryWrapper<AgentMcpBinding>()
+                        .eq(AgentMcpBinding::getAgentId, agentId));
+        if (mcpRefIds == null || mcpRefIds.isEmpty()) return;
+        for (Integer mcpRefId : mcpRefIds) {
+            if (mcpRefId == null) continue;
+            AgentMcpBinding binding = new AgentMcpBinding();
+            binding.setAgentId(agentId);
+            binding.setMcpRefId(mcpRefId);
+            binding.setEnabled(true);
+            mcpBindingMapper.insert(binding);
         }
     }
 }

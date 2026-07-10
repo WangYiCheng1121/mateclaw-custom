@@ -49,6 +49,28 @@ public class TemplateDTO {
      */
     private List<String> defaultToolNames;
 
+    /**
+     * Provider IDs to pre-bind as the agent's preferred fallback order.
+     * Index 0 = highest preference, matching the wire format of
+     * {@code PUT /agents/{agentId}/provider-preferences}.
+     * Providers not currently available are silently skipped.
+     */
+    private List<String> defaultProviderIds;
+
+    /**
+     * Platform knowledge base reference IDs to pre-bind on the new assistant.
+     * IDs must exist in the platform KB catalog at apply time; missing IDs
+     * are logged and skipped.
+     */
+    private List<String> defaultKnowledgeIds;
+
+    /**
+     * Platform MCP reference IDs to pre-bind on the new assistant.
+     * IDs must exist in the platform MCP catalog at apply time; missing IDs
+     * are logged and skipped.
+     */
+    private List<Integer> defaultMcpIds;
+
     @Data
     public static class WorkspaceFileTemplate {
         private String filename;

@@ -121,7 +121,8 @@ public class AuthService {
         // Step 5: 缓存平台 access_token，供 Platform*Client 调用平台 API 时携带认证头
         String clawAccessToken = platformResult != null ? platformResult.getAccessToken() : null;
         if (clawAccessToken != null) {
-            platformTokenHolder.setAccessToken(clawAccessToken);
+            Long expiresAt = platformResult.getExpiresAt();
+            platformTokenHolder.setAccessToken(clawAccessToken, expiresAt);
         }
         return new LoginResponse(user.getId(), token, user.getUsername(), user.getNickname(), user.getRole(),
                 workspaceId, clawAccessToken);

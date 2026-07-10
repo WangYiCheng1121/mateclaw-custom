@@ -11,6 +11,8 @@ import vip.mate.channel.web.Utf8SseEmitter;
 import vip.mate.agent.AgentService;
 import vip.mate.agent.AgentState;
 import vip.mate.agent.model.AgentEntity;
+import vip.mate.agent.model.TemplateDTO;
+import vip.mate.agent.service.TemplateService;
 import vip.mate.agent.vo.AgentCapabilitiesVO;
 import vip.mate.audit.service.AuditEventService;
 import vip.mate.llm.model.ModelConfigEntity;
@@ -49,6 +51,7 @@ public class AgentController {
     private final ModelConfigService modelConfigService;
     private final ModelCapabilityService modelCapabilityService;
     private final SystemSettingService systemSettingService;
+    private final TemplateService templateService;
     private final ExecutorService sseExecutor = Executors.newCachedThreadPool();
 
     @Operation(summary = "获取Agent列表")
@@ -138,6 +141,32 @@ public class AgentController {
         agent.setCreatorUserId(resolveUserId(auth));
         AgentEntity created = agentService.createAgent(agent);
         auditEventService.record("CREATE", "AGENT", String.valueOf(created.getId()), created.getName(), null);
+        return R.ok(created);
+    }
+
+    // ==================== Platform Presets ====================
+
+    @Operation(summary = "获取平台预置助手模板列表")
+    @GetMapping("/presets")
+    @RequireWorkspaceRole("viewer")
+    public R<List<TemplateDTO>> listPresets(
+            @RequestParam(required = false) String keyword) {
+        return R.ok(templateService.listTemplates(keyword));
+    }
+
+    @Operation(summary = "应用平台预置助手模板创建 Agent")
+    @PostMapping("/presets/{presetId}/apply")
+    @RequireWorkspaceRole("member")
+    public R<AgentEntity> applyPreset(
+            @PathVariable String presetId,
+            @RequestHeader(value = "X-Workspace-Id", required = false) Long workspaceId,
+            @RequestHeader(value = "Accept-Language", required = false) String acceptLanguage,
+            Authentication auth) {
+        long wsId = workspaceId != null ? workspaceId : 1L;
+        Long userId = resolveUserId(auth);
+        AgentEntity created = templateService.applyTemplate(presetId, wsId, userId, acceptLanguage);
+        auditEventService.record("CREATE", "AGENT", String.valueOf(created.getId()),
+                created.getName() + " (preset=" + presetId + ")", null);
         return R.ok(created);
     }
 

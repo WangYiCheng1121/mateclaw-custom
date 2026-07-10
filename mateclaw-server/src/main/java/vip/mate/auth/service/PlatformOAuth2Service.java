@@ -38,6 +38,8 @@ public class PlatformOAuth2Service {
     public static class PlatformAuthResult {
         private String accessToken;
         private String tokenType;
+        /** 令牌过期时间（毫秒时间戳） */
+        private Long expiresAt;
     }
 
     /**
@@ -99,17 +101,20 @@ public class PlatformOAuth2Service {
             JsonNode dataNode = loginJson.path("data");
             String accessToken = dataNode.path("accessToken").asText(null);
             String tokenType = dataNode.path("tokenType").asText("bearer");
+            long expiresIn = dataNode.path("expiresIn").asLong(7200); // 默认2小时
 
             if (accessToken == null || accessToken.isEmpty()) {
                 log.error("[PlatformOAuth2] Token为空: response={}", loginBody);
                 throw new MateClawException("err.auth.platform_token_failed", "平台认证失败，无法获取访问令牌");
             }
 
-            log.info("[PlatformOAuth2] 平台认证成功: username={}", username);
+            log.info("[PlatformOAuth2] 平台认证成功: username={}, expiresIn={}s", username, expiresIn);
 
             PlatformAuthResult result = new PlatformAuthResult();
             result.setAccessToken(accessToken);
             result.setTokenType(tokenType);
+            // 提前60秒过期，防止边界失效
+            result.setExpiresAt(System.currentTimeMillis() + (expiresIn - 60) * 1000);
             return result;
 
         } catch (MateClawException e) {

@@ -90,6 +90,17 @@ public class AgentEntity {
      */
     private Boolean hasSkillBinding;
 
+    /**
+     * Platform preset ID that created this assistant instance.
+     *
+     * <p>Tracing field only — records which platform preset template was used
+     * when this assistant was created. {@code NULL} means the assistant was
+     * created before this column existed or via legacy blank creation.
+     * <p>This field does NOT participate in any sync logic; the assistant
+     * instance is fully client-managed after creation.
+     */
+    private String presetId;
+
     @TableField(fill = FieldFill.INSERT)
     private LocalDateTime createTime;
 
