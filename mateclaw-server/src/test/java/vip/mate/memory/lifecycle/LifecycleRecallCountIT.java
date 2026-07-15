@@ -10,6 +10,7 @@ import org.springframework.context.ApplicationEventPublisher;
 import vip.mate.agent.AgentGraphBuilder;
 import vip.mate.agent.AgentService;
 import vip.mate.agent.BaseAgent;
+import vip.mate.agent.binding.service.AgentBindingService;
 import vip.mate.agent.model.AgentEntity;
 import vip.mate.agent.repository.AgentMapper;
 import vip.mate.memory.MemoryProperties;
@@ -42,6 +43,7 @@ class LifecycleRecallCountIT {
     @Mock private MemoryManager memoryManager;
     @Mock private ApplicationEventPublisher eventPublisher;
     @Mock private BaseAgent mockAgent;
+    @Mock private AgentBindingService agentBindingService;
     @Mock private ConversationMapper conversationMapper;
 
     private MemoryProperties props;
@@ -52,7 +54,7 @@ class LifecycleRecallCountIT {
         props = new MemoryProperties();
         MemoryLifecycleMediator mediator = new MemoryLifecycleMediator(memoryManager, eventPublisher);
         agentService = new AgentService(agentMapper, agentGraphBuilder,
-                memoryRecallTracker, mediator, props, conversationMapper);
+                memoryRecallTracker, mediator, props, agentBindingService, conversationMapper);
 
         // Stub agent resolution (lenient for structural-only tests)
         AgentEntity entity = new AgentEntity();

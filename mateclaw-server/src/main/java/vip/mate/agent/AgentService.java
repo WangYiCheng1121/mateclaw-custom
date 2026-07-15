@@ -9,6 +9,7 @@ import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 import reactor.core.publisher.Flux;
+import vip.mate.agent.binding.service.AgentBindingService;
 import vip.mate.agent.context.ChatOrigin;
 import vip.mate.agent.context.ChatOriginHolder;
 import vip.mate.agent.event.AgentLifecycleEvent;
@@ -17,11 +18,13 @@ import vip.mate.agent.repository.AgentMapper;
 import vip.mate.exception.MateClawException;
 import vip.mate.llm.chatmodel.ThinkingLevelHolder;
 import vip.mate.llm.event.ModelConfigChangedEvent;
+import vip.mate.llm.platform.AgentPlatformBindingContext;
 import vip.mate.memory.MemoryProperties;
 import vip.mate.memory.lifecycle.MemoryLifecycleMediator;
 import vip.mate.memory.lifecycle.TurnContext;
 import vip.mate.memory.service.MemoryRecallTracker;
 import vip.mate.workspace.conversation.model.ConversationEntity;
+import vip.mate.workspace.conversation.model.MessageContentPart;
 import vip.mate.workspace.conversation.repository.ConversationMapper;
 
 import java.util.List;
@@ -48,6 +51,7 @@ public class AgentService {
     private final MemoryRecallTracker memoryRecallTracker;
     private final MemoryLifecycleMediator lifecycleMediator;
     private final MemoryProperties memoryProperties;
+    private final AgentBindingService agentBindingService;
     /** Read-only lookup of a conversation's pinned model. Mapper (not service)
      *  to keep this a leaf dependency with no risk of a bean cycle. */
     private final ConversationMapper conversationMapper;
@@ -214,6 +218,22 @@ public class AgentService {
         agentInstances.remove(agentId);
     }
 
+    /**
+     * Query the agent's enabled knowledge base and MCP binding IDs and set
+     * them on the {@link AgentPlatformBindingContext} so downstream LLM proxy
+     * builders can inject them into the request body.
+     */
+    private void setPlatformBindings(Long agentId) {
+        try {
+            List<String> kbRefIds = agentBindingService.getKnowledgeBaseRefIds(agentId);
+            List<Integer> mcpRefIds = agentBindingService.getMcpRefIds(agentId);
+            AgentPlatformBindingContext.set(kbRefIds, mcpRefIds);
+        } catch (Exception e) {
+            log.warn("[AgentService] failed to resolve platform bindings for agent {}: {}",
+                    agentId, e.getMessage());
+        }
+    }
+
     // ==================== 运行时入口 ====================
 
     public String chat(Long agentId, String message, String conversationId) {
@@ -229,11 +249,43 @@ public class AgentService {
         memoryRecallTracker.trackRecalls(agentId, message);
         BaseAgent agent = getOrBuildAgentForConversation(agentId, conversationId);
         ChatOriginHolder.set(origin != null ? origin : ChatOrigin.EMPTY);
+        setPlatformBindings(agentId);
         try {
             return withLifecycleSync(agentId, message, conversationId,
                     (msg, convId) -> agent.chat(msg, convId));
         } finally {
             ChatOriginHolder.clear();
+            AgentPlatformBindingContext.clear();
+        }
+    }
+
+    /**
+     * 同步对话（支持多模态附件）。
+     * <p>
+     * 与 {@link #chat(Long, String, String)} 的区别：{@code contentParts} 中的
+     * 图片/视频会通过 {@link vip.mate.llm.routing.MultimodalRouter} +
+     * {@link vip.mate.llm.routing.MediaCaptionService} 处理后注入 LLM 请求，
+     * 而非仅以文本描述形式出现在 prompt 里。
+     * <p>
+     * 兼容性：当 {@code parts} 为 null 或空时，行为与普通 {@code chat()} 完全一致。
+     */
+    public String chatWithParts(Long agentId, String message, String conversationId,
+                                 List<MessageContentPart> parts) {
+        return chatWithParts(agentId, message, conversationId, parts, ChatOrigin.EMPTY);
+    }
+
+    public String chatWithParts(Long agentId, String message, String conversationId,
+                                 List<MessageContentPart> parts, ChatOrigin origin) {
+        memoryRecallTracker.trackRecalls(agentId, message);
+        BaseAgent agent = getOrBuildAgentForConversation(agentId, conversationId);
+        ChatOriginHolder.set(origin != null ? origin : ChatOrigin.EMPTY);
+        setPlatformBindings(agentId);
+        try {
+            return withLifecycleSync(agentId, message, conversationId,
+                    (msg, convId) -> agent.chatWithParts(msg, convId, parts));
+        } finally {
+            ChatOriginHolder.clear();
+            AgentPlatformBindingContext.clear();
         }
     }
 
@@ -249,10 +301,14 @@ public class AgentService {
         ChatOrigin captured = origin != null ? origin : ChatOrigin.EMPTY;
         return Flux.defer(() -> {
             ChatOriginHolder.set(captured);
+            setPlatformBindings(agentId);
             return withLifecycleFlux(agentId, message, conversationId,
                     (msg, convId) -> agent.chatStream(msg, convId),
                     chunk -> chunk);
-        }).doFinally(signal -> ChatOriginHolder.clear());
+        }).doFinally(signal -> {
+            ChatOriginHolder.clear();
+            AgentPlatformBindingContext.clear();
+        });
     }
 
     public Flux<StreamDelta> chatStructuredStream(Long agentId, String message, String conversationId) {
@@ -298,25 +354,33 @@ public class AgentService {
         if (agent instanceof StructuredStreamCapable capable) {
             return Flux.defer(() -> {
                         ChatOriginHolder.set(captured);
+                        setPlatformBindings(agentId);
                         return withLifecycleFlux(agentId, message, conversationId,
                                 (msg, convId) -> capable.chatStructuredStream(msg, convId,
                                                 requesterId != null ? requesterId : "")
                                         .doFinally(signal -> ThinkingLevelHolder.clear()),
                                 StreamDelta::content);
                     })
-                    .doFinally(signal -> ChatOriginHolder.clear());
+                    .doFinally(signal -> {
+                        ChatOriginHolder.clear();
+                        AgentPlatformBindingContext.clear();
+                    });
         }
 
         // 降级：不支持结构化流的 Agent，包装为纯内容流
         ThinkingLevelHolder.clear();
         return Flux.defer(() -> {
                     ChatOriginHolder.set(captured);
+                    setPlatformBindings(agentId);
                     return withLifecycleFlux(agentId, message, conversationId,
                             (msg, convId) -> agent.chatStream(msg, convId)
                                     .map(chunk -> new StreamDelta(chunk, null)),
                             StreamDelta::content);
                 })
-                .doFinally(signal -> ChatOriginHolder.clear());
+                .doFinally(signal -> {
+                    ChatOriginHolder.clear();
+                    AgentPlatformBindingContext.clear();
+                });
     }
 
     public String execute(Long agentId, String goal, String conversationId) {
@@ -327,11 +391,13 @@ public class AgentService {
         memoryRecallTracker.trackRecalls(agentId, goal);
         BaseAgent agent = getOrBuildAgentForConversation(agentId, conversationId);
         ChatOriginHolder.set(origin != null ? origin : ChatOrigin.EMPTY);
+        setPlatformBindings(agentId);
         try {
             return withLifecycleSync(agentId, goal, conversationId,
                     (msg, convId) -> agent.execute(msg, convId));
         } finally {
             ChatOriginHolder.clear();
+            AgentPlatformBindingContext.clear();
         }
     }
 
@@ -354,11 +420,13 @@ public class AgentService {
         memoryRecallTracker.trackRecalls(agentId, userMessage);
         BaseAgent agent = getOrBuildAgentForConversation(agentId, conversationId);
         ChatOriginHolder.set(origin != null ? origin : ChatOrigin.EMPTY);
+        setPlatformBindings(agentId);
         try {
             return withLifecycleSync(agentId, userMessage, conversationId,
                     (msg, convId) -> agent.chatWithReplay(msg, convId, toolCallPayload));
         } finally {
             ChatOriginHolder.clear();
+            AgentPlatformBindingContext.clear();
         }
     }
 
@@ -384,12 +452,16 @@ public class AgentService {
         ChatOrigin captured = origin != null ? origin : ChatOrigin.EMPTY;
         return Flux.defer(() -> {
                     ChatOriginHolder.set(captured);
+                    setPlatformBindings(agentId);
                     return withLifecycleFlux(agentId, userMessage, conversationId,
                             (msg, convId) -> agent.chatWithReplayStream(msg, convId, toolCallPayload,
                                     requesterId != null ? requesterId : ""),
                             StreamDelta::content);
                 })
-                .doFinally(signal -> ChatOriginHolder.clear());
+                .doFinally(signal -> {
+                    ChatOriginHolder.clear();
+                    AgentPlatformBindingContext.clear();
+                });
     }
 
     public AgentState getAgentState(Long agentId) {

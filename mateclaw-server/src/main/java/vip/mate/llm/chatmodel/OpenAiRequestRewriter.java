@@ -813,4 +813,73 @@ final class OpenAiRequestRewriter {
                 extraBody
         );
     }
+
+    /**
+     * Inject the agent's platform knowledge base and MCP reference IDs into the
+     * request body so the platform LLM proxy can inject knowledge base context
+     * and register MCP tools per-agent.
+     *
+     * <p>The IDs are written into the {@code extraBody} map under the
+     * {@code "knowledgeBaseIds"} and {@code "mcpIds"} keys, which Spring AI
+     * serializes as top-level JSON fields in the chat-completion request body.
+     *
+     * @param request          the chat completion request to modify
+     * @param knowledgeBaseIds enabled knowledge base ref IDs (nullable / empty = no change)
+     * @param mcpIds           enabled MCP ref IDs (nullable / empty = no change)
+     * @return the original request if nothing to inject, or a rebuilt copy
+     */
+    static OpenAiApi.ChatCompletionRequest injectPlatformBindings(
+            OpenAiApi.ChatCompletionRequest request,
+            List<String> knowledgeBaseIds,
+            List<Integer> mcpIds) {
+        if ((knowledgeBaseIds == null || knowledgeBaseIds.isEmpty())
+                && (mcpIds == null || mcpIds.isEmpty())) {
+            return request;
+        }
+        Map<String, Object> extraBody = new LinkedHashMap<>();
+        if (request.extraBody() != null) {
+            extraBody.putAll(request.extraBody());
+        }
+        if (knowledgeBaseIds != null && !knowledgeBaseIds.isEmpty()) {
+            extraBody.put("knowledgeBaseIds", knowledgeBaseIds);
+        }
+        if (mcpIds != null && !mcpIds.isEmpty()) {
+            extraBody.put("mcpIds", mcpIds);
+        }
+
+        return new OpenAiApi.ChatCompletionRequest(
+                request.messages(),
+                request.model(),
+                request.store(),
+                request.metadata(),
+                request.frequencyPenalty(),
+                request.logitBias(),
+                request.logprobs(),
+                request.topLogprobs(),
+                request.maxTokens(),
+                request.maxCompletionTokens(),
+                request.n(),
+                request.outputModalities(),
+                request.audioParameters(),
+                request.presencePenalty(),
+                request.responseFormat(),
+                request.seed(),
+                request.serviceTier(),
+                request.stop(),
+                request.stream(),
+                request.streamOptions(),
+                request.temperature(),
+                request.topP(),
+                request.tools(),
+                request.toolChoice(),
+                request.parallelToolCalls(),
+                request.user(),
+                request.reasoningEffort(),
+                request.webSearchOptions(),
+                request.verbosity(),
+                request.promptCacheKey(),
+                request.safetyIdentifier(),
+                extraBody
+        );
+    }
 }

@@ -16,6 +16,7 @@ import vip.mate.agent.model.TemplateDTO;
 import vip.mate.auth.config.PlatformOAuth2Config;
 import vip.mate.auth.service.PlatformNacosService;
 import vip.mate.auth.service.PlatformTokenHolder;
+import vip.mate.llm.platform.PlatformMachineTokenProvider;
 import vip.mate.skill.platform.PlatformResponse;
 
 import java.net.ConnectException;
@@ -54,17 +55,20 @@ public class PlatformAgentClient {
     private final PlatformOAuth2Config platformConfig;
     private final PlatformNacosService nacosService;
     private final PlatformTokenHolder tokenHolder;
+    private final PlatformMachineTokenProvider machineTokenProvider;
     private final RestTemplate restTemplate;
     private final ObjectMapper objectMapper;
 
     public PlatformAgentClient(PlatformOAuth2Config platformConfig,
                                PlatformNacosService nacosService,
                                PlatformTokenHolder tokenHolder,
+                               PlatformMachineTokenProvider machineTokenProvider,
                                RestTemplateBuilder restTemplateBuilder,
                                ObjectMapper objectMapper) {
         this.platformConfig = platformConfig;
         this.nacosService = nacosService;
         this.tokenHolder = tokenHolder;
+        this.machineTokenProvider = machineTokenProvider;
         this.objectMapper = objectMapper;
 
         // 使用配置的超时时间，如果未配置则使用默认值
@@ -93,10 +97,10 @@ public class PlatformAgentClient {
             return Collections.emptyList();
         }
 
-        String url = buildUrl(PRESETS_LIST_PATH);
-        if (keyword != null && !keyword.isBlank()) {
-            url += "?keyword=" + java.net.URLEncoder.encode(keyword, java.nio.charset.StandardCharsets.UTF_8);
-        }
+        String baseUrl = buildUrl(PRESETS_LIST_PATH);
+        String url = (keyword != null && !keyword.isBlank())
+                ? baseUrl + "?keyword=" + java.net.URLEncoder.encode(keyword, java.nio.charset.StandardCharsets.UTF_8)
+                : baseUrl;
 
         return executeWithRetry(() -> doFetchPresets(url), "fetchPresets");
     }
@@ -263,11 +267,15 @@ public class PlatformAgentClient {
     }
 
     private void applyAuth(HttpHeaders headers) {
+        // 优先用户 token（authorization_code），降级机器 token（client_credentials）
         String token = tokenHolder.getAccessToken();
+        if (token == null && machineTokenProvider != null) {
+            token = machineTokenProvider.getAccessToken();
+        }
         if (token != null) {
             headers.set(HttpHeaders.AUTHORIZATION, "Bearer " + token);
         } else {
-            log.warn("[PlatformAgentClient] No valid access token available");
+            log.warn("[PlatformAgentClient] No valid access token available (neither user nor machine)");
         }
     }
 

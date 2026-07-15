@@ -1,7 +1,6 @@
 package vip.mate.agent.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -9,6 +8,7 @@ import vip.mate.agent.AgentService;
 import vip.mate.agent.binding.service.AgentBindingService;
 import vip.mate.agent.model.AgentEntity;
 import vip.mate.agent.model.TemplateDTO;
+import vip.mate.agent.platform.PlatformAgentClient;
 import vip.mate.exception.MateClawException;
 import vip.mate.skill.model.SkillEntity;
 import vip.mate.skill.repository.SkillMapper;
@@ -57,6 +57,7 @@ class TemplateServiceBindingTest {
     private AgentBindingService agentBindingService;
     private SkillMapper skillMapper;
     private AvailableToolService availableToolService;
+    private PlatformAgentClient platformAgentClient;
     private TemplateService service;
     private TemplateService spyService;
 
@@ -67,6 +68,7 @@ class TemplateServiceBindingTest {
         agentBindingService = mock(AgentBindingService.class);
         skillMapper = mock(SkillMapper.class);
         availableToolService = mock(AvailableToolService.class);
+        platformAgentClient = mock(PlatformAgentClient.class);
 
         // createAgent stamps an id and echoes the entity back, matching the
         // real DAO contract the production code relies on.
@@ -79,10 +81,10 @@ class TemplateServiceBindingTest {
         service = new TemplateService(
                 agentService,
                 workspaceFileService,
-                new ObjectMapper(),
                 agentBindingService,
                 skillMapper,
-                availableToolService);
+                availableToolService,
+                platformAgentClient);
         spyService = spy(service);
     }
 

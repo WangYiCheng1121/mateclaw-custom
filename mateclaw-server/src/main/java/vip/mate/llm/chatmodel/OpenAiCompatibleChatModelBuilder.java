@@ -26,6 +26,7 @@ import vip.mate.llm.model.ModelConfigEntity;
 import vip.mate.llm.model.ModelFamily;
 import vip.mate.llm.model.ModelProtocol;
 import vip.mate.llm.model.ModelProviderEntity;
+import vip.mate.llm.platform.AgentPlatformBindingContext;
 import vip.mate.llm.platform.LlmProxyHelper;
 import vip.mate.llm.service.ModelProviderService;
 
@@ -273,6 +274,9 @@ public class OpenAiCompatibleChatModelBuilder implements ChatModelBuilder {
                 chatRequest = OpenAiRequestRewriter.stripReasoningEffortIfIncompatible(chatRequest);
                 chatRequest = OpenAiRequestRewriter.stripAutoToolChoice(chatRequest);
                 chatRequest = OpenAiRequestRewriter.patchVideoMediaContent(chatRequest);
+                chatRequest = OpenAiRequestRewriter.injectPlatformBindings(chatRequest,
+                        AgentPlatformBindingContext.getKbRefIds(),
+                        AgentPlatformBindingContext.getMcpRefIds());
                 logOpenAiRequest(provider, chatRequest);
                 try {
                     return super.chatCompletionEntity(chatRequest, additionalHttpHeader);
@@ -291,6 +295,9 @@ public class OpenAiCompatibleChatModelBuilder implements ChatModelBuilder {
                 chatRequest = OpenAiRequestRewriter.stripReasoningEffortIfIncompatible(chatRequest);
                 chatRequest = OpenAiRequestRewriter.stripAutoToolChoice(chatRequest);
                 chatRequest = OpenAiRequestRewriter.patchVideoMediaContent(chatRequest);
+                chatRequest = OpenAiRequestRewriter.injectPlatformBindings(chatRequest,
+                        AgentPlatformBindingContext.getKbRefIds(),
+                        AgentPlatformBindingContext.getMcpRefIds());
                 logOpenAiRequest(provider, chatRequest);
                 return super.chatCompletionStream(chatRequest, additionalHttpHeader)
                         .doOnError(error -> {

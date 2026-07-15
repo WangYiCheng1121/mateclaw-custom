@@ -10,6 +10,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import vip.mate.agent.binding.model.AgentSkillBinding;
+import vip.mate.agent.binding.repository.AgentKnowledgeBaseBindingMapper;
+import vip.mate.agent.binding.repository.AgentMcpBindingMapper;
 import vip.mate.agent.binding.repository.AgentProviderPreferenceMapper;
 import vip.mate.agent.binding.repository.AgentSkillBindingMapper;
 import vip.mate.agent.binding.repository.AgentToolBindingMapper;
@@ -46,6 +48,10 @@ class AgentBindingServiceCuratorTest {
     @Mock
     private AgentProviderPreferenceMapper providerPreferenceMapper;
     @Mock
+    private AgentKnowledgeBaseBindingMapper kbBindingMapper;
+    @Mock
+    private AgentMcpBindingMapper mcpBindingMapper;
+    @Mock
     private SkillRuntimeService skillRuntimeService;
     @Mock
     private AvailableToolService availableToolService;
@@ -73,6 +79,7 @@ class AgentBindingServiceCuratorTest {
     @BeforeEach
     void setUp() {
         service = new AgentBindingService(skillBindingMapper, toolBindingMapper, providerPreferenceMapper,
+                kbBindingMapper, mcpBindingMapper,
                 skillRuntimeService, availableToolService, agentMapper, skillMapper, acpSkillBridge);
     }
 

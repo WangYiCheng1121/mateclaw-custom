@@ -35,6 +35,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.io.IOException;
+import java.util.Base64;
 import reactor.core.Disposable;
 
 import java.util.ArrayList;
@@ -1119,13 +1120,25 @@ public class ChatController {
             return R.fail(401, "未登录，请先登录");
         }
         Long userId = resolveUserId(auth);
-        conversationService.getOrCreateConversation(request.getConversationId(), agentId, username, workspaceId);
-        conversationService.saveMessage(request.getConversationId(), "user", request.getMessage(), request.getContentParts());
+        List<MessageContentPart> parts = request.getContentParts();
 
-        String promptText = buildPromptText(request.getMessage(), request.getContentParts());
+        // ① 【新增】预处理 base64 文件：解码 → 落盘 → 回填 path
+        if (parts != null) {
+            for (MessageContentPart part : parts) {
+                if (part != null && part.getBase64Content() != null && !part.getBase64Content().isEmpty()) {
+                    processBase64Part(part, request.getConversationId());
+                }
+            }
+        }
+
+        conversationService.getOrCreateConversation(request.getConversationId(), agentId, username, workspaceId);
+        conversationService.saveMessage(request.getConversationId(), "user", request.getMessage(), parts);
+
+        String promptText = buildPromptText(request.getMessage(), parts);
         LlmUserContextHolder.set(String.valueOf(userId), username);
         try {
-            String response = agentService.chat(agentId, promptText, request.getConversationId());
+            // ② 【改动】使用多模态感知的 chatWithParts，复用 SSE 路径已有的多媒体管线
+            String response = agentService.chatWithParts(agentId, promptText, request.getConversationId(), parts);
             conversationService.saveMessage(request.getConversationId(), "assistant", response);
             completionPublisher.publish(agentId, request.getConversationId(), request.getMessage(), response, "web");
             return R.ok(response);
@@ -1666,6 +1679,41 @@ public class ChatController {
 
     private String safe(String text) {
         return text == null ? "" : text;
+    }
+
+    /**
+     * 将 contentPart 中的 base64 内容解码后落盘到 chat-uploads 目录，
+     * 并回填 {@code path}、{@code storedName} 字段，最后置空 {@code base64Content}。
+     */
+    private void processBase64Part(MessageContentPart part, String conversationId) {
+        try {
+            byte[] decoded = Base64.getDecoder().decode(part.getBase64Content());
+            String originalFilename = part.getFileName() != null ? part.getFileName() : "file";
+            String safeFilename = Path.of(originalFilename).getFileName().toString()
+                    .replaceAll("[^a-zA-Z0-9._-]", "_");
+            String storedName = System.currentTimeMillis() + "_" + safeFilename;
+            Path conversationDir = uploadRoot.resolve(conversationId);
+            Files.createDirectories(conversationDir);
+            Path target = conversationDir.resolve(storedName);
+            Files.write(target, decoded);
+
+            part.setPath(uploadRoot.resolve(conversationId).resolve(storedName).toString());
+            part.setStoredName(storedName);
+            if (part.getFileSize() == null) {
+                part.setFileSize((long) decoded.length);
+            }
+            // 落盘后即置空 base64Content，避免随消息持久化到 DB 造成表膨胀
+            part.setBase64Content(null);
+
+            log.info("Base64 attachment decoded and saved: conversationId={}, fileName={}, size={}",
+                    conversationId, part.getFileName(), decoded.length);
+        } catch (IllegalArgumentException e) {
+            log.warn("Invalid base64 content for part {}: {}", part.getFileName(), e.getMessage());
+            throw new RuntimeException("文件 base64 解码失败: " + part.getFileName(), e);
+        } catch (IOException e) {
+            log.error("Failed to save base64 attachment: {}", e.getMessage());
+            throw new RuntimeException("文件保存失败: " + part.getFileName(), e);
+        }
     }
 
     private static final java.util.Map<String, String> MEDIA_CONTENT_TYPES = java.util.Map.of(

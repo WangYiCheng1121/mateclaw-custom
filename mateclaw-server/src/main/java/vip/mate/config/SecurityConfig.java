@@ -27,6 +27,7 @@ import jakarta.servlet.http.HttpServletResponse;
 public class SecurityConfig {
 
     private final JwtAuthFilter jwtAuthFilter;
+    private final DwIdModeConfig dwIdModeConfig;
 
     /**
      * 密码编码器独立配置（打破 SecurityConfig → JwtAuthFilter → AuthService → BCryptPasswordEncoder 循环）
@@ -48,29 +49,36 @@ public class SecurityConfig {
                 .frameOptions(frame -> frame.sameOrigin())
             )
             .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-            .authorizeHttpRequests(auth -> auth
-                // GET /settings/language stays anonymous (first-paint i18n). PUT
-                // requires login + admin (see @RequireGlobalAdmin on the controller).
-                .requestMatchers(HttpMethod.GET, "/api/v1/settings/language").permitAll()
-                // 公开 API 接口
-                .requestMatchers(
-                    "/api/v1/auth/login",
-                    "/api/v1/auth/captcha",
-                    "/api/v1/agents/*/chat/stream",
-                    "/api/v1/chat/stream",
-                    "/api/v1/chat/*/stop",
-                    "/api/v1/setup/**",
-                    "/api/v1/channels/webhook/**",
-                    "/api/v1/channels/webchat/**",
-                    "/api/v1/talk/ws",
-                    // RFC-045: tool-generated files served via unguessable UUID + 10-min TTL
-                    "/api/v1/files/generated/**"
-                ).permitAll()
-                // 所有其他 API 接口需要认证
-                .requestMatchers("/api/**").authenticated()
-                // 非 API 请求（前端路由、静态资源、Swagger、H2 Console 等）全部放行
-                .anyRequest().permitAll()
-            )
+            .authorizeHttpRequests(auth -> {
+                // DW_ID 模式：无前端，纯后端服务，所有 API 无需认证
+                if (dwIdModeConfig.isDwIdMode()) {
+                    auth.requestMatchers("/api/**").permitAll()
+                        .anyRequest().permitAll();
+                } else {
+                    auth
+                        // GET /settings/language stays anonymous (first-paint i18n). PUT
+                        // requires login + admin (see @RequireGlobalAdmin on the controller).
+                        .requestMatchers(HttpMethod.GET, "/api/v1/settings/language").permitAll()
+                        // 公开 API 接口
+                        .requestMatchers(
+                            "/api/v1/auth/login",
+                            "/api/v1/auth/captcha",
+                            "/api/v1/agents/*/chat/stream",
+                            "/api/v1/chat/stream",
+                            "/api/v1/chat/*/stop",
+                            "/api/v1/setup/**",
+                            "/api/v1/channels/webhook/**",
+                            "/api/v1/channels/webchat/**",
+                            "/api/v1/talk/ws",
+                            // RFC-045: tool-generated files served via unguessable UUID + 10-min TTL
+                            "/api/v1/files/generated/**"
+                        ).permitAll()
+                        // 所有其他 API 接口需要认证
+                        .requestMatchers("/api/**").authenticated()
+                        // 非 API 请求（前端路由、静态资源、Swagger、H2 Console 等）全部放行
+                        .anyRequest().permitAll();
+                }
+            })
             .exceptionHandling(ex -> ex
                 .authenticationEntryPoint((request, response, authException) -> {
                     response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);

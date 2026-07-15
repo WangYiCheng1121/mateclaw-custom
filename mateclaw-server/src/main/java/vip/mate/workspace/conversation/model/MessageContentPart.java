@@ -49,6 +49,13 @@ public class MessageContentPart {
      */
     private String mediaId;
 
+    /**
+     * Base64 编码的文件内容。外部服务直接内联传输文件时使用。
+     * 服务端收到后自动解码落盘到 chat-uploads 目录并填充 {@link #path} 字段。
+     * 仅用于请求侧传输；持久化时不存入 DB，落盘后即置空避免消息表膨胀。
+     */
+    private String base64Content;
+
     // ==================== 工厂方法 ====================
 
     public static MessageContentPart text(String text) {

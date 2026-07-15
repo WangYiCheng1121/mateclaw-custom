@@ -10,6 +10,7 @@ import org.springframework.web.client.RestTemplate;
 import vip.mate.auth.config.PlatformOAuth2Config;
 import vip.mate.auth.service.PlatformNacosService;
 import vip.mate.auth.service.PlatformTokenHolder;
+import vip.mate.llm.platform.PlatformMachineTokenProvider;
 import vip.mate.skill.model.SkillEntity;
 
 import java.time.Duration;
@@ -32,6 +33,7 @@ public class PlatformSkillClient {
     private final PlatformOAuth2Config platformConfig;
     private final PlatformNacosService nacosService;
     private final PlatformTokenHolder tokenHolder;
+    private final PlatformMachineTokenProvider machineTokenProvider;
     private final RestTemplate restTemplate;
     private final ObjectMapper objectMapper;
 
@@ -39,12 +41,14 @@ public class PlatformSkillClient {
                                PlatformOAuth2Config platformConfig,
                                PlatformNacosService nacosService,
                                PlatformTokenHolder tokenHolder,
+                               PlatformMachineTokenProvider machineTokenProvider,
                                RestTemplateBuilder restTemplateBuilder,
                                ObjectMapper objectMapper) {
         this.syncProperties = syncProperties;
         this.platformConfig = platformConfig;
         this.nacosService = nacosService;
         this.tokenHolder = tokenHolder;
+        this.machineTokenProvider = machineTokenProvider;
         this.objectMapper = objectMapper;
         this.restTemplate = restTemplateBuilder
                 .connectTimeout(Duration.ofMillis(syncProperties.getConnectTimeout()))
@@ -239,7 +243,11 @@ public class PlatformSkillClient {
     }
 
     private void applyAuth(HttpHeaders headers) {
+        // 优先用户 token，降级机器 token（client_credentials）
         String token = tokenHolder.getAccessToken();
+        if (token == null && machineTokenProvider != null) {
+            token = machineTokenProvider.getAccessToken();
+        }
         if (token != null) {
             headers.set(HttpHeaders.AUTHORIZATION, "Bearer " + token);
         }

@@ -6,6 +6,8 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import vip.mate.agent.binding.model.AgentToolBinding;
+import vip.mate.agent.binding.repository.AgentKnowledgeBaseBindingMapper;
+import vip.mate.agent.binding.repository.AgentMcpBindingMapper;
 import vip.mate.agent.binding.repository.AgentProviderPreferenceMapper;
 import vip.mate.agent.binding.repository.AgentSkillBindingMapper;
 import vip.mate.agent.binding.repository.AgentToolBindingMapper;
@@ -46,6 +48,8 @@ class AgentBindingServiceValidationTest {
         AgentSkillBindingMapper skillBindingMapper = mock(AgentSkillBindingMapper.class);
         toolBindingMapper = mock(AgentToolBindingMapper.class);
         AgentProviderPreferenceMapper providerPreferenceMapper = mock(AgentProviderPreferenceMapper.class);
+        AgentKnowledgeBaseBindingMapper kbBindingMapper = mock(AgentKnowledgeBaseBindingMapper.class);
+        AgentMcpBindingMapper mcpBindingMapper = mock(AgentMcpBindingMapper.class);
         SkillRuntimeService skillRuntimeService = mock(SkillRuntimeService.class);
         availableToolService = mock(AvailableToolService.class);
         // Tool-binding tests don't exercise the agent/skill workspace lookup,
@@ -58,6 +62,8 @@ class AgentBindingServiceValidationTest {
                 skillBindingMapper,
                 toolBindingMapper,
                 providerPreferenceMapper,
+                kbBindingMapper,
+                mcpBindingMapper,
                 skillRuntimeService,
                 availableToolService,
                 agentMapper,

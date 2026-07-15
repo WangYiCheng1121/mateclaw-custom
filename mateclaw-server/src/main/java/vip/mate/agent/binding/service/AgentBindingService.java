@@ -926,4 +926,30 @@ public class AgentBindingService implements AgentBindingResolver {
             mcpBindingMapper.insert(binding);
         }
     }
+
+    // ==================== Platform binding context helpers ====================
+
+    /**
+     * Get enabled knowledge base reference IDs for an agent.
+     * Returns an empty list when there are no bindings.
+     */
+    public List<String> getKnowledgeBaseRefIds(Long agentId) {
+        return listKnowledgeBaseBindings(agentId).stream()
+                .filter(b -> Boolean.TRUE.equals(b.getEnabled()))
+                .map(AgentKnowledgeBaseBinding::getKbRefId)
+                .filter(id -> id != null && !id.isBlank())
+                .toList();
+    }
+
+    /**
+     * Get enabled MCP reference IDs for an agent.
+     * Returns an empty list when there are no bindings.
+     */
+    public List<Integer> getMcpRefIds(Long agentId) {
+        return listMcpBindings(agentId).stream()
+                .filter(b -> Boolean.TRUE.equals(b.getEnabled()))
+                .map(AgentMcpBinding::getMcpRefId)
+                .filter(id -> id != null)
+                .toList();
+    }
 }

@@ -4,7 +4,9 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 import org.springframework.web.method.HandlerMethod;
@@ -18,6 +20,7 @@ import vip.mate.workspace.core.annotation.RequireGlobalAdmin;
 import vip.mate.workspace.core.annotation.RequireWorkspaceRole;
 import vip.mate.workspace.core.service.WorkspaceService;
 
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -40,12 +43,19 @@ public class WorkspaceAccessInterceptor implements HandlerInterceptor {
     private final WorkspaceService workspaceService;
     private final AuthService authService;
     private final AgentMapper agentMapper;
+    private final DwIdModeConfig dwIdModeConfig;
 
     /** 默认 workspace ID（未传 header 时使用） */
     private static final long DEFAULT_WORKSPACE_ID = 1L;
 
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) throws Exception {
+        // DW_ID 模式：注入虚拟认证并跳过所有权限检查
+        if (dwIdModeConfig.isDwIdMode()) {
+            injectVirtualAuth();
+            return true;
+        }
+
         // 只拦截 Controller 方法
         if (!(handler instanceof HandlerMethod handlerMethod)) {
             return true;
@@ -227,5 +237,20 @@ public class WorkspaceAccessInterceptor implements HandlerInterceptor {
         response.setStatus(HttpServletResponse.SC_FORBIDDEN);
         response.setContentType("application/json;charset=UTF-8");
         response.getWriter().write("{\"code\":403,\"msg\":\"" + message + "\",\"data\":null}");
+    }
+
+    /**
+     * DW_ID 模式：注入虚拟认证用户（glsec），使后续 Controller 层能正常获取 Authentication。
+     */
+    private void injectVirtualAuth() {
+        if (SecurityContextHolder.getContext().getAuthentication() != null) {
+            return; // 已有认证，跳过
+        }
+        UserEntity glsec = authService.findByUsername("glsec");
+        if (glsec == null) return;
+        var auth = new UsernamePasswordAuthenticationToken(
+                glsec.getUsername(), null,
+                List.of(new SimpleGrantedAuthority("ROLE_" + glsec.getRole().toUpperCase())));
+        SecurityContextHolder.getContext().setAuthentication(auth);
     }
 }

@@ -190,6 +190,37 @@ public abstract class BaseAgent {
     }
 
     /**
+     * 同步对话（支持多模态附件）。
+     * <p>
+     * 默认实现在纯文本同步调用基础上注入多媒体管线（MultimodalRouter +
+     * MediaCaptionService + 原生 Media），与 SSE 流式路径共享同一套能力。
+     * 子类（StateGraphReActAgent 等）可按需覆盖以接入 StateGraph 流程。
+     *
+     * @param userMessage    用户消息文本
+     * @param conversationId 会话 ID
+     * @param parts          消息的内容片段（含图片/视频/文件附件）
+     * @return 助手回复
+     */
+    public String chatWithParts(String userMessage, String conversationId, List<MessageContentPart> parts) {
+        setState(AgentState.RUNNING);
+        try {
+            ChatClient.ChatClientRequestSpec request = chatClient.prompt()
+                    .system(systemPrompt != null ? systemPrompt : "你是一个有帮助的AI助手。");
+
+            List<Message> historyMessages = buildConversationHistory(conversationId, userMessage);
+            if (!historyMessages.isEmpty()) {
+                request = request.messages(historyMessages);
+            }
+
+            // 构建多模态 UserMessage（复用与 SSE 流式相同的多媒体管线）
+            UserMessage multimodalUser = buildMultimodalUserMessage(userMessage, parts);
+            return request.messages(multimodalUser).call().content();
+        } finally {
+            setState(AgentState.IDLE);
+        }
+    }
+
+    /**
      * 带工具重放的流式对话接口（Web 端审批通过后调用）
      */
     public Flux<AgentService.StreamDelta> chatWithReplayStream(String userMessage, String conversationId,
@@ -943,6 +974,31 @@ public abstract class BaseAgent {
                     null);
         }
         List<MessageContentPart> parts = conversationService.parseMessageParts(message);
+        return buildMultimodalUserMessageInternal(renderedContent, parts);
+    }
+
+    /**
+     * Build a multimodal {@link UserMessage} directly from raw content parts,
+     * without requiring a persisted {@link MessageEntity}. This is the shared
+     * core used by both {@link #chatWithParts} (sync) and
+     * {@link #buildUserMessageInternal} (SSE history replay).
+     * <p>
+     * Handles: MultimodalRouter decision → sidecar captioning (for non-vision
+     * primary models) → native Media injection (for vision-capable models).
+     *
+     * @param text  rendered message text (may include descriptions from buildPromptText)
+     * @param parts content parts (may contain image/video/file types with valid paths)
+     * @return a {@link UserMessage} that may carry {@link Media} attachments
+     */
+    protected UserMessage buildMultimodalUserMessage(String text, List<MessageContentPart> parts) {
+        return buildMultimodalUserMessageInternal(text, parts).userMessage();
+    }
+
+    /**
+     * Internal variant that also returns the routing decision, useful for
+     * callers that need to persist it as metadata.
+     */
+    private CurrentTurnUserMessage buildMultimodalUserMessageInternal(String renderedContent, List<MessageContentPart> parts) {
 
         // Sidecar routing — runs first so caption text gets folded into finalText
         // before native media injection considers the same parts again.
