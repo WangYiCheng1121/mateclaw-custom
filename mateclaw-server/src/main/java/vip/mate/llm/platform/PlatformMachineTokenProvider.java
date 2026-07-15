@@ -7,6 +7,7 @@ import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
 import vip.mate.auth.config.PlatformOAuth2Config;
+import vip.mate.auth.service.PlatformNacosService;
 
 import java.util.Map;
 import java.util.concurrent.locks.ReentrantLock;
@@ -26,6 +27,7 @@ import java.util.concurrent.locks.ReentrantLock;
 public class PlatformMachineTokenProvider {
 
     private final PlatformOAuth2Config platformConfig;
+    private final PlatformNacosService nacosService;
     private final RestTemplate restTemplate;
     private final ObjectMapper objectMapper;
 
@@ -37,8 +39,10 @@ public class PlatformMachineTokenProvider {
     private static final long REFRESH_BUFFER_SECONDS = 60;
 
     public PlatformMachineTokenProvider(PlatformOAuth2Config platformConfig,
+                                        PlatformNacosService nacosService,
                                         ObjectMapper objectMapper) {
         this.platformConfig = platformConfig;
+        this.nacosService = nacosService;
         this.objectMapper = objectMapper;
         this.restTemplate = new RestTemplate();
         // 设置超时避免阻塞启动
@@ -77,7 +81,7 @@ public class PlatformMachineTokenProvider {
             return null;
         }
 
-        String tokenUrl = platformConfig.getGatewayUrl() + "/uni/oauth/token"
+        String tokenUrl = nacosService.resolveGatewayUrl() + "/uni/oauth/token"
                 + "?grant_type=client_credentials"
                 + "&client_id=" + platformConfig.getClientId()
                 + "&client_secret=" + platformConfig.getClientSecret();

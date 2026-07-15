@@ -8,6 +8,7 @@ import org.springframework.http.*;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
 import vip.mate.auth.config.PlatformOAuth2Config;
+import vip.mate.auth.service.PlatformHeaderBuilder;
 import vip.mate.auth.service.PlatformNacosService;
 import vip.mate.auth.service.PlatformTokenHolder;
 import vip.mate.llm.platform.PlatformMachineTokenProvider;
@@ -44,6 +45,7 @@ public class PlatformSecurityClient {
     private final PlatformSecurityProperties securityProperties;
     private final PlatformOAuth2Config platformConfig;
     private final PlatformNacosService nacosService;
+    private final PlatformHeaderBuilder headerBuilder;
     private final PlatformTokenHolder tokenHolder;
     private final PlatformMachineTokenProvider machineTokenProvider;
     private final RestTemplate restTemplate;
@@ -52,6 +54,7 @@ public class PlatformSecurityClient {
     public PlatformSecurityClient(PlatformSecurityProperties securityProperties,
                                    PlatformOAuth2Config platformConfig,
                                    PlatformNacosService nacosService,
+                                   PlatformHeaderBuilder headerBuilder,
                                    PlatformTokenHolder tokenHolder,
                                    PlatformMachineTokenProvider machineTokenProvider,
                                    RestTemplateBuilder restTemplateBuilder,
@@ -59,6 +62,7 @@ public class PlatformSecurityClient {
         this.securityProperties = securityProperties;
         this.platformConfig = platformConfig;
         this.nacosService = nacosService;
+        this.headerBuilder = headerBuilder;
         this.tokenHolder = tokenHolder;
         this.machineTokenProvider = machineTokenProvider;
         this.objectMapper = objectMapper;
@@ -179,8 +183,7 @@ public class PlatformSecurityClient {
     }
 
     private HttpHeaders buildAuthHeaders() {
-        HttpHeaders headers = new HttpHeaders();
-        headers.setContentType(MediaType.APPLICATION_JSON);
+        HttpHeaders headers = headerBuilder.buildHeaders();
         String token = tokenHolder.getAccessToken();
         if (token == null && machineTokenProvider != null) {
             token = machineTokenProvider.getAccessToken();

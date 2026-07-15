@@ -14,6 +14,7 @@ import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestTemplate;
 import vip.mate.agent.model.TemplateDTO;
 import vip.mate.auth.config.PlatformOAuth2Config;
+import vip.mate.auth.service.PlatformHeaderBuilder;
 import vip.mate.auth.service.PlatformNacosService;
 import vip.mate.auth.service.PlatformTokenHolder;
 import vip.mate.llm.platform.PlatformMachineTokenProvider;
@@ -54,6 +55,7 @@ public class PlatformAgentClient {
 
     private final PlatformOAuth2Config platformConfig;
     private final PlatformNacosService nacosService;
+    private final PlatformHeaderBuilder headerBuilder;
     private final PlatformTokenHolder tokenHolder;
     private final PlatformMachineTokenProvider machineTokenProvider;
     private final RestTemplate restTemplate;
@@ -61,12 +63,14 @@ public class PlatformAgentClient {
 
     public PlatformAgentClient(PlatformOAuth2Config platformConfig,
                                PlatformNacosService nacosService,
+                               PlatformHeaderBuilder headerBuilder,
                                PlatformTokenHolder tokenHolder,
                                PlatformMachineTokenProvider machineTokenProvider,
                                RestTemplateBuilder restTemplateBuilder,
                                ObjectMapper objectMapper) {
         this.platformConfig = platformConfig;
         this.nacosService = nacosService;
+        this.headerBuilder = headerBuilder;
         this.tokenHolder = tokenHolder;
         this.machineTokenProvider = machineTokenProvider;
         this.objectMapper = objectMapper;
@@ -106,8 +110,7 @@ public class PlatformAgentClient {
     }
 
     private List<TemplateDTO> doFetchPresets(String url) {
-        HttpHeaders headers = new HttpHeaders();
-        headers.setContentType(MediaType.APPLICATION_JSON);
+        HttpHeaders headers = headerBuilder.buildHeaders();
         applyAuth(headers);
 
         HttpEntity<Void> entity = new HttpEntity<>(headers);
@@ -165,7 +168,7 @@ public class PlatformAgentClient {
     }
 
     private TemplateDTO doFetchPresetDetail(String url, String presetId) {
-        HttpHeaders headers = new HttpHeaders();
+        HttpHeaders headers = headerBuilder.buildHeaders();
         applyAuth(headers);
         HttpEntity<Void> entity = new HttpEntity<>(headers);
 

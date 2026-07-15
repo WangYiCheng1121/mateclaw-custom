@@ -8,6 +8,7 @@ import org.springframework.http.*;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
 import vip.mate.auth.config.PlatformOAuth2Config;
+import vip.mate.auth.service.PlatformHeaderBuilder;
 import vip.mate.auth.service.PlatformNacosService;
 import vip.mate.auth.service.PlatformTokenHolder;
 import vip.mate.llm.platform.PlatformMachineTokenProvider;
@@ -32,6 +33,7 @@ public class PlatformSkillClient {
     private final PlatformSkillProperties syncProperties;
     private final PlatformOAuth2Config platformConfig;
     private final PlatformNacosService nacosService;
+    private final PlatformHeaderBuilder headerBuilder;
     private final PlatformTokenHolder tokenHolder;
     private final PlatformMachineTokenProvider machineTokenProvider;
     private final RestTemplate restTemplate;
@@ -40,6 +42,7 @@ public class PlatformSkillClient {
     public PlatformSkillClient(PlatformSkillProperties syncProperties,
                                PlatformOAuth2Config platformConfig,
                                PlatformNacosService nacosService,
+                               PlatformHeaderBuilder headerBuilder,
                                PlatformTokenHolder tokenHolder,
                                PlatformMachineTokenProvider machineTokenProvider,
                                RestTemplateBuilder restTemplateBuilder,
@@ -47,6 +50,7 @@ public class PlatformSkillClient {
         this.syncProperties = syncProperties;
         this.platformConfig = platformConfig;
         this.nacosService = nacosService;
+        this.headerBuilder = headerBuilder;
         this.tokenHolder = tokenHolder;
         this.machineTokenProvider = machineTokenProvider;
         this.objectMapper = objectMapper;
@@ -70,8 +74,7 @@ public class PlatformSkillClient {
         String url = buildUrl(syncProperties.getAssignedSkillsPath());
 
         try {
-            HttpHeaders headers = new HttpHeaders();
-            headers.setContentType(MediaType.APPLICATION_JSON);
+            HttpHeaders headers = headerBuilder.buildHeaders();
             applyAuth(headers);
 
             HttpEntity<Void> entity = new HttpEntity<>(headers);
@@ -123,7 +126,7 @@ public class PlatformSkillClient {
         String url = buildUrl(path);
 
         try {
-            HttpHeaders headers = new HttpHeaders();
+            HttpHeaders headers = headerBuilder.buildHeaders();
             applyAuth(headers);
             HttpEntity<Void> entity = new HttpEntity<>(headers);
 
@@ -153,7 +156,7 @@ public class PlatformSkillClient {
     public boolean isReachable() {
         try {
             String url = buildUrl("/actuator/health");
-            HttpHeaders headers = new HttpHeaders();
+            HttpHeaders headers = headerBuilder.buildHeaders();
             applyAuth(headers);
             HttpEntity<Void> entity = new HttpEntity<>(headers);
             ResponseEntity<String> response = restTemplate.exchange(url, HttpMethod.GET, entity, String.class);
@@ -177,7 +180,7 @@ public class PlatformSkillClient {
         String url = buildUrl(syncProperties.getCategoriesPath());
 
         try {
-            HttpHeaders headers = new HttpHeaders();
+            HttpHeaders headers = headerBuilder.buildHeaders();
             applyAuth(headers);
             HttpEntity<Void> entity = new HttpEntity<>(headers);
             ResponseEntity<String> response = restTemplate.exchange(
@@ -218,7 +221,7 @@ public class PlatformSkillClient {
         }
 
         try {
-            HttpHeaders headers = new HttpHeaders();
+            HttpHeaders headers = headerBuilder.buildHeaders();
             applyAuth(headers);
             HttpEntity<Void> entity = new HttpEntity<>(headers);
             ResponseEntity<String> response = restTemplate.exchange(

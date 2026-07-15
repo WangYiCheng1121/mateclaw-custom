@@ -8,6 +8,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestTemplate;
 import vip.mate.auth.config.PlatformOAuth2Config;
+import vip.mate.auth.service.PlatformHeaderBuilder;
 import vip.mate.auth.service.PlatformNacosService;
 import vip.mate.auth.service.PlatformTokenHolder;
 import vip.mate.llm.platform.LlmUserContextHolder;
@@ -34,6 +35,7 @@ public class PlatformSearchProxyClient {
     private final PlatformSearchProxyProperties proxyProperties;
     private final PlatformOAuth2Config platformConfig;
     private final PlatformNacosService nacosService;
+    private final PlatformHeaderBuilder headerBuilder;
     private final PlatformTokenHolder platformTokenHolder;
     private final PlatformMachineTokenProvider machineTokenProvider;
     private final RestTemplate restTemplate;
@@ -42,11 +44,13 @@ public class PlatformSearchProxyClient {
             PlatformSearchProxyProperties proxyProperties,
             PlatformOAuth2Config platformConfig,
             PlatformNacosService nacosService,
+            PlatformHeaderBuilder headerBuilder,
             PlatformTokenHolder platformTokenHolder,
             PlatformMachineTokenProvider machineTokenProvider) {
         this.proxyProperties = proxyProperties;
         this.platformConfig = platformConfig;
         this.nacosService = nacosService;
+        this.headerBuilder = headerBuilder;
         this.platformTokenHolder = platformTokenHolder;
         this.machineTokenProvider = machineTokenProvider;
 
@@ -111,8 +115,7 @@ public class PlatformSearchProxyClient {
             reqBody.set("language", searchQuery.language());
         }
 
-        HttpHeaders headers = new HttpHeaders();
-        headers.setContentType(MediaType.APPLICATION_JSON);
+        HttpHeaders headers = headerBuilder.buildHeaders();
         if (token != null && !token.isBlank()) {
             headers.setBearerAuth(token);
         } else {

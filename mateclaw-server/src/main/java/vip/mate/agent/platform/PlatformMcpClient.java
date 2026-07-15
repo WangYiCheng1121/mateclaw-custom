@@ -13,6 +13,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
 import vip.mate.auth.config.PlatformOAuth2Config;
+import vip.mate.auth.service.PlatformHeaderBuilder;
 import vip.mate.auth.service.PlatformNacosService;
 import vip.mate.auth.service.PlatformTokenHolder;
 import vip.mate.llm.platform.PlatformMachineTokenProvider;
@@ -42,6 +43,7 @@ public class PlatformMcpClient {
 
     private final PlatformOAuth2Config platformConfig;
     private final PlatformNacosService nacosService;
+    private final PlatformHeaderBuilder headerBuilder;
     private final PlatformTokenHolder tokenHolder;
     private final PlatformMachineTokenProvider machineTokenProvider;
     private final RestTemplate restTemplate;
@@ -49,12 +51,14 @@ public class PlatformMcpClient {
 
     public PlatformMcpClient(PlatformOAuth2Config platformConfig,
                              PlatformNacosService nacosService,
+                             PlatformHeaderBuilder headerBuilder,
                              PlatformTokenHolder tokenHolder,
                              PlatformMachineTokenProvider machineTokenProvider,
                              RestTemplateBuilder restTemplateBuilder,
                              ObjectMapper objectMapper) {
         this.platformConfig = platformConfig;
         this.nacosService = nacosService;
+        this.headerBuilder = headerBuilder;
         this.tokenHolder = tokenHolder;
         this.machineTokenProvider = machineTokenProvider;
         this.objectMapper = objectMapper;
@@ -82,8 +86,7 @@ public class PlatformMcpClient {
         }
 
         try {
-            HttpHeaders headers = new HttpHeaders();
-            headers.setContentType(MediaType.APPLICATION_JSON);
+            HttpHeaders headers = headerBuilder.buildHeaders();
             applyAuth(headers);
 
             HttpEntity<Void> entity = new HttpEntity<>(headers);
