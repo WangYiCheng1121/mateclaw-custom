@@ -9,6 +9,7 @@ import org.springframework.web.client.RestTemplate;
 import vip.mate.auth.config.PlatformOAuth2Config;
 import vip.mate.auth.service.PlatformNacosService;
 import vip.mate.auth.service.PlatformTokenHolder;
+import vip.mate.llm.platform.PlatformMachineTokenProvider;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
@@ -40,6 +41,7 @@ public class PlatformLogClient {
     private final PlatformOAuth2Config platformConfig;
     private final PlatformNacosService nacosService;
     private final PlatformTokenHolder tokenHolder;
+    private final PlatformMachineTokenProvider machineTokenProvider;
     private final RestTemplate restTemplate;
     private final ObjectMapper objectMapper;
 
@@ -47,12 +49,14 @@ public class PlatformLogClient {
                              PlatformOAuth2Config platformConfig,
                              PlatformNacosService nacosService,
                              PlatformTokenHolder tokenHolder,
+                             PlatformMachineTokenProvider machineTokenProvider,
                              RestTemplateBuilder restTemplateBuilder,
                              ObjectMapper objectMapper) {
         this.logProperties = logProperties;
         this.platformConfig = platformConfig;
         this.nacosService = nacosService;
         this.tokenHolder = tokenHolder;
+        this.machineTokenProvider = machineTokenProvider;
         this.objectMapper = objectMapper;
         this.restTemplate = restTemplateBuilder
                 .connectTimeout(Duration.ofMillis(logProperties.getConnectTimeout()))
@@ -112,6 +116,9 @@ public class PlatformLogClient {
 
     private void applyAuth(HttpHeaders headers) {
         String token = tokenHolder.getAccessToken();
+        if (token == null && machineTokenProvider != null) {
+            token = machineTokenProvider.getAccessToken();
+        }
         if (token != null) {
             headers.set(HttpHeaders.AUTHORIZATION, "Bearer " + token);
         }
