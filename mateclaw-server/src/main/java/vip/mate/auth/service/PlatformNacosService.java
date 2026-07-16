@@ -19,7 +19,7 @@ import vip.mate.config.DwIdModeConfig;
  * <p>
  * <b>DW_ID 模式（集群内部直连）</b>：绕过网关，使用集群内部 K8s Service DNS 直连
  * <ul>
- *   <li>ai-manage 服务：http://ai-manage:20008/...</li>
+ *   <li>ai-manage 服务：http://glsec-ai-manage:20008/...</li>
  *   <li>其他服务：直连路径</li>
  * </ul>
  *
@@ -41,12 +41,12 @@ public class PlatformNacosService {
     /**
      * 集群内部直连地址（DW_ID 模式，K8s Service DNS + 端口）
      */
-    private static final String AI_MANAGE_URL_CLUSTER = "http://ai-manage:20008";
+    private static final String AI_MANAGE_URL_CLUSTER = "http://glsec-ai-manage:20008";
 
     /**
      * 集群内部 OAuth 服务地址（DW_ID 模式，K8s Service DNS）
      */
-    private static final String UNI_URL_CLUSTER = "http://uni";
+    private static final String UNI_URL_CLUSTER = "http://glsec-auth:50010";
 
     /**
      * 解析平台网关地址（用于 OAuth2 登录认证 / 机器令牌）
@@ -70,7 +70,7 @@ public class PlatformNacosService {
      * <p>
      * DW_ID 模式下：
      * <ul>
-     *   <li>ai-manage → http://ai-manage:20008（集群内部 K8s Service DNS）</li>
+     *   <li>ai-manage → http://glsec-ai-manage:20008（集群内部 K8s Service DNS）</li>
      *   <li>esp-user → ""（集群内部直连）</li>
      * </ul>
      *
