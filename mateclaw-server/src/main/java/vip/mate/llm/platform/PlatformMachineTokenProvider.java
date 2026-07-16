@@ -8,6 +8,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
 import vip.mate.auth.config.PlatformOAuth2Config;
 import vip.mate.auth.service.PlatformNacosService;
+import vip.mate.config.DwIdModeConfig;
 
 import java.util.Map;
 import java.util.concurrent.locks.ReentrantLock;
@@ -28,6 +29,7 @@ public class PlatformMachineTokenProvider {
 
     private final PlatformOAuth2Config platformConfig;
     private final PlatformNacosService nacosService;
+    private final DwIdModeConfig dwIdModeConfig;
     private final RestTemplate restTemplate;
     private final ObjectMapper objectMapper;
 
@@ -40,9 +42,11 @@ public class PlatformMachineTokenProvider {
 
     public PlatformMachineTokenProvider(PlatformOAuth2Config platformConfig,
                                         PlatformNacosService nacosService,
+                                        DwIdModeConfig dwIdModeConfig,
                                         ObjectMapper objectMapper) {
         this.platformConfig = platformConfig;
         this.nacosService = nacosService;
+        this.dwIdModeConfig = dwIdModeConfig;
         this.objectMapper = objectMapper;
         this.restTemplate = new RestTemplate();
         // 设置超时避免阻塞启动
@@ -81,7 +85,8 @@ public class PlatformMachineTokenProvider {
             return null;
         }
 
-        String tokenUrl = nacosService.resolveGatewayUrl() + "/uni/oauth/token"
+        String tokenPath = dwIdModeConfig.isDwIdMode() ? "/oauth/token" : "/uni/oauth/token";
+        String tokenUrl = nacosService.resolveGatewayUrl() + tokenPath
                 + "?grant_type=client_credentials"
                 + "&client_id=" + platformConfig.getClientId()
                 + "&client_secret=" + platformConfig.getClientSecret();

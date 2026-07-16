@@ -17,9 +17,9 @@ import vip.mate.config.DwIdModeConfig;
  *   <li>ai-manage：gatewayUrl/ai-manage/...</li>
  * </ul>
  * <p>
- * <b>DW_ID 模式（集群内部直连）</b>：绕过网关，使用集群内部 K8s Service 域名+端口
+ * <b>DW_ID 模式（集群内部直连）</b>：绕过网关，使用集群内部 K8s Service DNS 直连
  * <ul>
- *   <li>ai-manage 服务：/ai-manage:20008/...</li>
+ *   <li>ai-manage 服务：http://ai-manage:20008/...</li>
  *   <li>其他服务：直连路径</li>
  * </ul>
  *
@@ -39,19 +39,24 @@ public class PlatformNacosService {
     private static final String AI_MANAGE_PATH = "/ai-manage";
 
     /**
-     * 集群内部直连路径前缀（DW_ID 模式，K8s Service 端口）
+     * 集群内部直连地址（DW_ID 模式，K8s Service DNS + 端口）
      */
-    private static final String AI_MANAGE_PATH_CLUSTER = "/ai-manage:20008";
+    private static final String AI_MANAGE_URL_CLUSTER = "http://ai-manage:20008";
+
+    /**
+     * 集群内部 OAuth 服务地址（DW_ID 模式，K8s Service DNS）
+     */
+    private static final String UNI_URL_CLUSTER = "http://uni";
 
     /**
      * 解析平台网关地址（用于 OAuth2 登录认证 / 机器令牌）
      * <p>
-     * 非 DW_ID 模式：返回外网网关根地址（如 {@code http://192.168.10.225}）
-     * <br>DW_ID 模式：返回空字符串（集群内部直连，不需要网关前缀）
+     * 非 DW_ID 模式：返回外网网关根地址
+     * <br>DW_ID 模式：返回集群内部 uni 服务地址（http://uni）
      */
     public String resolveGatewayUrl() {
         if (dwIdModeConfig.isDwIdMode()) {
-            return "";
+            return UNI_URL_CLUSTER;
         }
         return config.getGatewayUrl();
     }
@@ -65,7 +70,7 @@ public class PlatformNacosService {
      * <p>
      * DW_ID 模式下：
      * <ul>
-     *   <li>ai-manage → /ai-manage:20008（集群内部 K8s Service 端口）</li>
+     *   <li>ai-manage → http://ai-manage:20008（集群内部 K8s Service DNS）</li>
      *   <li>esp-user → ""（集群内部直连）</li>
      * </ul>
      *
@@ -78,15 +83,13 @@ public class PlatformNacosService {
         String path;
 
         if ("ai-manage".equalsIgnoreCase(serviceName)) {
-            path = dwIdMode ? AI_MANAGE_PATH_CLUSTER : AI_MANAGE_PATH;
+            path = dwIdMode ? AI_MANAGE_URL_CLUSTER : AI_MANAGE_PATH;
         } else if ("esp-user".equalsIgnoreCase(serviceName)) {
-            // esp-user 登录接口直连网关根路径，不需要路径前缀
             log.debug("[PlatformService] esp-user服务直连网关根路径");
             return baseUrl;
         } else {
-            // 未知服务名，默认使用 ai-manage
             log.warn("[PlatformService] 未知服务名 [{}]，默认使用 ai-manage", serviceName);
-            path = dwIdMode ? AI_MANAGE_PATH_CLUSTER : AI_MANAGE_PATH;
+            path = dwIdMode ? AI_MANAGE_URL_CLUSTER : AI_MANAGE_PATH;
         }
 
         String fullUrl = baseUrl + path;
