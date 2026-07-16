@@ -48,6 +48,7 @@ public class PlatformNacosService {
      */
     private static final String UNI_URL_CLUSTER = "http://glsec-auth:50010";
 
+
     /**
      * 解析平台网关地址（用于 OAuth2 登录认证 / 机器令牌）
      * <p>

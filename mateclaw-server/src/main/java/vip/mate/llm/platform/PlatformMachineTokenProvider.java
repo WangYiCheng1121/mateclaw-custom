@@ -5,14 +5,12 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.*;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
-import org.springframework.util.LinkedMultiValueMap;
-import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.RestTemplate;
 import vip.mate.auth.config.PlatformOAuth2Config;
 import vip.mate.auth.service.PlatformNacosService;
+import vip.mate.config.DwIdModeConfig;
+import vip.mate.config.TrustInternalServiceConfig;
 
-import java.nio.charset.StandardCharsets;
-import java.util.Base64;
 import java.util.Map;
 import java.util.concurrent.locks.ReentrantLock;
 
@@ -32,6 +30,8 @@ public class PlatformMachineTokenProvider {
 
     private final PlatformOAuth2Config platformConfig;
     private final PlatformNacosService nacosService;
+    private final DwIdModeConfig dwIdModeConfig;
+    private final TrustInternalServiceConfig trustConfig;
     private final RestTemplate restTemplate;
     private final ObjectMapper objectMapper;
 
@@ -44,9 +44,13 @@ public class PlatformMachineTokenProvider {
 
     public PlatformMachineTokenProvider(PlatformOAuth2Config platformConfig,
                                         PlatformNacosService nacosService,
+                                        DwIdModeConfig dwIdModeConfig,
+                                        TrustInternalServiceConfig trustConfig,
                                         ObjectMapper objectMapper) {
         this.platformConfig = platformConfig;
         this.nacosService = nacosService;
+        this.dwIdModeConfig = dwIdModeConfig;
+        this.trustConfig = trustConfig;
         this.objectMapper = objectMapper;
         this.restTemplate = new RestTemplate();
         // 设置超时避免阻塞启动
@@ -85,24 +89,25 @@ public class PlatformMachineTokenProvider {
             return null;
         }
 
+        // DW_ID 模式 + 集群内服务互信：跳过 OAuth2 token 获取，
+        // 直接以无认证方式调用 ai-manage（由 ai-manage 侧的环境变量放行）
+        if (dwIdModeConfig.isDwIdMode() && trustConfig.isEnabled()) {
+            log.debug("[MachineToken] Trust-internal mode — skipping OAuth2 token request");
+            return null;
+        }
+
         String tokenPath = "/uni/oauth/token";
-        String tokenUrl = nacosService.resolveGatewayUrl() + tokenPath;
+        // 平台端 OAuth2 端点接受 query string 传参（兼容 Spring Security OAuth2）
+        String tokenUrl = nacosService.resolveGatewayUrl() + tokenPath
+                + "?grant_type=client_credentials"
+                + "&client_id=" + platformConfig.getClientId()
+                + "&client_secret=" + platformConfig.getClientSecret();
 
         try {
             log.info("[MachineToken] Requesting client_credentials token from platform...");
             HttpHeaders headers = new HttpHeaders();
-            headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
-
-            // OAuth2 RFC 6749 §4.4.2: client_credentials MUST use HTTP Basic Auth
-            String credentials = platformConfig.getClientId() + ":" + platformConfig.getClientSecret();
-            String encodedCredentials = Base64.getEncoder()
-                    .encodeToString(credentials.getBytes(StandardCharsets.UTF_8));
-            headers.set(HttpHeaders.AUTHORIZATION, "Basic " + encodedCredentials);
-
-            MultiValueMap<String, String> body = new LinkedMultiValueMap<>();
-            body.add("grant_type", "client_credentials");
-
-            HttpEntity<MultiValueMap<String, String>> entity = new HttpEntity<>(body, headers);
+            headers.setContentType(MediaType.APPLICATION_JSON);
+            HttpEntity<Void> entity = new HttpEntity<>(headers);
 
             ResponseEntity<String> response = restTemplate.exchange(
                     tokenUrl, HttpMethod.POST, entity, String.class);
