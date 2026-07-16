@@ -5,10 +5,14 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.*;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
+import org.springframework.util.LinkedMultiValueMap;
+import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.RestTemplate;
 import vip.mate.auth.config.PlatformOAuth2Config;
 import vip.mate.auth.service.PlatformNacosService;
 
+import java.nio.charset.StandardCharsets;
+import java.util.Base64;
 import java.util.Map;
 import java.util.concurrent.locks.ReentrantLock;
 
@@ -82,16 +86,23 @@ public class PlatformMachineTokenProvider {
         }
 
         String tokenPath = "/uni/oauth/token";
-        String tokenUrl = nacosService.resolveGatewayUrl() + tokenPath
-                + "?grant_type=client_credentials"
-                + "&client_id=" + platformConfig.getClientId()
-                + "&client_secret=" + platformConfig.getClientSecret();
+        String tokenUrl = nacosService.resolveGatewayUrl() + tokenPath;
 
         try {
             log.info("[MachineToken] Requesting client_credentials token from platform...");
             HttpHeaders headers = new HttpHeaders();
-            headers.setContentType(MediaType.APPLICATION_JSON);
-            HttpEntity<Void> entity = new HttpEntity<>(headers);
+            headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
+
+            // OAuth2 RFC 6749 §4.4.2: client_credentials MUST use HTTP Basic Auth
+            String credentials = platformConfig.getClientId() + ":" + platformConfig.getClientSecret();
+            String encodedCredentials = Base64.getEncoder()
+                    .encodeToString(credentials.getBytes(StandardCharsets.UTF_8));
+            headers.set(HttpHeaders.AUTHORIZATION, "Basic " + encodedCredentials);
+
+            MultiValueMap<String, String> body = new LinkedMultiValueMap<>();
+            body.add("grant_type", "client_credentials");
+
+            HttpEntity<MultiValueMap<String, String>> entity = new HttpEntity<>(body, headers);
 
             ResponseEntity<String> response = restTemplate.exchange(
                     tokenUrl, HttpMethod.POST, entity, String.class);

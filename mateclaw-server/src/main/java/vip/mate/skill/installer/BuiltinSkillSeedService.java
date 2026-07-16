@@ -25,6 +25,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.LocalDateTime;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -128,8 +129,7 @@ public class BuiltinSkillSeedService implements ApplicationRunner {
                     continue;
                 }
 
-                SkillEntity existing = skillMapper.selectOne(
-                        new LambdaQueryWrapper<SkillEntity>().eq(SkillEntity::getName, name));
+                SkillEntity existing = findExistingByName(name);
 
                 if (existing == null) {
                     SkillEntity row = buildNew(parsed, content);
@@ -155,6 +155,42 @@ public class BuiltinSkillSeedService implements ApplicationRunner {
         // the next startup re-runs the full loop.
         writeSnapshot(new SeedSnapshot(SNAPSHOT_VERSION, currentManifest, countBuiltinRows()));
         return new SyncStats(inserted, updated, unchanged, skipped);
+    }
+
+    /**
+     * Find an existing builtin skill by name, handling duplicates gracefully.
+     * <p>
+     * In some deployment scenarios (e.g. Docker restarts with persisted H2 data),
+     * the legacy {@code data-*.sql} MERGE seed and this service may create
+     * duplicate rows with the same name but different IDs. When duplicates are
+     * found, we keep the row with the smallest ID (oldest / canonical) and
+     * delete the rest, logging a warning so operators can investigate.
+     *
+     * @param name skill name (unique key per frontmatter)
+     * @return the canonical row, or {@code null} if none exists
+     */
+    private SkillEntity findExistingByName(String name) {
+        List<SkillEntity> rows = skillMapper.selectList(
+                new LambdaQueryWrapper<SkillEntity>()
+                        .eq(SkillEntity::getName, name)
+                        .eq(SkillEntity::getSkillType, SKILL_TYPE_BUILTIN));
+        if (rows.isEmpty()) {
+            return null;
+        }
+        if (rows.size() == 1) {
+            return rows.get(0);
+        }
+
+        // Duplicates detected — keep the row with the smallest ID and delete the rest.
+        log.warn("[SkillSeed] Found {} duplicate rows for builtin skill '{}' — cleaning up",
+                rows.size(), name);
+        rows.sort(Comparator.comparing(SkillEntity::getId));
+        SkillEntity canonical = rows.get(0);
+        for (int i = 1; i < rows.size(); i++) {
+            skillMapper.deleteById(rows.get(i).getId());
+            log.info("[SkillSeed] Deleted duplicate skill '{}' id={}", name, rows.get(i).getId());
+        }
+        return canonical;
     }
 
     // ==================== Snapshot helpers ====================
