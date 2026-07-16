@@ -1,5 +1,6 @@
 package vip.mate.config;
 
+import com.baomidou.mybatisplus.core.toolkit.IdWorker;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.ApplicationArguments;
@@ -126,14 +127,12 @@ public class DwIdAgentInitializer implements ApplicationRunner {
         }
 
         String encodedPw = passwordEncoder.encode(GLSEC_DEFAULT_PASSWORD);
-        // UserEntity 使用 ASSIGN_ID，直接用 JdbcTemplate 插入
+        // UserEntity 使用 ASSIGN_ID，JdbcTemplate 需手动生成雪花 ID
+        long newId = IdWorker.getId();
         jdbcTemplate.update(
-                "INSERT INTO mate_user (username, password, nickname, role, enabled, create_time, update_time, deleted) "
-                        + "VALUES (?, ?, ?, ?, ?, NOW(), NOW(), 0)",
-                GLSEC_USERNAME, encodedPw, "GLClaw Service", "admin", true);
-
-        Long newId = jdbcTemplate.queryForObject(
-                "SELECT id FROM mate_user WHERE username = ?", Long.class, GLSEC_USERNAME);
+                "INSERT INTO mate_user (id, username, password, nickname, role, enabled, create_time, update_time, deleted) "
+                        + "VALUES (?, ?, ?, ?, ?, ?, NOW(), NOW(), 0)",
+                newId, GLSEC_USERNAME, encodedPw, "GLClaw Service", "admin", true);
         log.info("[DW_ID] Created glsec service account (id={}, role=admin)", newId);
 
         // 确保 glsec 是默认工作区成员（owner 角色）
