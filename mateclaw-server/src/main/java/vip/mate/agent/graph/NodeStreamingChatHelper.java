@@ -563,11 +563,47 @@ public class NodeStreamingChatHelper {
                 if (lastResult.errorType() == ErrorType.THINKING_BLOCK_ERROR) {
                     return lastResult; // 已经重试过了
                 }
-                // RFC-009: EMPTY_RESPONSE — break the primary-retry loop and fall through to
-                // the fallback chain. Retrying the same model that returned nothing is rarely
-                // productive; a different provider has a better chance of succeeding.
+                // RFC-009: EMPTY_RESPONSE — inline-retry once with a short wait.
+                // Local models (especially cold-start via platform proxy) may
+                // return an empty stream before the model is ready; a 2 s retry
+                // gives it time to warm up from the first request.  Cloud
+                // providers that genuinely return nothing are rare enough that
+                // the single short wait doesn't meaningfully degrade latency.
                 if (lastResult.errorType() == ErrorType.EMPTY_RESPONSE) {
-                    log.warn("[{}] Primary returned empty response — skipping same-model retries, handing off to fallback chain", phase);
+                    if (attempt == 0) {
+                        log.warn("[{}] Primary returned empty response on first attempt (possible cold start) — retrying once after 2s before fallback", phase);
+                        if (broadcast) {
+                            broadcastDelta(conversationId, "warning",
+                                    buildDeltaJson("模型正在预热，请稍候..."));
+                        }
+                        // Short wait with stop-check (poll every 200ms)
+                        long remaining = 2000;
+                        while (remaining > 0) {
+                            if (streamTracker != null && streamTracker.isStopRequested(conversationId)) {
+                                log.info("[{}] Stop requested during empty-response retry wait — aborting", phase);
+                                throw new CancellationException("Stream stopped by user");
+                            }
+                            long slice = Math.min(200, remaining);
+                            try {
+                                Thread.sleep(slice);
+                            } catch (InterruptedException ie) {
+                                Thread.currentThread().interrupt();
+                                return buildErrorResult("LLM 调用被中断", conversationId, phase);
+                            }
+                            remaining -= slice;
+                        }
+                        lastResult = doStreamCall(chatModel, prompt, conversationId, phase + "_retry", broadcast, 0);
+                        llmCallCount++;
+                        retryCount++;
+                        if (lastResult != null && lastResult.errorType() == ErrorType.NONE && lastResult.errorMessage() == null) {
+                            logPerfSummary(phase, conversationId, callStartMs, llmCallCount, retryCount, failoverCount);
+                            return lastResult;
+                        }
+                        // Retry also failed — remember for reporting and fall through to fallback chain
+                        log.warn("[{}] Primary returned empty response after cold-start retry — handing off to fallback chain", phase);
+                    } else {
+                        log.warn("[{}] Primary returned empty response after retry — handing off to fallback chain", phase);
+                    }
                     break;
                 }
                 // 成功
@@ -1101,12 +1137,21 @@ public class NodeStreamingChatHelper {
         // Only fire when neither truncation cap fired (those deliberately
         // produce non-empty output) and there are no tool calls
         // (tool-only responses are legitimately empty-text).
+        //
+        // IMPORTANT: Do NOT broadcast the error via buildErrorResultWithType here.
+        // EMPTY_RESPONSE is recoverable (cold-start retry / fallback chain), and
+        // a premature "error" SSE event causes the frontend to tear down the SSE
+        // connection, breaking subsequent retries. Instead, return a silent error
+        // result; streamCallInternal will own all user-facing messaging.
         if (!truncated
                 && contentAccum.length() == 0
                 && thinkingAccum.length() == 0
                 && toolCallAccumulators.isEmpty()) {
             log.warn("[{}] LLM returned empty response (no content, no thinking, no tool calls) — marking as EMPTY_RESPONSE for fallback", phase);
-            return buildErrorResultWithType("LLM 返回空响应", conversationId, phase, ErrorType.EMPTY_RESPONSE);
+            AssistantMessage emptyMsg = new AssistantMessage("");
+            return new StreamResult("", "", emptyMsg,
+                    List.of(), false, 0, 0, false,
+                    "LLM 返回空响应", ErrorType.EMPTY_RESPONSE);
         }
 
         String truncationReason = truncatedByThinkingCap ? "thinking_only_no_content"
