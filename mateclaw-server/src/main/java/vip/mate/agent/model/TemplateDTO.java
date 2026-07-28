@@ -71,11 +71,49 @@ public class TemplateDTO {
      */
     private List<Integer> defaultMcpIds;
 
+    /**
+     * Platform knowledge base full info (id + name + description) for client-side display.
+     * Populated by the platform preset detail API alongside the legacy ID-only fields.
+     * The client uses {@link #defaultKnowledgeIds} for API calls;
+     * this field provides human-readable labels for selection UIs.
+     */
+    private List<KnowledgeBaseRef> defaultKnowledgeBases;
+
+    /**
+     * Platform MCP full info (id + name + description) for client-side display.
+     * Populated by the platform preset detail API alongside the legacy ID-only fields.
+     * The client uses {@link #defaultMcpIds} for API calls;
+     * this field provides human-readable labels for selection UIs.
+     */
+    private List<McpRef> defaultMcps;
+
+    // ==================== 内嵌类型 ====================
+
     @Data
     public static class WorkspaceFileTemplate {
         private String filename;
         private String content;
         private Boolean enabled;
         private Integer sortOrder;
+    }
+
+    @Data
+    public static class KnowledgeBaseRef {
+        /** 知识库引用ID（对应 {@link #defaultKnowledgeIds} 中的值） */
+        private String kbRefId;
+        /** 知识库名称 */
+        private String kbName;
+        /** 知识库描述 */
+        private String description;
+    }
+
+    @Data
+    public static class McpRef {
+        /** MCP 引用ID（对应 {@link #defaultMcpIds} 中的值） */
+        private Integer mcpRefId;
+        /** MCP 服务名称 */
+        private String mcpName;
+        /** MCP 服务描述 */
+        private String description;
     }
 }

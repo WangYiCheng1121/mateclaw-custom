@@ -18,10 +18,7 @@ import vip.mate.tool.model.AvailableToolDTO;
 import vip.mate.tool.service.AvailableToolService;
 import vip.mate.workspace.document.WorkspaceFileService;
 
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 import java.util.stream.Collectors;
 
 /**
@@ -337,7 +334,18 @@ public class TemplateService {
         }
         if (validIds.isEmpty()) return;
 
-        agentBindingService.setKnowledgeBaseBindings(created.getId(), validIds);
+        // Build kbRefId → kbName map from the new full-info field
+        Map<String, String> kbNames = null;
+        if (template.getDefaultKnowledgeBases() != null) {
+            kbNames = new java.util.LinkedHashMap<>();
+            for (TemplateDTO.KnowledgeBaseRef kb : template.getDefaultKnowledgeBases()) {
+                if (kb.getKbRefId() != null) {
+                    kbNames.put(kb.getKbRefId(), kb.getKbName());
+                }
+            }
+        }
+
+        agentBindingService.setKnowledgeBaseBindings(created.getId(), validIds, kbNames);
         log.info("[Template] template {} pre-bound {} knowledge base(s) on agent {}",
                 template.getId(), validIds.size(), created.getId());
     }
@@ -360,7 +368,18 @@ public class TemplateService {
         }
         if (validIds.isEmpty()) return;
 
-        agentBindingService.setMcpBindings(created.getId(), validIds);
+        // Build mcpRefId → mcpName map from the new full-info field
+        Map<Integer, String> mcpNames = null;
+        if (template.getDefaultMcps() != null) {
+            mcpNames = new java.util.LinkedHashMap<>();
+            for (TemplateDTO.McpRef mcp : template.getDefaultMcps()) {
+                if (mcp.getMcpRefId() != null) {
+                    mcpNames.put(mcp.getMcpRefId(), mcp.getMcpName());
+                }
+            }
+        }
+
+        agentBindingService.setMcpBindings(created.getId(), validIds, mcpNames);
         log.info("[Template] template {} pre-bound {} MCP(s) on agent {}",
                 template.getId(), validIds.size(), created.getId());
     }

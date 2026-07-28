@@ -879,10 +879,22 @@ public class AgentBindingService implements AgentBindingResolver {
 
     /**
      * Replace the agent's knowledge base binding set.
-     * Only stores reference IDs and names; actual traffic is routed through
+     * Only stores reference IDs; actual traffic is routed through
      * the platform LLM proxy at chat time.
      */
     public void setKnowledgeBaseBindings(Long agentId, List<String> kbRefIds) {
+        setKnowledgeBaseBindings(agentId, kbRefIds, null);
+    }
+
+    /**
+     * Replace the agent's knowledge base binding set with display names.
+     *
+     * @param agentId   agent ID
+     * @param kbRefIds  platform knowledge base reference IDs
+     * @param kbNames   kbRefId → kbName map for UI display (nullable)
+     */
+    public void setKnowledgeBaseBindings(Long agentId, List<String> kbRefIds,
+                                         Map<String, String> kbNames) {
         kbBindingMapper.delete(
                 new LambdaQueryWrapper<AgentKnowledgeBaseBinding>()
                         .eq(AgentKnowledgeBaseBinding::getAgentId, agentId));
@@ -893,6 +905,9 @@ public class AgentBindingService implements AgentBindingResolver {
             binding.setAgentId(agentId);
             binding.setKbRefId(kbRefId.trim());
             binding.setEnabled(true);
+            if (kbNames != null) {
+                binding.setKbName(kbNames.getOrDefault(kbRefId, kbRefId));
+            }
             kbBindingMapper.insert(binding);
         }
     }
@@ -909,10 +924,22 @@ public class AgentBindingService implements AgentBindingResolver {
 
     /**
      * Replace the agent's MCP binding set.
-     * Only stores reference IDs and names; actual traffic is routed through
+     * Only stores reference IDs; actual traffic is routed through
      * the platform LLM proxy at chat time.
      */
     public void setMcpBindings(Long agentId, List<Integer> mcpRefIds) {
+        setMcpBindings(agentId, mcpRefIds, null);
+    }
+
+    /**
+     * Replace the agent's MCP binding set with display names.
+     *
+     * @param agentId    agent ID
+     * @param mcpRefIds  platform MCP reference IDs
+     * @param mcpNames   mcpRefId → mcpName map for UI display (nullable)
+     */
+    public void setMcpBindings(Long agentId, List<Integer> mcpRefIds,
+                               Map<Integer, String> mcpNames) {
         mcpBindingMapper.delete(
                 new LambdaQueryWrapper<AgentMcpBinding>()
                         .eq(AgentMcpBinding::getAgentId, agentId));
@@ -923,6 +950,9 @@ public class AgentBindingService implements AgentBindingResolver {
             binding.setAgentId(agentId);
             binding.setMcpRefId(mcpRefId);
             binding.setEnabled(true);
+            if (mcpNames != null) {
+                binding.setMcpName(mcpNames.getOrDefault(mcpRefId, String.valueOf(mcpRefId)));
+            }
             mcpBindingMapper.insert(binding);
         }
     }
