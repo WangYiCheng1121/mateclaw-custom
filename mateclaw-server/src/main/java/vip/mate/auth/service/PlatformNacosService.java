@@ -17,10 +17,11 @@ import vip.mate.config.DwIdModeConfig;
  *   <li>ai-manage：gatewayUrl/ai-manage/...</li>
  * </ul>
  * <p>
- * <b>DW_ID 模式（集群内部直连）</b>：绕过网关，使用集群内部 K8s Service DNS 直连
+ * <b>DW_ID 模式（集群内部直连）</b>：绕过网关，直连 ai-manage 服务。
+ * 目标地址优先级：环境变量 AI_MANAGE_CLUSTER_URL > 默认 K8S Service DNS。
  * <ul>
- *   <li>ai-manage 服务：http://glsec-ai-manage:20008/...</li>
- *   <li>其他服务：直连路径</li>
+ *   <li>K8S 模式：http://glsec-ai-manage:20008（默认值，K8S Service DNS）</li>
+ *   <li>VPC 模式：http://127.0.0.1:{port}（通过 AI_MANAGE_CLUSTER_URL 覆盖）</li>
  * </ul>
  *
  * @author MateClaw Team
@@ -39,9 +40,10 @@ public class PlatformNacosService {
     private static final String AI_MANAGE_PATH = "/ai-manage";
 
     /**
-     * 集群内部直连地址（DW_ID 模式，K8s Service DNS + 端口）
+     * DW_ID 模式下 ai-manage 集群内直连默认地址（K8S Service DNS）。
+     * 可通过环境变量 AI_MANAGE_CLUSTER_URL 覆盖（VPC 模式）。
      */
-    private static final String AI_MANAGE_URL_CLUSTER = "http://glsec-ai-manage:20008";
+    private static final String DEFAULT_AI_MANAGE_CLUSTER_URL = "http://glsec-ai-manage:20008";
 
     /**
      * 集群内部 OAuth 服务地址（DW_ID 模式，K8s Service DNS）
@@ -84,17 +86,30 @@ public class PlatformNacosService {
         String path;
 
         if ("ai-manage".equalsIgnoreCase(serviceName)) {
-            path = dwIdMode ? AI_MANAGE_URL_CLUSTER : AI_MANAGE_PATH;
+            path = dwIdMode ? resolveAiManageClusterUrl() : AI_MANAGE_PATH;
         } else if ("esp-user".equalsIgnoreCase(serviceName)) {
             log.debug("[PlatformService] esp-user服务直连网关根路径");
             return baseUrl;
         } else {
             log.warn("[PlatformService] 未知服务名 [{}]，默认使用 ai-manage", serviceName);
-            path = dwIdMode ? AI_MANAGE_URL_CLUSTER : AI_MANAGE_PATH;
+            path = dwIdMode ? resolveAiManageClusterUrl() : AI_MANAGE_PATH;
         }
 
         String fullUrl = baseUrl + path;
         log.debug("[PlatformService] 解析服务 [{}] → {} (dwIdMode={})", serviceName, fullUrl, dwIdMode);
         return fullUrl;
+    }
+
+    /**
+     * 解析 ai-manage 集群内直连地址。
+     * 优先读环境变量 AI_MANAGE_CLUSTER_URL（VPC 模式覆盖），兜底 K8S Service DNS。
+     */
+    private String resolveAiManageClusterUrl() {
+        String env = System.getenv("AI_MANAGE_CLUSTER_URL");
+        if (env != null && !env.isBlank()) {
+            log.info("[PlatformService] AI_MANAGE_CLUSTER_URL from env: {}", env);
+            return env;
+        }
+        return DEFAULT_AI_MANAGE_CLUSTER_URL;
     }
 }
