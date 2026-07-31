@@ -167,7 +167,18 @@ public class DatabaseBootstrapRunner implements ApplicationRunner {
                 return false;
             }
             Integer userCount = jdbcTemplate.queryForObject("SELECT COUNT(1) FROM mate_user", Integer.class);
-            return userCount != null && userCount > 0;
+            if (userCount == null || userCount == 0) {
+                return false;
+            }
+            // 同时检查 Agent 和模型是否已种子化，防止用户表有数据但 Agent/模型表为空
+            // （例如：平台 OAuth 登录自动创建了用户，但种子脚本从未运行，或数据库
+            //  从旧版本迁移时只残留了用户表数据）
+            if (!tableExists("mate_agent") || !tableExists("mate_model_config")) {
+                return false;
+            }
+            Integer agentCount = jdbcTemplate.queryForObject("SELECT COUNT(1) FROM mate_agent", Integer.class);
+            Integer modelCount = jdbcTemplate.queryForObject("SELECT COUNT(1) FROM mate_model_config", Integer.class);
+            return agentCount != null && agentCount > 0 && modelCount != null && modelCount > 0;
         } catch (Exception e) {
             log.warn("Error checking database state", e);
             return false;
